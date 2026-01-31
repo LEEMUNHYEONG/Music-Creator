@@ -342,6 +342,16 @@ window.loadProject = function(projectId) {
             if (styleEl) styleEl.value = manualStylePrompt;
         }
         
+        // 1단계 선택 태그 복원 (장르, 분위기, 시대 등)
+        if (projectData.step1Tags && typeof projectData.step1Tags === 'object' && typeof window.setTagSelections === 'function') {
+            const step1Map = { genre: 'genreTags', mood: 'moodTags', era: 'eraTags', theme: 'themeTags', perspective: 'perspectiveTags', time: 'timeTags', special: 'specialTags', region: 'regionTags' };
+            Object.keys(step1Map).forEach(key => {
+                if (projectData.step1Tags[key] && Array.isArray(projectData.step1Tags[key])) {
+                    window.setTagSelections(step1Map[key], projectData.step1Tags[key]);
+                }
+            });
+        }
+        
         // 2단계: 수노 변환
         // 제목 복원 (2단계)
         if (title) {
@@ -372,6 +382,22 @@ window.loadProject = function(projectId) {
             if (typeof window.renderVocalPartAssignments === 'function') {
                 window.renderVocalPartAssignments();
             }
+        }
+        
+        // 2단계 선택 태그·템포 복원
+        if (projectData.step2Tags && typeof projectData.step2Tags === 'object' && typeof window.setTagSelections === 'function') {
+            const step2Map = { audioFormat: 'audioFormatTags', venue: 'sunoVenueTags', vocalStyle: 'vocalStyle', instruments: 'instrumentTags' };
+            Object.keys(step2Map).forEach(key => {
+                if (projectData.step2Tags[key] && Array.isArray(projectData.step2Tags[key])) {
+                    window.setTagSelections(step2Map[key], projectData.step2Tags[key]);
+                }
+            });
+        }
+        if (projectData.tempo) {
+            const tempoSlider = document.getElementById('tempoSlider');
+            const tempoValue = document.getElementById('tempoValue');
+            if (tempoSlider) tempoSlider.value = projectData.tempo;
+            if (tempoValue) tempoValue.textContent = projectData.tempo;
         }
         
         // 3단계: AI 분석 결과 (저장된 분석이 있으면 로딩 숨기고 결과 표시)
@@ -546,18 +572,21 @@ window.loadProject = function(projectId) {
             }
         }
         
-        // 최종 평가 점수
-        if (projectData.beforeScore !== undefined) {
-            const beforeScoreEl = document.getElementById('beforeScore');
-            if (beforeScoreEl) beforeScoreEl.textContent = projectData.beforeScore;
-        }
-        
-        if (projectData.afterScore !== undefined) {
-            const afterScoreEl = document.getElementById('afterScore');
-            if (afterScoreEl) afterScoreEl.textContent = projectData.afterScore;
-        }
-        
-        if (projectData.aiComment) {
+        // 최종 평가 점수·등급·프로그레스 바 복원
+        if (projectData.beforeScore !== undefined || projectData.afterScore !== undefined) {
+            const before = projectData.beforeScore !== undefined ? projectData.beforeScore : 0;
+            const after = projectData.afterScore !== undefined ? projectData.afterScore : before;
+            if (typeof window.updateFinalEvaluationUI === 'function') {
+                window.updateFinalEvaluationUI(before, after, projectData.aiComment != null ? projectData.aiComment : undefined);
+            } else {
+                const beforeScoreEl = document.getElementById('beforeScore');
+                const afterScoreEl = document.getElementById('afterScore');
+                const aiCommentEl = document.getElementById('aiComment');
+                if (beforeScoreEl) beforeScoreEl.textContent = before;
+                if (afterScoreEl) afterScoreEl.textContent = after;
+                if (projectData.aiComment != null && aiCommentEl) aiCommentEl.textContent = projectData.aiComment;
+            }
+        } else if (projectData.aiComment) {
             const aiCommentEl = document.getElementById('aiComment');
             if (aiCommentEl) aiCommentEl.textContent = projectData.aiComment;
         }
@@ -1215,24 +1244,23 @@ window.goToStep = function(step, saveBefore = false, skipValidation = false) {
                     }
                 }
                 
-                // 최종 평가 점수 복원
-                if (projectData.beforeScore !== undefined) {
-                    const beforeScoreEl = document.getElementById('beforeScore');
-                    if (beforeScoreEl && !beforeScoreEl.textContent) {
-                        beforeScoreEl.textContent = projectData.beforeScore;
+                // 최종 평가 점수·등급·프로그레스 바 복원
+                if (projectData.beforeScore !== undefined || projectData.afterScore !== undefined) {
+                    const before = projectData.beforeScore !== undefined ? projectData.beforeScore : 0;
+                    const after = projectData.afterScore !== undefined ? projectData.afterScore : before;
+                    if (typeof window.updateFinalEvaluationUI === 'function') {
+                        window.updateFinalEvaluationUI(before, after, projectData.aiComment != null ? projectData.aiComment : undefined);
+                    } else {
+                        const beforeScoreEl = document.getElementById('beforeScore');
+                        const afterScoreEl = document.getElementById('afterScore');
+                        const aiCommentEl = document.getElementById('aiComment');
+                        if (beforeScoreEl && !beforeScoreEl.textContent) beforeScoreEl.textContent = before;
+                        if (afterScoreEl && !afterScoreEl.textContent) afterScoreEl.textContent = after;
+                        if (projectData.aiComment && aiCommentEl && !aiCommentEl.textContent) aiCommentEl.textContent = projectData.aiComment;
                     }
-                }
-                if (projectData.afterScore !== undefined) {
-                    const afterScoreEl = document.getElementById('afterScore');
-                    if (afterScoreEl && !afterScoreEl.textContent) {
-                        afterScoreEl.textContent = projectData.afterScore;
-                    }
-                }
-                if (projectData.aiComment) {
+                } else if (projectData.aiComment) {
                     const aiCommentEl = document.getElementById('aiComment');
-                    if (aiCommentEl && !aiCommentEl.textContent) {
-                        aiCommentEl.textContent = projectData.aiComment;
-                    }
+                    if (aiCommentEl && !aiCommentEl.textContent) aiCommentEl.textContent = projectData.aiComment;
                 }
             }
             
@@ -1456,7 +1484,7 @@ window.restoreStepData = function(step) {
         
         switch (step) {
             case 1:
-                // 1단계: 가사 작성
+                // 1단계: 가사 작성 + 선택 태그
                 const title1 = window.currentProject?.title || projectData.title || '';
                 if (title1) {
                     const titleEl = document.getElementById('songTitle');
@@ -1470,10 +1498,18 @@ window.restoreStepData = function(step) {
                     const styleEl = document.getElementById('manualStylePrompt');
                     if (styleEl) styleEl.value = projectData.manualStylePrompt;
                 }
+                if (projectData.step1Tags && typeof projectData.step1Tags === 'object' && typeof window.setTagSelections === 'function') {
+                    const step1Map = { genre: 'genreTags', mood: 'moodTags', era: 'eraTags', theme: 'themeTags', perspective: 'perspectiveTags', time: 'timeTags', special: 'specialTags', region: 'regionTags' };
+                    Object.keys(step1Map).forEach(key => {
+                        if (projectData.step1Tags[key] && Array.isArray(projectData.step1Tags[key])) {
+                            window.setTagSelections(step1Map[key], projectData.step1Tags[key]);
+                        }
+                    });
+                }
                 break;
                 
             case 2:
-                // 2단계: 수노 변환
+                // 2단계: 수노 변환 + 선택 태그·템포
                 const title2 = window.currentProject?.title || projectData.title || '';
                 if (title2) {
                     const sunoTitleEl = document.getElementById('sunoTitle');
@@ -1492,7 +1528,20 @@ window.restoreStepData = function(step) {
                     const stylePromptEl = document.getElementById('stylePrompt');
                     if (stylePromptEl) stylePromptEl.value = projectData.stylePrompt;
                 }
-                // 파트별 보컬 스타일 지정 복원
+                if (projectData.step2Tags && typeof projectData.step2Tags === 'object' && typeof window.setTagSelections === 'function') {
+                    const step2Map = { audioFormat: 'audioFormatTags', venue: 'sunoVenueTags', vocalStyle: 'vocalStyle', instruments: 'instrumentTags' };
+                    Object.keys(step2Map).forEach(key => {
+                        if (projectData.step2Tags[key] && Array.isArray(projectData.step2Tags[key])) {
+                            window.setTagSelections(step2Map[key], projectData.step2Tags[key]);
+                        }
+                    });
+                }
+                if (projectData.tempo) {
+                    const tempoSlider = document.getElementById('tempoSlider');
+                    const tempoValue = document.getElementById('tempoValue');
+                    if (tempoSlider) tempoSlider.value = projectData.tempo;
+                    if (tempoValue) tempoValue.textContent = projectData.tempo;
+                }
                 if (projectData.vocalPartAssignments && typeof projectData.vocalPartAssignments === 'object') {
                     window.vocalPartAssignments = projectData.vocalPartAssignments;
                     if (typeof window.renderVocalPartAssignments === 'function') {
@@ -1594,13 +1643,13 @@ window.restoreStepData = function(step) {
                 break;
                 
             case 4:
-                // 4단계: 최종 확정 (finalLyrics/finalizedLyrics 둘 다 지원)
-                const lyrics4 = projectData.finalLyrics || projectData.finalizedLyrics || '';
+                // 4단계: 최종 확정 (저장 시 finalizedLyrics/finalizedStyle 사용, 호환으로 finalLyrics/finalStyle도 지원)
+                const lyrics4 = projectData.finalizedLyrics || projectData.finalLyrics || '';
                 if (lyrics4) {
                     const finalizedLyricsEl = document.getElementById('finalizedLyrics');
                     if (finalizedLyricsEl) finalizedLyricsEl.value = lyrics4;
                 }
-                const style4 = projectData.finalStyle || projectData.finalizedStyle || '';
+                const style4 = projectData.finalizedStyle || projectData.finalStyle || '';
                 if (style4) {
                     const finalizedStyleEl = document.getElementById('finalizedStyle');
                     if (finalizedStyleEl) finalizedStyleEl.value = style4;
@@ -1608,81 +1657,67 @@ window.restoreStepData = function(step) {
                 break;
                 
             case 5:
-                // 5단계: 최종 출력
-                if (projectData.finalLyrics) {
+                // 5단계: 최종 출력 (finalLyrics/finalStyle 우선, 없으면 finalizedLyrics/finalizedStyle 사용)
+                const finalLyrics5 = projectData.finalLyrics || projectData.finalizedLyrics || '';
+                const finalStyle5 = projectData.finalStyle || projectData.finalizedStyle || '';
+                if (finalLyrics5) {
                     const finalLyricsEl = document.getElementById('finalLyrics');
-                    if (finalLyricsEl) {
-                        finalLyricsEl.textContent = projectData.finalLyrics;
-                    }
-                    // 중간 버전 프리뷰도 복원
+                    if (finalLyricsEl) finalLyricsEl.textContent = finalLyrics5;
                     const intermediateLyricsPreview = document.getElementById('intermediateLyricsPreview');
-                    if (intermediateLyricsPreview) {
-                        intermediateLyricsPreview.textContent = projectData.finalLyrics;
-                    }
+                    if (intermediateLyricsPreview) intermediateLyricsPreview.textContent = finalLyrics5;
                 }
-                if (projectData.finalStyle) {
+                if (finalStyle5) {
                     const finalStyleEl = document.getElementById('finalStyle');
-                    if (finalStyleEl) {
-                        finalStyleEl.textContent = projectData.finalStyle;
-                    }
-                    // 중간 버전 프리뷰도 복원
+                    if (finalStyleEl) finalStyleEl.textContent = finalStyle5;
                     const intermediateStylePreview = document.getElementById('intermediateStylePreview');
-                    if (intermediateStylePreview) {
-                        intermediateStylePreview.textContent = projectData.finalStyle;
-                    }
+                    if (intermediateStylePreview) intermediateStylePreview.textContent = finalStyle5;
                 }
-                // 제목 복원
-                const title = window.currentProject?.title || projectData.title || '';
-                if (title) {
+                const title5 = window.currentProject?.title || projectData.title || '';
+                if (title5) {
                     const finalTitleTextEl = document.getElementById('finalTitleText');
-                    if (finalTitleTextEl) {
-                        finalTitleTextEl.textContent = title;
+                    if (finalTitleTextEl) finalTitleTextEl.textContent = title5;
+                }
+                if (projectData.beforeScore !== undefined || projectData.afterScore !== undefined) {
+                    const before = projectData.beforeScore !== undefined ? projectData.beforeScore : 0;
+                    const after = projectData.afterScore !== undefined ? projectData.afterScore : before;
+                    if (typeof window.updateFinalEvaluationUI === 'function') {
+                        window.updateFinalEvaluationUI(before, after, projectData.aiComment != null ? projectData.aiComment : undefined);
+                    } else {
+                        const beforeScoreEl = document.getElementById('beforeScore');
+                        const afterScoreEl = document.getElementById('afterScore');
+                        const aiCommentEl = document.getElementById('aiComment');
+                        if (beforeScoreEl) beforeScoreEl.textContent = before;
+                        if (afterScoreEl) afterScoreEl.textContent = after;
+                        if (projectData.aiComment != null && aiCommentEl) aiCommentEl.textContent = projectData.aiComment;
                     }
-                }
-                // 최종 평가 점수 복원
-                if (projectData.beforeScore !== undefined) {
-                    const beforeScoreEl = document.getElementById('beforeScore');
-                    if (beforeScoreEl) beforeScoreEl.textContent = projectData.beforeScore;
-                }
-                if (projectData.afterScore !== undefined) {
-                    const afterScoreEl = document.getElementById('afterScore');
-                    if (afterScoreEl) afterScoreEl.textContent = projectData.afterScore;
-                }
-                if (projectData.aiComment) {
+                } else if (projectData.aiComment) {
                     const aiCommentEl = document.getElementById('aiComment');
                     if (aiCommentEl) aiCommentEl.textContent = projectData.aiComment;
                 }
                 break;
                 
             case 6:
-                // 6단계: 마케팅 자료
+                // 6단계: 마케팅 자료 (유튜브/틱톡/해시태그/썸네일 + MV 설정/썸네일·배경·인물 프롬프트/씬 개요)
                 if (projectData.marketing) {
                     const marketing = projectData.marketing;
                     
-                    // 유튜브 설명 복원
                     if (marketing.youtubeDesc) {
                         const youtubeDescEl = document.getElementById('youtubeDesc');
                         if (youtubeDescEl) youtubeDescEl.textContent = marketing.youtubeDesc;
                     }
-                    
-                    // 틱톡 설명 복원
                     if (marketing.tiktokDesc) {
                         const tiktokDescEl = document.getElementById('tiktokDesc');
                         if (tiktokDescEl) tiktokDescEl.textContent = marketing.tiktokDesc;
                     }
-                    
-                    // 해시태그 복원
                     if (marketing.hashtags) {
                         const hashtagsEl = document.getElementById('hashtagsContent');
                         if (hashtagsEl) hashtagsEl.textContent = marketing.hashtags;
                     }
-                    
-                    // 썸네일 문구 복원
                     if (marketing.thumbnails && Array.isArray(marketing.thumbnails) && marketing.thumbnails.length > 0) {
                         const thumbnailsGridEl = document.getElementById('thumbnailsGrid');
                         if (thumbnailsGridEl) {
                             let thumbnailsHtml = '';
-                            marketing.thumbnails.forEach((thumb, index) => {
+                            marketing.thumbnails.forEach((thumb) => {
                                 const thumbnailText = typeof thumb === 'string' ? thumb : (thumb.text || thumb.content || String(thumb));
                                 thumbnailsHtml += `
                                     <div class="thumbnail-item" style="padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s;" 
@@ -1696,6 +1731,140 @@ window.restoreStepData = function(step) {
                             });
                             thumbnailsGridEl.innerHTML = thumbnailsHtml;
                         }
+                    }
+                    
+                    // MV 설정 복원 (시대, 국가, 장소 유형, 인물 수, 조명, 카메라, 분위기, 인물 정보)
+                    if (marketing.mvSettings) {
+                        const mvSettings = marketing.mvSettings;
+                        const setVal = (id, val) => { const el = document.getElementById(id); if (el && val !== undefined && val !== '') el.value = val; };
+                        setVal('mvEra', mvSettings.era);
+                        setVal('mvCountry', mvSettings.country);
+                        setVal('mvCharacterCount', mvSettings.characterCount || '1');
+                        setVal('mvCustomSettings', mvSettings.customSettings);
+                        setVal('mvLighting', mvSettings.lighting);
+                        setVal('mvCameraWork', mvSettings.cameraWork);
+                        setVal('mvMood', mvSettings.mood);
+                        const locationTagsContainer = document.getElementById('mvLocationTags');
+                        if (locationTagsContainer && Array.isArray(mvSettings.location)) {
+                            locationTagsContainer.querySelectorAll('.tag-btn').forEach(btn => {
+                                const v = btn.getAttribute('data-value');
+                                btn.classList.toggle('active', mvSettings.location.indexOf(v) !== -1);
+                            });
+                        }
+                        if (typeof window.updateCharacterInputs === 'function') window.updateCharacterInputs();
+                        if (mvSettings.characters && Array.isArray(mvSettings.characters)) {
+                            mvSettings.characters.forEach((char, idx) => {
+                                const i = idx + 1;
+                                setVal('mvCharacter' + i + '_gender', char.gender);
+                                setVal('mvCharacter' + i + '_age', char.age);
+                                setVal('mvCharacter' + i + '_race', char.race);
+                                setVal('mvCharacter' + i + '_appearance', char.appearance);
+                            });
+                        }
+                        if (typeof window.saveMVSettings === 'function') window.saveMVSettings();
+                    }
+                    
+                    // 썸네일/배경/인물 프롬프트 복원
+                    if (marketing.mvPrompts) {
+                        const mp = marketing.mvPrompts;
+                        const setPrompt = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+                        setPrompt('mvThumbnailPromptEn', mp.thumbnailEn);
+                        setPrompt('mvThumbnailPromptKo', mp.thumbnailKo);
+                        setPrompt('mvBackgroundDetailPromptEn', mp.backgroundDetailEn);
+                        setPrompt('mvBackgroundDetailPromptKo', mp.backgroundDetailKo);
+                        setPrompt('mvCharacterDetailPromptEn', mp.characterDetailEn);
+                        setPrompt('mvCharacterDetailPromptKo', mp.characterDetailKo);
+                    }
+                    
+                    // MV 씬 데이터 복원 및 씬 개요/결과 UI 렌더링
+                    if (marketing.mvScenes && Array.isArray(marketing.mvScenes) && marketing.mvScenes.length > 0) {
+                        window.currentScenes = JSON.parse(JSON.stringify(marketing.mvScenes));
+                        const mvSceneOverviewContainer = document.getElementById('mvSceneOverviewContainer');
+                        const mvPromptsContainer = document.getElementById('mvPromptsContainer');
+                        const mvSceneOverviewSection = document.getElementById('mvSceneOverviewSection');
+                        const mvResultsSection = document.getElementById('mvResultsSection');
+                        if (mvSceneOverviewContainer) {
+                            let html = `
+                                <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);">
+                                    <h3 style="margin: 0 0 10px 0; color: var(--text-primary); font-size: 1.1rem;">
+                                        <i class="fas fa-film"></i> 씬별 개요
+                                    </h3>
+                                    <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem;">각 씬의 배경, 인물, 장소 등을 확인하고 수정할 수 있습니다.</p>
+                                </div>
+                            `;
+                            window.currentScenes.forEach((scene, index) => {
+                                const existingPrompt = (scene.prompt || '').replace(/[가-힣]+/g, '').trim();
+                                const existingPromptKo = scene.promptKo || '';
+                                html += `
+                                    <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);" data-scene-index="${index}">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                            <div style="display: flex; align-items: center; gap: 10px;">
+                                                <h4 style="margin: 0; color: var(--text-primary);">씬 ${index + 1}</h4>
+                                                <span style="color: var(--accent); font-weight: 600;">${scene.time || ''}</span>
+                                            </div>
+                                            <div style="display: flex; gap: 8px;">
+                                                <button class="btn btn-small btn-primary" onclick="regenerateSceneOverviewPrompt(${index})" style="padding: 6px 12px; font-size: 0.8rem;"><i class="fas fa-sync-alt"></i> 재생성</button>
+                                                <button class="btn btn-small btn-secondary" onclick="editSceneOverview(${index})" style="padding: 6px 12px; font-size: 0.8rem;"><i class="fas fa-edit"></i> 수정</button>
+                                                <button id="copySceneOverviewBtn_${index}" class="btn btn-small btn-success" onclick="copySceneOverviewPromptEn(${index}, event)" style="padding: 6px 12px; font-size: 0.8rem;"><i class="fas fa-copy"></i> 복사</button>
+                                            </div>
+                                        </div>
+                                        <div style="margin-bottom: 10px;">
+                                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">장면 설명:</label>
+                                            <textarea class="scene-description" data-index="${index}" data-scene-index="${index}" style="width: 100%; min-height: 80px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; resize: vertical;">${escapeHtml(scene.scene || '')}</textarea>
+                                        </div>
+                                        <div style="margin-bottom: 10px;">
+                                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">영어 프롬프트:</label>
+                                            <textarea id="scene_overview_${index}_en" class="scene-prompt-en-overview" data-index="${index}" data-scene-index="${index}" style="width: 100%; min-height: 120px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; font-family: monospace; resize: vertical;">${escapeHtml(existingPrompt)}</textarea>
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">한글 프롬프트:</label>
+                                            <textarea id="scene_overview_${index}_ko" class="scene-prompt-ko-overview" data-index="${index}" data-scene-index="${index}" style="width: 100%; min-height: 120px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; resize: vertical;">${escapeHtml(existingPromptKo)}</textarea>
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                            if (mvSceneOverviewContainer) mvSceneOverviewContainer.innerHTML = html;
+                        }
+                        if (mvSceneOverviewSection) mvSceneOverviewSection.style.display = 'block';
+                        if (mvResultsSection) mvResultsSection.style.display = 'block';
+                        if (mvPromptsContainer && window.currentScenes.length > 0) {
+                            let resultHtml = '';
+                            window.currentScenes.forEach((scene, index) => {
+                                const sceneId = 'scene_' + index;
+                                const scenePromptEn = (scene.prompt || '').replace(/\/\*\s*Scene\s+\d+\s*\*\/\s*/gi, '').trim();
+                                const scenePromptKo = scene.promptKo || '';
+                                resultHtml += `
+                                    <div class="mv-prompt-item" style="margin-bottom: 25px; padding: 20px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border);">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                            <h4 style="margin: 0; color: var(--text-primary); font-size: 1.1rem;">씬 ${index + 1}</h4>
+                                            <div style="display: flex; gap: 8px; align-items: center;">
+                                                <span style="color: var(--accent); font-weight: 600; font-size: 0.9rem;">${scene.time || ''}</span>
+                                                <button class="btn btn-small btn-primary" onclick="regenerateScenePrompt(${index})" style="padding: 4px 8px; font-size: 0.75rem;">재생성</button>
+                                                <button class="btn btn-small btn-success" onclick="saveScenePrompt(${index})" style="padding: 4px 8px; font-size: 0.75rem;">저장</button>
+                                            </div>
+                                        </div>
+                                        <div style="margin-bottom: 15px; padding: 12px; background: var(--bg-input); border-radius: 6px;">
+                                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">장면:</div>
+                                            <div style="color: var(--text-primary);">${escapeHtml(scene.scene || '')}</div>
+                                        </div>
+                                        <div style="margin-bottom: 10px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                                <label style="font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">영어 프롬프트</label>
+                                                <button id="copyScenePromptBtn_${index}" class="btn btn-small btn-success" onclick="copyScenePromptEn(${index}, event)" style="padding: 4px 10px; font-size: 0.75rem;"><i class="fas fa-copy"></i> 복사</button>
+                                            </div>
+                                            <textarea id="${sceneId}_en" class="scene-prompt-en" data-scene-index="${index}" style="width: 100%; min-height: 100px; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; font-family: monospace; font-size: 0.9rem; color: var(--text-primary); resize: vertical;">${escapeHtml(scenePromptEn)}</textarea>
+                                        </div>
+                                        <div>
+                                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">한글 번역본</label>
+                                            <textarea id="${sceneId}_ko" class="scene-prompt-ko" data-scene-index="${index}" style="width: 100%; min-height: 100px; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; color: var(--text-primary); resize: vertical;">${escapeHtml(scenePromptKo)}</textarea>
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                            mvPromptsContainer.innerHTML = resultHtml;
+                        }
+                        const totalImagesEl = document.getElementById('mvTotalImages');
+                        if (totalImagesEl) totalImagesEl.textContent = window.currentScenes.length;
                     }
                 }
                 break;
@@ -1746,10 +1915,31 @@ window.saveCurrentProject = function() {
         project.data.originalLyrics = (document.getElementById('originalLyrics')?.value || '').trim() || existing.originalLyrics || '';
         project.data.manualStylePrompt = (document.getElementById('manualStylePrompt')?.value || '').trim() || existing.manualStylePrompt || '';
         
+        // 1단계 선택 태그 저장 (장르, 분위기, 시대, 테마 등)
+        const step1TagIds = ['genreTags', 'moodTags', 'eraTags', 'themeTags', 'perspectiveTags', 'timeTags', 'specialTags', 'regionTags'];
+        project.data.step1Tags = (existing.step1Tags && typeof existing.step1Tags === 'object') ? { ...existing.step1Tags } : {};
+        step1TagIds.forEach(id => {
+            const key = id.replace('Tags', '');
+            const vals = (typeof getSelectedTags === 'function' ? getSelectedTags(id) : []);
+            if (vals.length > 0) project.data.step1Tags[key] = vals;
+        });
+        
         // 2단계: 수노 변환 (DOM 값이 있으면 사용, 없으면 기존 데이터 유지)
         const sunoTitle = document.getElementById('sunoTitle')?.value || document.getElementById('songTitle')?.value || '';
         project.data.sunoLyrics = (document.getElementById('sunoLyrics')?.value || '').trim() || existing.sunoLyrics || '';
         project.data.stylePrompt = (document.getElementById('stylePrompt')?.value || '').trim() || existing.stylePrompt || '';
+        
+        // 2단계 선택 태그·템포 저장
+        const step2TagIds = ['audioFormatTags', 'sunoVenueTags', 'vocalStyle', 'instrumentTags'];
+        project.data.step2Tags = (existing.step2Tags && typeof existing.step2Tags === 'object') ? { ...existing.step2Tags } : {};
+        step2TagIds.forEach(id => {
+            const key = id === 'sunoVenueTags' ? 'venue' : id === 'audioFormatTags' ? 'audioFormat' : id === 'instrumentTags' ? 'instruments' : id === 'vocalStyle' ? 'vocalStyle' : id;
+            const vals = (typeof getSelectedTags === 'function' ? getSelectedTags(id) : []);
+            if (vals.length > 0) project.data.step2Tags[key] = vals;
+        });
+        const tempoVal = document.getElementById('tempoSlider')?.value || document.getElementById('tempoValue')?.textContent || '';
+        if (tempoVal) project.data.tempo = tempoVal;
+        else if (existing.tempo) project.data.tempo = existing.tempo;
         
         // 2단계 파트별 보컬 스타일 지정 저장
         if (window.vocalPartAssignments && typeof window.vocalPartAssignments === 'object') {
@@ -1797,6 +1987,11 @@ window.saveCurrentProject = function() {
         const existingMarketing = existing.marketing || {};
         project.data.marketing = { ...existingMarketing };
         
+        // 현재 활성 단계 확인 (다른 단계에서 저장 시 6단계 데이터 덮어쓰기 방지)
+        const activePanel = document.querySelector('.panel.active');
+        const currentStep = activePanel && activePanel.id && activePanel.id.match(/panel(\d+)/) ? parseInt(activePanel.id.replace('panel', ''), 10) : 0;
+        const isOnStep6 = (currentStep === 6);
+        
         const youtubeDescEl = document.getElementById('youtubeDesc');
         const youtubeVal = youtubeDescEl?.textContent?.trim() || '';
         if (youtubeVal) project.data.marketing.youtubeDesc = youtubeVal;
@@ -1832,78 +2027,70 @@ window.saveCurrentProject = function() {
             project.data.marketing.thumbnails = existingMarketing.thumbnails;
         }
         
-        // MV 프롬프트 데이터 (이미 window.currentProject.data.marketing에 있을 수 있음)
-        // MV 설정 수집
-        const mvSettings = {
-            era: document.getElementById('mvEra')?.value || '',
-            country: document.getElementById('mvCountry')?.value || '',
-            location: (typeof window.getMVLocationValues === 'function' ? window.getMVLocationValues() : []),
-            characterCount: document.getElementById('mvCharacterCount')?.value || '1',
-            customSettings: document.getElementById('mvCustomSettings')?.value || '',
-            lighting: document.getElementById('mvLighting')?.value || '',
-            cameraWork: document.getElementById('mvCameraWork')?.value || '',
-            mood: document.getElementById('mvMood')?.value || ''
-        };
-        
-        // 인물 정보 수집 (저장/로드 스키마 일치: gender, age, race, appearance)
-        const characterCount = parseInt(mvSettings.characterCount) || 1;
-        const characters = [];
-        for (let i = 1; i <= characterCount; i++) {
-            const gender = document.getElementById(`mvCharacter${i}_gender`)?.value || '';
-            const age = document.getElementById(`mvCharacter${i}_age`)?.value || '';
-            const race = document.getElementById(`mvCharacter${i}_race`)?.value || '';
-            const appearance = document.getElementById(`mvCharacter${i}_appearance`)?.value || '';
-            if (gender || age || race || appearance) {
-                characters.push({ gender, age, race, appearance });
+        // MV 설정/프롬프트/씬: 6단계일 때만 DOM에서 수집, 아니면 기존 저장값 유지
+        if (isOnStep6) {
+            const mvSettings = {
+                era: document.getElementById('mvEra')?.value || '',
+                country: document.getElementById('mvCountry')?.value || '',
+                location: (typeof window.getMVLocationValues === 'function' ? window.getMVLocationValues() : []),
+                characterCount: document.getElementById('mvCharacterCount')?.value || '1',
+                customSettings: document.getElementById('mvCustomSettings')?.value || '',
+                lighting: document.getElementById('mvLighting')?.value || '',
+                cameraWork: document.getElementById('mvCameraWork')?.value || '',
+                mood: document.getElementById('mvMood')?.value || ''
+            };
+            const characterCount = parseInt(mvSettings.characterCount) || 1;
+            const characters = [];
+            for (let i = 1; i <= characterCount; i++) {
+                const gender = document.getElementById(`mvCharacter${i}_gender`)?.value || '';
+                const age = document.getElementById(`mvCharacter${i}_age`)?.value || '';
+                const race = document.getElementById(`mvCharacter${i}_race`)?.value || '';
+                const appearance = document.getElementById(`mvCharacter${i}_appearance`)?.value || '';
+                if (gender || age || race || appearance) {
+                    characters.push({ gender, age, race, appearance });
+                }
+            }
+            mvSettings.characters = characters;
+            project.data.marketing.mvSettings = mvSettings;
+            
+            const mvPrompts = {
+                thumbnailEn: document.getElementById('mvThumbnailPromptEn')?.value || '',
+                thumbnailKo: document.getElementById('mvThumbnailPromptKo')?.value || '',
+                backgroundDetailEn: document.getElementById('mvBackgroundDetailPromptEn')?.value || '',
+                backgroundDetailKo: document.getElementById('mvBackgroundDetailPromptKo')?.value || '',
+                characterDetailEn: document.getElementById('mvCharacterDetailPromptEn')?.value || '',
+                characterDetailKo: document.getElementById('mvCharacterDetailPromptKo')?.value || ''
+            };
+            project.data.marketing.mvPrompts = mvPrompts;
+            
+            if (window.currentScenes && window.currentScenes.length > 0) {
+                const descriptions = document.querySelectorAll('.scene-description');
+                descriptions.forEach((desc, index) => {
+                    if (window.currentScenes[index]) {
+                        window.currentScenes[index].scene = desc.value;
+                    }
+                });
+                window.currentScenes.forEach((scene, index) => {
+                    const enEl = document.getElementById(`scene_overview_${index}_en`);
+                    const koEl = document.getElementById(`scene_overview_${index}_ko`);
+                    if (enEl) window.currentScenes[index].prompt = enEl.value;
+                    if (koEl) window.currentScenes[index].promptKo = koEl.value;
+                });
+                project.data.marketing.mvScenes = JSON.parse(JSON.stringify(window.currentScenes));
+            }
+        } else {
+            if (existingMarketing.mvSettings) project.data.marketing.mvSettings = existingMarketing.mvSettings;
+            if (existingMarketing.mvPrompts) project.data.marketing.mvPrompts = existingMarketing.mvPrompts;
+            if (existingMarketing.mvScenes && Array.isArray(existingMarketing.mvScenes)) {
+                project.data.marketing.mvScenes = existingMarketing.mvScenes;
             }
         }
-        mvSettings.characters = characters;
-        
-        // 썸네일/배경/인물 프롬프트 수집
-        const mvPrompts = {
-            thumbnailEn: document.getElementById('mvThumbnailPromptEn')?.value || '',
-            thumbnailKo: document.getElementById('mvThumbnailPromptKo')?.value || '',
-            backgroundDetailEn: document.getElementById('mvBackgroundDetailPromptEn')?.value || '',
-            backgroundDetailKo: document.getElementById('mvBackgroundDetailPromptKo')?.value || '',
-            characterDetailEn: document.getElementById('mvCharacterDetailPromptEn')?.value || '',
-            characterDetailKo: document.getElementById('mvCharacterDetailPromptKo')?.value || ''
-        };
-        
-        // MV 씬 데이터 수집 (씬 개요 섹션에서)
-        if (window.currentScenes && window.currentScenes.length > 0) {
-            // 씬 개요 섹션의 최신 데이터 수집
-            const descriptions = document.querySelectorAll('.scene-description');
-            descriptions.forEach((desc, index) => {
-                if (window.currentScenes[index]) {
-                    window.currentScenes[index].scene = desc.value;
-                }
-            });
-            
-            // 영어/한글 프롬프트 수집
-            window.currentScenes.forEach((scene, index) => {
-                const enEl = document.getElementById(`scene_overview_${index}_en`);
-                const koEl = document.getElementById(`scene_overview_${index}_ko`);
-                
-                if (enEl) {
-                    window.currentScenes[index].prompt = enEl.value;
-                }
-                if (koEl) {
-                    window.currentScenes[index].promptKo = koEl.value;
-                }
-            });
-            
-            project.data.marketing.mvScenes = JSON.parse(JSON.stringify(window.currentScenes));
-        }
-        
-        // MV 설정 및 프롬프트 저장
-        project.data.marketing.mvSettings = mvSettings;
-        project.data.marketing.mvPrompts = mvPrompts;
         
         // 현재 활성화된 단계 확인 (이미 도달한 단계보다 낮은 값으로 덮어쓰지 않음)
-        const activePanel = document.querySelector('.panel.active');
+        const activePanelForLastStep = document.querySelector('.panel.active');
         const existingLastStep = Math.max(1, parseInt(project.lastStep, 10) || 1);
-        if (activePanel) {
-            const panelId = activePanel.id;
+        if (activePanelForLastStep) {
+            const panelId = activePanelForLastStep.id;
             const stepMatch = panelId.match(/panel(\d+)/);
             if (stepMatch) {
                 const currentStep = parseInt(stepMatch[1], 10);
@@ -2579,6 +2766,27 @@ if (document.readyState === 'loading') {
 window.addEventListener('resize', function() {
     if (typeof window.updateMainContentPosition === 'function') {
         window.updateMainContentPosition();
+    }
+});
+
+// 페이지 종료/새로고침 시 현재 프로젝트 자동 저장 (1~6단계 작업 상태 유지)
+window.addEventListener('beforeunload', function() {
+    try {
+        if (typeof window.saveCurrentProject !== 'function') return;
+        if (window.currentProjectId) {
+            window.saveCurrentProject();
+            return;
+        }
+        // 프로젝트 없어도 1단계 이상 내용이 있으면 새 프로젝트 생성 후 저장
+        const hasContent = (document.getElementById('songTitle')?.value || '').trim() ||
+            (document.getElementById('originalLyrics')?.value || '').trim() ||
+            (document.getElementById('sunoLyrics')?.value || '').trim();
+        if (hasContent) {
+            window.currentProjectId = 'proj_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            window.saveCurrentProject();
+        }
+    } catch (e) {
+        console.warn('자동 저장 실패:', e);
     }
 });
 
@@ -5151,6 +5359,39 @@ window.confirmFinalizedContent = function() {
 // ═══════════════════════════════════════════════════════════════
 // 5단계: 최종 평가 요약 생성 함수
 // ═══════════════════════════════════════════════════════════════
+/** 점수(0-100)로 등급 문자열 반환 */
+function getGradeFromScore(score) {
+    const n = Math.min(100, Math.max(0, parseInt(score, 10) || 0));
+    if (n >= 95) return 'S+';
+    if (n >= 90) return 'S';
+    if (n >= 85) return 'A+';
+    if (n >= 80) return 'A';
+    if (n >= 75) return 'B+';
+    if (n >= 70) return 'B';
+    if (n >= 65) return 'C+';
+    if (n >= 60) return 'C';
+    if (n >= 50) return 'D';
+    return 'F';
+}
+
+/** 최종 평가 요약 UI만 갱신 (수치, 등급, 프로그레스 바) */
+window.updateFinalEvaluationUI = function(beforeScoreVal, afterScoreVal, aiCommentText) {
+    const beforeScoreEl = document.getElementById('beforeScore');
+    const afterScoreEl = document.getElementById('afterScore');
+    const finalGradeEl = document.getElementById('finalGrade');
+    const beforeBar = document.getElementById('beforeScoreBar');
+    const afterBar = document.getElementById('afterScoreBar');
+    const aiCommentEl = document.getElementById('aiComment');
+    const before = Math.min(100, Math.max(0, parseInt(beforeScoreVal, 10) || 0));
+    const after = Math.min(100, Math.max(0, parseInt(afterScoreVal, 10) || 0));
+    if (beforeScoreEl) beforeScoreEl.textContent = before;
+    if (afterScoreEl) afterScoreEl.textContent = after;
+    if (finalGradeEl) finalGradeEl.textContent = getGradeFromScore(after);
+    if (beforeBar) beforeBar.style.width = before + '%';
+    if (afterBar) afterBar.style.width = after + '%';
+    if (aiCommentText != null && aiCommentEl) aiCommentEl.textContent = aiCommentText;
+};
+
 window.generateFinalEvaluation = async function() {
     try {
         const beforeScoreEl = document.getElementById('beforeScore');
@@ -5179,25 +5420,14 @@ window.generateFinalEvaluation = async function() {
         
         if (!finalLyrics.trim()) {
             console.warn('⚠️ 최종 가사가 없어 평가를 생성할 수 없습니다.');
-            // 기본값 설정 (3단계 분석 결과 사용)
-            if (beforeScoreEl) beforeScoreEl.textContent = beforeScore || 0;
-            if (afterScoreEl) afterScoreEl.textContent = beforeScore || 0;
-            if (aiCommentEl) {
-                aiCommentEl.textContent = '최종 가사가 없어 평가를 생성할 수 없습니다.\n\n4-5단계에서 최종 가사를 확인한 후 다시 시도해주세요.';
-            }
-            if (finalGradeEl) {
-                let grade = '-';
-                if (beforeScore >= 95) grade = 'S+';
-                else if (beforeScore >= 90) grade = 'S';
-                else if (beforeScore >= 85) grade = 'A+';
-                else if (beforeScore >= 80) grade = 'A';
-                else if (beforeScore >= 75) grade = 'B+';
-                else if (beforeScore >= 70) grade = 'B';
-                else if (beforeScore >= 65) grade = 'C+';
-                else if (beforeScore >= 60) grade = 'C';
-                else if (beforeScore >= 50) grade = 'D';
-                else grade = 'F';
-                finalGradeEl.textContent = grade;
+            const def = Math.min(100, Math.max(0, parseInt(beforeScore, 10) || 0));
+            if (typeof window.updateFinalEvaluationUI === 'function') {
+                window.updateFinalEvaluationUI(def, def, '최종 가사가 없어 평가를 생성할 수 없습니다.\n\n4-5단계에서 최종 가사를 확인한 후 다시 시도해주세요.');
+            } else {
+                if (beforeScoreEl) beforeScoreEl.textContent = def;
+                if (afterScoreEl) afterScoreEl.textContent = def;
+                if (aiCommentEl) aiCommentEl.textContent = '최종 가사가 없어 평가를 생성할 수 없습니다.\n\n4-5단계에서 최종 가사를 확인한 후 다시 시도해주세요.';
+                if (finalGradeEl) finalGradeEl.textContent = getGradeFromScore(def);
             }
             return;
         }
@@ -5206,10 +5436,14 @@ window.generateFinalEvaluation = async function() {
         const geminiKey = localStorage.getItem('gemini_api_key') || '';
         if (!geminiKey || !geminiKey.startsWith('AIza')) {
             console.warn('⚠️ Gemini API 키가 없어 평가를 생성할 수 없습니다.');
-            // 기본값 설정 (3단계 분석 결과 사용)
-            if (beforeScoreEl) beforeScoreEl.textContent = beforeScore || 0;
-            if (afterScoreEl) afterScoreEl.textContent = beforeScore || 0;
-            if (aiCommentEl) aiCommentEl.textContent = 'Gemini API 키를 설정하면 자동으로 최종 평가를 생성할 수 있습니다.';
+            const def = Math.min(100, Math.max(0, parseInt(beforeScore, 10) || 0));
+            if (typeof window.updateFinalEvaluationUI === 'function') {
+                window.updateFinalEvaluationUI(def, def, 'Gemini API 키를 설정하면 자동으로 최종 평가를 생성할 수 있습니다.');
+            } else {
+                if (beforeScoreEl) beforeScoreEl.textContent = def;
+                if (afterScoreEl) afterScoreEl.textContent = def;
+                if (aiCommentEl) aiCommentEl.textContent = 'Gemini API 키를 설정하면 자동으로 최종 평가를 생성할 수 있습니다.';
+            }
             return;
         }
         
@@ -5313,38 +5547,17 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? '...' : ''}
             };
         }
         
-        // 점수 설정
-        const beforeScoreValue = evaluationData.beforeScore || beforeScore || 0;
-        const afterScoreValue = evaluationData.afterScore || beforeScore || 0;
+        // 점수 정수화 (0-100) 후 UI 갱신 (수치·등급·프로그레스 바)
+        const beforeScoreValue = Math.min(100, Math.max(0, parseInt(evaluationData.beforeScore ?? beforeScore, 10) || 0));
+        const afterScoreValue = Math.min(100, Math.max(0, parseInt(evaluationData.afterScore ?? beforeScore, 10) || 0));
         
-        if (beforeScoreEl) {
-            beforeScoreEl.textContent = beforeScoreValue;
-        }
-        
-        if (afterScoreEl) {
-            afterScoreEl.textContent = afterScoreValue;
-        }
-        
-        // 등급 계산 및 표시
-        if (finalGradeEl) {
-            let grade = '-';
-            if (afterScoreValue >= 95) grade = 'S+';
-            else if (afterScoreValue >= 90) grade = 'S';
-            else if (afterScoreValue >= 85) grade = 'A+';
-            else if (afterScoreValue >= 80) grade = 'A';
-            else if (afterScoreValue >= 75) grade = 'B+';
-            else if (afterScoreValue >= 70) grade = 'B';
-            else if (afterScoreValue >= 65) grade = 'C+';
-            else if (afterScoreValue >= 60) grade = 'C';
-            else if (afterScoreValue >= 50) grade = 'D';
-            else grade = 'F';
-            
-            finalGradeEl.textContent = grade;
-        }
-        
-        // AI 코멘트 설정
-        if (aiCommentEl) {
-            aiCommentEl.textContent = evaluationData.aiComment || '평가 코멘트를 생성할 수 없습니다.';
+        if (typeof window.updateFinalEvaluationUI === 'function') {
+            window.updateFinalEvaluationUI(beforeScoreValue, afterScoreValue, evaluationData.aiComment || '평가 코멘트를 생성할 수 없습니다.');
+        } else {
+            if (beforeScoreEl) beforeScoreEl.textContent = beforeScoreValue;
+            if (afterScoreEl) afterScoreEl.textContent = afterScoreValue;
+            if (finalGradeEl) finalGradeEl.textContent = getGradeFromScore(afterScoreValue);
+            if (aiCommentEl) aiCommentEl.textContent = evaluationData.aiComment || '평가 코멘트를 생성할 수 없습니다.';
         }
         
         // 프로젝트 데이터에 저장
@@ -5364,19 +5577,17 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? '...' : ''}
         
     } catch (error) {
         console.error('❌ 최종 평가 생성 오류:', error);
-        
-        // 오류 시 기본값 설정
-        const beforeScoreEl = document.getElementById('beforeScore');
-        const afterScoreEl = document.getElementById('afterScore');
-        const aiCommentEl = document.getElementById('aiComment');
-        
         const analysisData = window.currentProject?.data?.analysis;
-        const defaultScore = analysisData?.scores?.overall || analysisData?.scores?.overallScore || 0;
-        
-        if (beforeScoreEl) beforeScoreEl.textContent = defaultScore;
-        if (afterScoreEl) afterScoreEl.textContent = defaultScore;
-        if (aiCommentEl) {
-            aiCommentEl.textContent = '평가를 생성하는 중 오류가 발생했습니다. ' + error.message;
+        const defaultScore = Math.min(100, Math.max(0, parseInt(analysisData?.scores?.overall ?? analysisData?.scores?.overallScore ?? 0, 10) || 0));
+        if (typeof window.updateFinalEvaluationUI === 'function') {
+            window.updateFinalEvaluationUI(defaultScore, defaultScore, '평가를 생성하는 중 오류가 발생했습니다. ' + error.message);
+        } else {
+            const beforeScoreEl = document.getElementById('beforeScore');
+            const afterScoreEl = document.getElementById('afterScore');
+            const aiCommentEl = document.getElementById('aiComment');
+            if (beforeScoreEl) beforeScoreEl.textContent = defaultScore;
+            if (afterScoreEl) afterScoreEl.textContent = defaultScore;
+            if (aiCommentEl) aiCommentEl.textContent = '평가를 생성하는 중 오류가 발생했습니다. ' + error.message;
         }
     }
 };
@@ -5931,6 +6142,18 @@ function getSelectedTags(containerId) {
     
     return tags;
 }
+
+// 저장된 태그 선택 복원 (containerId 내 .tag-btn에 values에 있으면 .active 부여)
+window.setTagSelections = function(containerId, values) {
+    if (!values || !Array.isArray(values) || values.length === 0) return;
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.querySelectorAll('.tag-btn').forEach(btn => {
+        if (btn.classList.contains('custom-tag-btn')) return;
+        const v = btn.getAttribute('data-value') || btn.textContent.trim();
+        btn.classList.toggle('active', values.indexOf(v) !== -1);
+    });
+};
 
 // ═══════════════════════════════════════════════════════════════
 // 파트별 보컬 스타일 지정 함수들

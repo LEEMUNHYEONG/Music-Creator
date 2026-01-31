@@ -425,6 +425,90 @@ header {
     }
 }
 
+/* 5단계: 최종 평가 요약 (개선 전/후 수치·그래프) */
+.eval-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: stretch;
+}
+.eval-score-card {
+    padding: 16px 18px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.eval-before {
+    background: rgba(255, 82, 82, 0.08);
+    border: 1px solid rgba(255, 82, 82, 0.2);
+}
+.eval-after {
+    background: rgba(0, 230, 118, 0.08);
+    border: 1px solid rgba(0, 230, 118, 0.25);
+}
+.eval-score-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+}
+.eval-score-row {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.eval-score-value {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+.eval-after .eval-score-value {
+    background: linear-gradient(135deg, #00e676 0%, #00e5ff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.eval-score-unit {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+.eval-grade-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    background: var(--success);
+    color: #fff;
+    margin-left: 4px;
+}
+.eval-progress-wrap {
+    margin-top: 4px;
+}
+.eval-progress-bar {
+    height: 8px;
+    background: var(--bg-input);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.eval-progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: rgba(255, 82, 82, 0.6);
+    transition: width 0.4s ease;
+}
+.eval-after-fill {
+    background: linear-gradient(90deg, #00e676, #00e5ff);
+}
+@media (max-width: 1024px) {
+    .eval-summary {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* 카드 & 폼 */
 .card {
     background: var(--bg-card);

@@ -2234,17 +2234,31 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                     </div>
                 </div>
 
-                <div class="two-column">
-                    <div class="total-score" style="background: rgba(255, 82, 82, 0.1);">
-                        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px;">개선 전</div>
-                        <div class="total-score-value" id="beforeScore" style="font-size: 2.5rem;">0</div>
-                        <div class="total-score-label">점</div>
+                <div class="eval-summary two-column">
+                    <div class="eval-score-card eval-before">
+                        <div class="eval-score-label">개선 전</div>
+                        <div class="eval-score-row">
+                            <span class="eval-score-value" id="beforeScore">0</span>
+                            <span class="eval-score-unit">점</span>
+                        </div>
+                        <div class="eval-progress-wrap" aria-hidden="true">
+                            <div class="eval-progress-bar" role="presentation">
+                                <div class="eval-progress-fill" id="beforeScoreBar" style="width: 0%;"></div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="total-score" style="background: rgba(0, 230, 118, 0.1);">
-                        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px;">개선 후</div>
-                        <div class="total-score-value" id="afterScore" style="font-size: 2.5rem; background: linear-gradient(135deg, #00e676 0%, #00e5ff 100%); -webkit-background-clip: text; background-clip: text;">0</div>
-                        <div class="total-score-label">점</div>
-                        <div class="grade-badge" id="finalGrade" style="background: var(--success);">-</div>
+                    <div class="eval-score-card eval-after">
+                        <div class="eval-score-label">개선 후</div>
+                        <div class="eval-score-row">
+                            <span class="eval-score-value" id="afterScore">0</span>
+                            <span class="eval-score-unit">점</span>
+                            <span class="eval-grade-badge" id="finalGrade">-</span>
+                        </div>
+                        <div class="eval-progress-wrap" aria-hidden="true">
+                            <div class="eval-progress-bar" role="presentation">
+                                <div class="eval-progress-fill eval-after-fill" id="afterScoreBar" style="width: 0%;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -3870,18 +3884,21 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                         }
                     }
                     
-                    // 최종 평가 점수
-                    if (projectData.beforeScore !== undefined) {
-                        const beforeScoreEl = document.getElementById('beforeScore');
-                        if (beforeScoreEl) beforeScoreEl.textContent = projectData.beforeScore;
-                    }
-                    
-                    if (projectData.afterScore !== undefined) {
-                        const afterScoreEl = document.getElementById('afterScore');
-                        if (afterScoreEl) afterScoreEl.textContent = projectData.afterScore;
-                    }
-                    
-                    if (projectData.aiComment) {
+                    // 최종 평가 점수·등급·프로그레스 바
+                    if (projectData.beforeScore !== undefined || projectData.afterScore !== undefined) {
+                        const before = projectData.beforeScore !== undefined ? projectData.beforeScore : 0;
+                        const after = projectData.afterScore !== undefined ? projectData.afterScore : before;
+                        if (typeof window.updateFinalEvaluationUI === 'function') {
+                            window.updateFinalEvaluationUI(before, after, projectData.aiComment != null ? projectData.aiComment : undefined);
+                        } else {
+                            const beforeScoreEl = document.getElementById('beforeScore');
+                            const afterScoreEl = document.getElementById('afterScore');
+                            const aiCommentEl = document.getElementById('aiComment');
+                            if (beforeScoreEl) beforeScoreEl.textContent = before;
+                            if (afterScoreEl) afterScoreEl.textContent = after;
+                            if (projectData.aiComment != null && aiCommentEl) aiCommentEl.textContent = projectData.aiComment;
+                        }
+                    } else if (projectData.aiComment) {
                         const aiCommentEl = document.getElementById('aiComment');
                         if (aiCommentEl) aiCommentEl.textContent = projectData.aiComment;
                     }
