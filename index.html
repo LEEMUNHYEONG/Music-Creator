@@ -289,6 +289,10 @@
                     aria-label="현재 프로젝트 저장">
                 <i class="fas fa-save" aria-hidden="true"></i> 현재 프로젝트 저장
             </button>
+            <button class="btn btn-secondary btn-small" onclick="if(typeof window.saveAndClose === 'function') { window.saveAndClose(); } else { alert('저장 후 닫기 기능을 사용할 수 없습니다.'); }" style="width: 100%; margin-top: 8px;"
+                    aria-label="저장 후 닫기" title="모든 내용 저장 후 창을 닫습니다">
+                <i class="fas fa-save"></i> 저장 후 닫기
+            </button>
         </div>
 
         <div class="sidebar-search">
@@ -3839,9 +3843,9 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                         }
                     }
                     
-                    // 4단계: 개선안 반영 및 확정
-                    const finalLyrics = projectData.finalLyrics || foundProject.finalLyrics || foundProject.finalizedLyrics || '';
-                    const finalStyle = projectData.finalStyle || foundProject.finalStyle || foundProject.finalizedStyle || '';
+                    // 4단계: 개선안 반영 및 확정 (우선순위: finalizedLyrics > finalLyrics)
+                    const finalLyrics = projectData.finalizedLyrics || foundProject.finalizedLyrics || projectData.finalLyrics || foundProject.finalLyrics || '';
+                    const finalStyle = projectData.finalizedStyle || foundProject.finalizedStyle || projectData.finalStyle || foundProject.finalStyle || '';
                     
                     if (finalLyrics || finalStyle || projectData.improvements) {
                         const improvementCard = document.getElementById('improvementCard');

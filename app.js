@@ -247,6 +247,7 @@ window.editMode = false;  // 수정 모드 상태 (false = 읽기 전용, true =
 
 // ═══════════════════════════════════════════════════════════════
 // 프로젝트 로드 함수 (모든 단계 데이터 포함)
+// 불러오면 저장된 1~6단계 전체 상태가 그대로 복원됩니다 (각 단계별 저장·현재 프로젝트 저장 모두 동일).
 // ═══════════════════════════════════════════════════════════════
 window.loadProject = function(projectId) {
     try {
@@ -261,13 +262,12 @@ window.loadProject = function(projectId) {
             mvPromptsContainer.innerHTML = '';
         }
         
-        // localStorage에서 모든 프로젝트 데이터 찾기
+        // localStorage에서 프로젝트 찾기 (우선순위: musicCreatorProjects > savedProjects > sunoLyricsHistory > stylePromptHistory)
+        // 같은 프로젝트가 여러 키에 있으면 4·5단계 데이터가 있는 버전을 우선 사용
         let foundProject = null;
+        const projectKeys = ['musicCreatorProjects', 'savedProjects', 'sunoLyricsHistory', 'stylePromptHistory'];
         
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (!key) continue;
-            
+        for (const key of projectKeys) {
             try {
                 const data = localStorage.getItem(key);
                 if (!data) continue;
@@ -277,19 +277,62 @@ window.loadProject = function(projectId) {
                     if (Array.isArray(parsed)) {
                         const project = parsed.find(p => p && p.id === projectId);
                         if (project) {
-                            foundProject = project;
-                            break;
+                            if (!foundProject) {
+                                foundProject = project;
+                            } else {
+                                // 이미 찾은 버전보다 4·5단계 데이터가 더 완전하면 교체
+                                const pd = (project.data || project);
+                                const existingPd = (foundProject.data || foundProject);
+                                const hasMore = !!(pd.finalLyrics || pd.finalizedLyrics || pd.finalStyle || pd.finalizedStyle);
+                                const existingHas = !!(existingPd.finalLyrics || existingPd.finalizedLyrics || existingPd.finalStyle || existingPd.finalizedStyle);
+                                const newer = (new Date(pd.savedAt || project.savedAt || 0) > new Date(existingPd.savedAt || foundProject.savedAt || 0));
+                                if ((hasMore && !existingHas) || (hasMore && newer) || (!existingHas && newer)) {
+                                    foundProject = project;
+                                }
+                            }
                         }
                     }
                 } else if (data.trim().startsWith('{')) {
                     const parsed = JSON.parse(data);
                     if (parsed && parsed.id === projectId) {
-                        foundProject = parsed;
-                        break;
+                        if (!foundProject) {
+                            foundProject = parsed;
+                        } else {
+                            const pd = (parsed.data || parsed);
+                            const existingPd = (foundProject.data || foundProject);
+                            const hasMore = !!(pd.finalLyrics || pd.finalizedLyrics || pd.finalStyle || pd.finalizedStyle);
+                            const existingHas = !!(existingPd.finalLyrics || existingPd.finalizedLyrics || existingPd.finalStyle || existingPd.finalizedStyle);
+                            const newer = (new Date(pd.savedAt || parsed.savedAt || 0) > new Date(existingPd.savedAt || foundProject.savedAt || 0));
+                            if ((hasMore && !existingHas) || (hasMore && newer) || (!existingHas && newer)) {
+                                foundProject = parsed;
+                            }
+                        }
                     }
                 }
             } catch (e) {
                 // 무시
+            }
+        }
+        
+        // projectKeys에서 못 찾으면 기존 방식으로 전체 localStorage 검색 (호환)
+        if (!foundProject) {
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (!key || projectKeys.includes(key)) continue;
+                try {
+                    const data = localStorage.getItem(key);
+                    if (!data) continue;
+                    if (data.trim().startsWith('[')) {
+                        const parsed = JSON.parse(data);
+                        if (Array.isArray(parsed)) {
+                            const project = parsed.find(p => p && p.id === projectId);
+                            if (project) { foundProject = project; break; }
+                        }
+                    } else if (data.trim().startsWith('{')) {
+                        const parsed = JSON.parse(data);
+                        if (parsed && parsed.id === projectId) { foundProject = parsed; break; }
+                    }
+                } catch (e) {}
             }
         }
         
@@ -298,13 +341,51 @@ window.loadProject = function(projectId) {
                 return;
         }
         
+        // 모든 키에서 같은 ID 프로젝트를 찾아 4·5단계 데이터가 있으면 병합 (누락 보완)
+        const projectData = foundProject.data || foundProject;
+        if (!projectData.finalLyrics && !projectData.finalizedLyrics && !projectData.finalStyle && !projectData.finalizedStyle) {
+            for (const key of projectKeys) {
+                try {
+                    const data = localStorage.getItem(key);
+                    if (!data || !data.trim().startsWith('[')) continue;
+                    const parsed = JSON.parse(data);
+                    if (!Array.isArray(parsed)) continue;
+                    const other = parsed.find(p => p && p.id === projectId);
+                    if (!other) continue;
+                    const od = other.data || other;
+                    if (od.finalLyrics && !projectData.finalLyrics) {
+                        if (!foundProject.data) foundProject.data = {};
+                        foundProject.data.finalLyrics = od.finalLyrics;
+                        projectData.finalLyrics = od.finalLyrics;
+                    }
+                    if (od.finalizedLyrics && !projectData.finalizedLyrics) {
+                        if (!foundProject.data) foundProject.data = {};
+                        foundProject.data.finalizedLyrics = od.finalizedLyrics;
+                        projectData.finalizedLyrics = od.finalizedLyrics;
+                    }
+                    if (od.finalStyle && !projectData.finalStyle) {
+                        if (!foundProject.data) foundProject.data = {};
+                        foundProject.data.finalStyle = od.finalStyle;
+                        projectData.finalStyle = od.finalStyle;
+                    }
+                    if (od.finalizedStyle && !projectData.finalizedStyle) {
+                        if (!foundProject.data) foundProject.data = {};
+                        foundProject.data.finalizedStyle = od.finalizedStyle;
+                        projectData.finalizedStyle = od.finalizedStyle;
+                    }
+                    if (projectData.finalLyrics || projectData.finalizedLyrics || projectData.finalStyle || projectData.finalizedStyle) {
+                        console.log('✅ 4·5단계 데이터 병합:', key);
+                        break;
+                    }
+                } catch (e) {}
+            }
+        }
+        
         // 프로젝트 데이터를 UI에 로드
         console.log('✅ 프로젝트 로드 시작:', foundProject.title || '제목 없음');
         window.currentProject = foundProject;
         window.currentProjectId = projectId;
         
-        // 프로젝트 데이터 구조 확인 (data 객체 또는 직접 속성)
-        const projectData = foundProject.data || foundProject;
         // flat 저장 구조 호환: currentProject.data가 없으면 projectData로 보정 (restoreStepData, goToStep에서 사용)
         if (!window.currentProject.data) {
             window.currentProject.data = projectData;
@@ -490,9 +571,9 @@ window.loadProject = function(projectId) {
             }
         }
         
-        // 4단계: 개선안 반영 및 확정
-        const finalizedLyrics = projectData.finalLyrics || foundProject.finalLyrics || foundProject.finalizedLyrics || '';
-        const finalizedStyle = projectData.finalStyle || foundProject.finalStyle || foundProject.finalizedStyle || '';
+        // 4단계: 개선안 반영 및 확정 (우선순위: finalizedLyrics > finalLyrics)
+        const finalizedLyrics = projectData.finalizedLyrics || foundProject.finalizedLyrics || projectData.finalLyrics || foundProject.finalLyrics || '';
+        const finalizedStyle = projectData.finalizedStyle || foundProject.finalizedStyle || projectData.finalStyle || foundProject.finalStyle || '';
         
         if (finalizedLyrics || finalizedStyle || projectData.improvements) {
             const improvementCard = document.getElementById('improvementCard');
@@ -541,7 +622,7 @@ window.loadProject = function(projectId) {
                 console.warn('⚠️ finalLyrics 요소를 찾을 수 없습니다.');
             }
         } else if (hasReachedStep5) {
-            console.warn('⚠️ 5단계 최종 가사 데이터가 없습니다.');
+            console.warn('⚠️ 5단계 최종 가사 데이터가 없습니다. (다른 키에서 병합 시도했으나 없음)');
         }
         
         // 5단계 최종 스타일 표시
@@ -554,7 +635,7 @@ window.loadProject = function(projectId) {
                 console.warn('⚠️ finalStyle 요소를 찾을 수 없습니다.');
             }
         } else if (hasReachedStep5) {
-            console.warn('⚠️ 5단계 최종 스타일 데이터가 없습니다.');
+            console.warn('⚠️ 5단계 최종 스타일 데이터가 없습니다. (다른 키에서 병합 시도했으나 없음)');
         }
         
         // 5단계 중간 버전 프리뷰도 복원
@@ -939,22 +1020,47 @@ window.loadProject = function(projectId) {
         if (typeof window.goToStep === 'function') {
             window.goToStep(lastStep, false, true);
         }
+        // 로드 직후 단계 완료 배지 갱신 (4·5단계는 currentProject.data 기준으로도 표시)
+        if (typeof window.updateStepProgress === 'function') {
+            window.updateStepProgress();
+        }
         
-        // 5단계로 이동한 경우 추가 데이터 복원 확인
-        if (lastStep === 5) {
+        // 4단계 또는 5단계로 이동한 경우 추가 데이터 복원 확인
+        if (lastStep === 4 || lastStep === 5) {
             setTimeout(() => {
-                // 5단계 데이터가 제대로 표시되었는지 확인
-                const finalLyricsEl = document.getElementById('finalLyrics');
-                const finalStyleEl = document.getElementById('finalStyle');
-                
-                if (finalLyricsEl && !finalLyricsEl.textContent && finalLyrics) {
-                    console.log('⚠️ 5단계 가사가 비어있어 재복원 시도');
-                    finalLyricsEl.textContent = finalLyrics;
+                // 4단계 데이터 재검증
+                if (lastStep >= 4) {
+                    const finalizedLyricsEl = document.getElementById('finalizedLyrics');
+                    const finalizedStyleEl = document.getElementById('finalizedStyle');
+                    
+                    if (finalizedLyricsEl && !finalizedLyricsEl.value && finalizedLyrics) {
+                        console.log('⚠️ 4단계 가사가 비어있어 재복원 시도');
+                        finalizedLyricsEl.value = finalizedLyrics;
+                    }
+                    
+                    if (finalizedStyleEl && !finalizedStyleEl.value && finalizedStyle) {
+                        console.log('⚠️ 4단계 스타일이 비어있어 재복원 시도');
+                        finalizedStyleEl.value = finalizedStyle;
+                    }
                 }
                 
-                if (finalStyleEl && !finalStyleEl.textContent && finalStyle) {
-                    console.log('⚠️ 5단계 스타일이 비어있어 재복원 시도');
-                    finalStyleEl.textContent = finalStyle;
+                // 5단계 데이터 재검증
+                if (lastStep === 5) {
+                    const finalLyricsEl = document.getElementById('finalLyrics');
+                    const finalStyleEl = document.getElementById('finalStyle');
+                    
+                    if (finalLyricsEl && !finalLyricsEl.textContent && finalLyrics) {
+                        console.log('⚠️ 5단계 가사가 비어있어 재복원 시도');
+                        finalLyricsEl.textContent = finalLyrics;
+                    }
+                    
+                    if (finalStyleEl && !finalStyleEl.textContent && finalStyle) {
+                        console.log('⚠️ 5단계 스타일이 비어있어 재복원 시도');
+                        finalStyleEl.textContent = finalStyle;
+                    }
+                }
+                if (typeof window.updateStepProgress === 'function') {
+                    window.updateStepProgress();
                 }
             }, 500);
         }
@@ -1203,35 +1309,37 @@ window.goToStep = function(step, saveBefore = false, skipValidation = false) {
         
         // 5단계 특별 처리: 최종 평가 요약 생성 및 데이터 복원
         if (step === 5) {
-            // 저장된 프로젝트 데이터가 있으면 5단계 데이터 복원
+            // 저장된 프로젝트 데이터가 있으면 5단계 데이터 복원 (항상 복원 시도)
             if (window.currentProject && window.currentProject.data) {
                 const projectData = window.currentProject.data;
                 
-                // 5단계 최종 가사 복원
-                if (projectData.finalLyrics) {
+                // 5단계 최종 가사 복원 (우선순위: finalLyrics > finalizedLyrics)
+                const lyrics5 = projectData.finalLyrics || projectData.finalizedLyrics || '';
+                if (lyrics5) {
                     const finalLyricsEl = document.getElementById('finalLyrics');
-                    if (finalLyricsEl && !finalLyricsEl.textContent) {
-                        finalLyricsEl.textContent = projectData.finalLyrics;
-                        console.log('✅ 5단계 가사 복원 (goToStep):', projectData.finalLyrics.length, '자');
+                    if (finalLyricsEl) {
+                        finalLyricsEl.textContent = lyrics5;
+                        console.log('✅ 5단계 가사 복원 (goToStep):', lyrics5.length, '자');
                     }
                     // 중간 버전 프리뷰도 복원
                     const intermediateLyricsPreview = document.getElementById('intermediateLyricsPreview');
-                    if (intermediateLyricsPreview && !intermediateLyricsPreview.textContent) {
-                        intermediateLyricsPreview.textContent = projectData.finalLyrics;
+                    if (intermediateLyricsPreview) {
+                        intermediateLyricsPreview.textContent = lyrics5;
                     }
                 }
                 
-                // 5단계 최종 스타일 복원
-                if (projectData.finalStyle) {
+                // 5단계 최종 스타일 복원 (우선순위: finalStyle > finalizedStyle)
+                const style5 = projectData.finalStyle || projectData.finalizedStyle || '';
+                if (style5) {
                     const finalStyleEl = document.getElementById('finalStyle');
-                    if (finalStyleEl && !finalStyleEl.textContent) {
-                        finalStyleEl.textContent = projectData.finalStyle;
-                        console.log('✅ 5단계 스타일 복원 (goToStep):', projectData.finalStyle.length, '자');
+                    if (finalStyleEl) {
+                        finalStyleEl.textContent = style5;
+                        console.log('✅ 5단계 스타일 복원 (goToStep):', style5.length, '자');
                     }
                     // 중간 버전 프리뷰도 복원
                     const intermediateStylePreview = document.getElementById('intermediateStylePreview');
-                    if (intermediateStylePreview && !intermediateStylePreview.textContent) {
-                        intermediateStylePreview.textContent = projectData.finalStyle;
+                    if (intermediateStylePreview) {
+                        intermediateStylePreview.textContent = style5;
                     }
                 }
                 
@@ -1239,7 +1347,7 @@ window.goToStep = function(step, saveBefore = false, skipValidation = false) {
                 const title = window.currentProject.title || projectData.title || '';
                 if (title) {
                     const finalTitleTextEl = document.getElementById('finalTitleText');
-                    if (finalTitleTextEl && !finalTitleTextEl.textContent) {
+                    if (finalTitleTextEl) {
                         finalTitleTextEl.textContent = title;
                     }
                 }
@@ -1776,15 +1884,25 @@ window.restoreStepData = function(step) {
                         setPrompt('mvCharacterDetailPromptKo', mp.characterDetailKo);
                     }
                     
-                    // MV 씬 데이터 복원 및 씬 개요/결과 UI 렌더링
+                    // MV 씬 데이터 복원 및 씬 개요/결과 UI 렌더링 (중복 방지)
                     if (marketing.mvScenes && Array.isArray(marketing.mvScenes) && marketing.mvScenes.length > 0) {
-                        window.currentScenes = JSON.parse(JSON.stringify(marketing.mvScenes));
                         const mvSceneOverviewContainer = document.getElementById('mvSceneOverviewContainer');
                         const mvPromptsContainer = document.getElementById('mvPromptsContainer');
                         const mvSceneOverviewSection = document.getElementById('mvSceneOverviewSection');
                         const mvResultsSection = document.getElementById('mvResultsSection');
-                        if (mvSceneOverviewContainer) {
-                            let html = `
+                        
+                        // 이미 렌더링되어 있으면 중복 렌더링 방지 (loadProject에서 이미 렌더링된 경우)
+                        const alreadyRendered = (mvSceneOverviewContainer && mvSceneOverviewContainer.innerHTML.trim()) ||
+                            (window.currentScenes && window.currentScenes.length > 0 && mvPromptsContainer && mvPromptsContainer.children.length >= window.currentScenes.length);
+                        if (alreadyRendered) {
+                            if (mvSceneOverviewSection) mvSceneOverviewSection.style.display = 'block';
+                            if (mvResultsSection) mvResultsSection.style.display = 'block';
+                            const totalImagesEl = document.getElementById('mvTotalImages');
+                            if (totalImagesEl && window.currentScenes && window.currentScenes.length > 0) totalImagesEl.textContent = window.currentScenes.length;
+                        } else {
+                            window.currentScenes = JSON.parse(JSON.stringify(marketing.mvScenes));
+                            if (mvSceneOverviewContainer) {
+                                let html = `
                                 <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);">
                                     <h3 style="margin: 0 0 10px 0; color: var(--text-primary); font-size: 1.1rem;">
                                         <i class="fas fa-film"></i> 씬별 개요
@@ -1823,48 +1941,49 @@ window.restoreStepData = function(step) {
                                     </div>
                                 `;
                             });
-                            if (mvSceneOverviewContainer) mvSceneOverviewContainer.innerHTML = html;
-                        }
-                        if (mvSceneOverviewSection) mvSceneOverviewSection.style.display = 'block';
-                        if (mvResultsSection) mvResultsSection.style.display = 'block';
-                        if (mvPromptsContainer && window.currentScenes.length > 0) {
-                            let resultHtml = '';
-                            window.currentScenes.forEach((scene, index) => {
-                                const sceneId = 'scene_' + index;
-                                const scenePromptEn = (scene.prompt || '').replace(/\/\*\s*Scene\s+\d+\s*\*\/\s*/gi, '').trim();
-                                const scenePromptKo = scene.promptKo || '';
-                                resultHtml += `
-                                    <div class="mv-prompt-item" style="margin-bottom: 25px; padding: 20px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border);">
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                                            <h4 style="margin: 0; color: var(--text-primary); font-size: 1.1rem;">씬 ${index + 1}</h4>
-                                            <div style="display: flex; gap: 8px; align-items: center;">
-                                                <span style="color: var(--accent); font-weight: 600; font-size: 0.9rem;">${scene.time || ''}</span>
-                                                <button class="btn btn-small btn-primary" onclick="regenerateScenePrompt(${index})" style="padding: 4px 8px; font-size: 0.75rem;">재생성</button>
-                                                <button class="btn btn-small btn-success" onclick="saveScenePrompt(${index})" style="padding: 4px 8px; font-size: 0.75rem;">저장</button>
+                                if (mvSceneOverviewContainer) mvSceneOverviewContainer.innerHTML = html;
+                            }
+                            if (mvSceneOverviewSection) mvSceneOverviewSection.style.display = 'block';
+                            if (mvResultsSection) mvResultsSection.style.display = 'block';
+                            if (mvPromptsContainer && window.currentScenes.length > 0) {
+                                let resultHtml = '';
+                                window.currentScenes.forEach((scene, index) => {
+                                    const sceneId = 'scene_' + index;
+                                    const scenePromptEn = (scene.prompt || '').replace(/\/\*\s*Scene\s+\d+\s*\*\/\s*/gi, '').trim();
+                                    const scenePromptKo = scene.promptKo || '';
+                                    resultHtml += `
+                                        <div class="mv-prompt-item" style="margin-bottom: 25px; padding: 20px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border);">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                                <h4 style="margin: 0; color: var(--text-primary); font-size: 1.1rem;">씬 ${index + 1}</h4>
+                                                <div style="display: flex; gap: 8px; align-items: center;">
+                                                    <span style="color: var(--accent); font-weight: 600; font-size: 0.9rem;">${scene.time || ''}</span>
+                                                    <button class="btn btn-small btn-primary" onclick="regenerateScenePrompt(${index})" style="padding: 4px 8px; font-size: 0.75rem;">재생성</button>
+                                                    <button class="btn btn-small btn-success" onclick="saveScenePrompt(${index})" style="padding: 4px 8px; font-size: 0.75rem;">저장</button>
+                                                </div>
+                                            </div>
+                                            <div style="margin-bottom: 15px; padding: 12px; background: var(--bg-input); border-radius: 6px;">
+                                                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">장면:</div>
+                                                <div style="color: var(--text-primary);">${escapeHtml(scene.scene || '')}</div>
+                                            </div>
+                                            <div style="margin-bottom: 10px;">
+                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                                    <label style="font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">영어 프롬프트</label>
+                                                    <button id="copyScenePromptBtn_${index}" class="btn btn-small btn-success" onclick="copyScenePromptEn(${index}, event)" style="padding: 4px 10px; font-size: 0.75rem;"><i class="fas fa-copy"></i> 복사</button>
+                                                </div>
+                                                <textarea id="${sceneId}_en" class="scene-prompt-en" data-scene-index="${index}" style="width: 100%; min-height: 100px; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; font-family: monospace; font-size: 0.9rem; color: var(--text-primary); resize: vertical;">${escapeHtml(scenePromptEn)}</textarea>
+                                            </div>
+                                            <div>
+                                                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">한글 번역본</label>
+                                                <textarea id="${sceneId}_ko" class="scene-prompt-ko" data-scene-index="${index}" style="width: 100%; min-height: 100px; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; color: var(--text-primary); resize: vertical;">${escapeHtml(scenePromptKo)}</textarea>
                                             </div>
                                         </div>
-                                        <div style="margin-bottom: 15px; padding: 12px; background: var(--bg-input); border-radius: 6px;">
-                                            <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">장면:</div>
-                                            <div style="color: var(--text-primary);">${escapeHtml(scene.scene || '')}</div>
-                                        </div>
-                                        <div style="margin-bottom: 10px;">
-                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                                <label style="font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">영어 프롬프트</label>
-                                                <button id="copyScenePromptBtn_${index}" class="btn btn-small btn-success" onclick="copyScenePromptEn(${index}, event)" style="padding: 4px 10px; font-size: 0.75rem;"><i class="fas fa-copy"></i> 복사</button>
-                                            </div>
-                                            <textarea id="${sceneId}_en" class="scene-prompt-en" data-scene-index="${index}" style="width: 100%; min-height: 100px; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; font-family: monospace; font-size: 0.9rem; color: var(--text-primary); resize: vertical;">${escapeHtml(scenePromptEn)}</textarea>
-                                        </div>
-                                        <div>
-                                            <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">한글 번역본</label>
-                                            <textarea id="${sceneId}_ko" class="scene-prompt-ko" data-scene-index="${index}" style="width: 100%; min-height: 100px; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; color: var(--text-primary); resize: vertical;">${escapeHtml(scenePromptKo)}</textarea>
-                                        </div>
-                                    </div>
-                                `;
-                            });
-                            mvPromptsContainer.innerHTML = resultHtml;
+                                    `;
+                                });
+                                mvPromptsContainer.innerHTML = resultHtml;
+                            }
+                            const totalImagesEl = document.getElementById('mvTotalImages');
+                            if (totalImagesEl) totalImagesEl.textContent = window.currentScenes.length;
                         }
-                        const totalImagesEl = document.getElementById('mvTotalImages');
-                        if (totalImagesEl) totalImagesEl.textContent = window.currentScenes.length;
                     }
                 }
                 break;
@@ -1881,6 +2000,8 @@ window.restoreStepData = function(step) {
 // ═══════════════════════════════════════════════════════════════
 window.saveCurrentProject = function() {
     try {
+        // 각 단계에서 "저장" 버튼을 눌러도 1~6단계 전체 데이터가 수집·유지됩니다.
+        // 현재 단계가 아닌 항목은 DOM이 비어 있으면 기존 저장값을 덮어쓰지 않아, 불러올 때 모든 상태가 그대로 복원됩니다.
         // 현재 프로젝트 ID가 없으면 새 프로젝트 생성
         let projectId = window.currentProjectId;
         if (!projectId) {
@@ -1888,8 +2009,7 @@ window.saveCurrentProject = function() {
             window.currentProjectId = projectId;
         }
         
-        // 현재 UI에서 프로젝트 데이터 수집 (모든 단계)
-        // DOM이 비어 있으면 기존 currentProject.data 유지 → 저장 시 단계별 값이 덮어쓰이지 않도록
+        // 현재 UI에서 프로젝트 데이터 수집 (모든 단계) — DOM 없으면 기존 값 유지
         const existing = window.currentProject?.data || {};
         
         const titleFromSongTitle = document.getElementById('songTitle')?.value || '';
@@ -1960,17 +2080,21 @@ window.saveCurrentProject = function() {
             project.data.feedbacks = JSON.parse(JSON.stringify(existing.feedbacks));
         }
         
-        // 4단계: 최종 확정 데이터 (DOM에서 직접 수집, 명시적 저장)
-        const finalizedLyricsValue = (document.getElementById('finalizedLyrics')?.value || '').trim() || existing.finalizedLyrics || existing.finalLyrics || '';
-        const finalizedStyleValue = (document.getElementById('finalizedStyle')?.value || '').trim() || existing.finalizedStyle || existing.finalStyle || '';
+        // 4단계: 최종 확정 데이터 (DOM 우선, 없으면 기존 데이터 보존 - 다른 단계에서 저장해도 덮어쓰지 않음)
+        const finalizedLyricsDom = (document.getElementById('finalizedLyrics')?.value || '').trim();
+        const finalizedStyleDom = (document.getElementById('finalizedStyle')?.value || '').trim();
+        const finalizedLyricsValue = finalizedLyricsDom || existing.finalizedLyrics || existing.finalLyrics || '';
+        const finalizedStyleValue = finalizedStyleDom || existing.finalizedStyle || existing.finalStyle || '';
         project.data.finalizedLyrics = finalizedLyricsValue;
         project.data.finalizedStyle = finalizedStyleValue;
         
-        // 5단계: 최종 출력 데이터 (우선순위: 5단계 DOM > 4단계 > 기존)
+        // 5단계: 최종 출력 데이터 (DOM 우선, 없으면 4단계 또는 기존 데이터 보존)
         const finalLyricsEl = document.getElementById('finalLyrics');
         const finalStyleEl = document.getElementById('finalStyle');
-        const finalLyricsValue = (finalLyricsEl?.textContent || '').trim() || finalizedLyricsValue || '';
-        const finalStyleValue = (finalStyleEl?.textContent || '').trim() || finalizedStyleValue || '';
+        const finalLyricsDom = (finalLyricsEl?.textContent || '').trim();
+        const finalStyleDom = (finalStyleEl?.textContent || '').trim();
+        const finalLyricsValue = finalLyricsDom || finalizedLyricsValue || existing.finalLyrics || existing.finalizedLyrics || '';
+        const finalStyleValue = finalStyleDom || finalizedStyleValue || existing.finalStyle || existing.finalizedStyle || '';
         
         project.data.finalLyrics = finalLyricsValue;
         project.data.finalStyle = finalStyleValue;
@@ -2360,6 +2484,45 @@ window.saveCurrentProject = function() {
         }
         
         return false;
+    }
+};
+
+// 저장 후 닫기: 모든 내용 저장 후 창 닫기 (브라우저 정책상 창이 닫히지 않을 수 있음)
+window.saveAndClose = function() {
+    try {
+        if (typeof window.saveCurrentProject !== 'function') {
+            alert('저장 기능을 사용할 수 없습니다.');
+            return;
+        }
+        if (!window.currentProjectId) {
+            const hasContent = (document.getElementById('songTitle')?.value || '').trim() ||
+                (document.getElementById('originalLyrics')?.value || '').trim() ||
+                (document.getElementById('sunoLyrics')?.value || '').trim();
+            if (!hasContent) {
+                if (typeof window.showCopyIndicator === 'function') {
+                    window.showCopyIndicator('저장할 내용이 없습니다. 창을 닫아 주세요.');
+                } else {
+                    alert('저장할 내용이 없습니다.\n\n창을 닫아 주세요.');
+                }
+                window.close();
+                return;
+            }
+            window.currentProjectId = 'proj_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+        const saved = window.saveCurrentProject();
+        if (saved) {
+            if (typeof window.showCopyIndicator === 'function') {
+                window.showCopyIndicator('✅ 모든 내용이 저장되었습니다. 이제 브라우저 창을 닫아도 됩니다.');
+            } else {
+                alert('✅ 모든 내용이 저장되었습니다.\n\n이제 브라우저 창을 닫아도 됩니다.');
+            }
+            window.close();
+        } else {
+            alert('저장에 실패했습니다. 다시 시도해 주세요.');
+        }
+    } catch (e) {
+        console.error('저장 후 닫기 오류:', e);
+        alert('저장 후 닫기 중 오류가 발생했습니다.');
     }
 };
 
@@ -2769,7 +2932,7 @@ window.addEventListener('resize', function() {
     }
 });
 
-// 페이지 종료/새로고침 시 현재 프로젝트 자동 저장 (1~6단계 작업 상태 유지)
+// 브라우저 닫기/탭 닫기/새로고침 시 자동 저장 — 각 단계 작성 중이어도 모든 내용이 저장됨
 window.addEventListener('beforeunload', function() {
     try {
         if (typeof window.saveCurrentProject !== 'function') return;
@@ -13671,11 +13834,15 @@ window.updateStepProgress = function() {
             },
             4: function() {
                 var l = document.getElementById('finalizedLyrics');
-                return l && l.value.trim();
+                if (l && l.value.trim()) return true;
+                var d = window.currentProject && (window.currentProject.data || window.currentProject);
+                return !!(d && (d.finalizedLyrics || d.finalLyrics));
             },
             5: function() {
                 var l = document.getElementById('finalLyrics');
-                return l && l.textContent.trim();
+                if (l && l.textContent.trim()) return true;
+                var d = window.currentProject && (window.currentProject.data || window.currentProject);
+                return !!(d && (d.finalLyrics || d.finalizedLyrics));
             },
             6: function() {
                 var y = document.getElementById('youtubeDesc');
