@@ -11175,6 +11175,7 @@ window.loadProjectList = function(force = false) {
         const projectListEl = document.getElementById('projectList');
         if (!projectListEl) {
             console.error('projectList 요소를 찾을 수 없습니다.');
+            window.loadProjectListLoading = false;
             return;
         }
         
@@ -11243,8 +11244,9 @@ window.loadProjectList = function(force = false) {
             var recentEl = document.getElementById('recentProjectsList');
             if (recentEl) { recentEl.innerHTML = ''; recentEl.style.display = 'none'; }
             console.warn('⚠️ 프로젝트 데이터를 찾을 수 없습니다.');
-        return;
-    }
+            window.loadProjectListLoading = false;
+            return;
+        }
     
         console.log(`✅ 총 ${projects.length}개 프로젝트 발견 (${foundKeys.length}개 키에서)`);
         
@@ -11314,6 +11316,7 @@ window.loadProjectList = function(force = false) {
             projectListEl.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">검색 결과가 없습니다.</div>';
             var recentEl = document.getElementById('recentProjectsList');
             if (recentEl) { recentEl.innerHTML = ''; recentEl.style.display = 'none'; }
+            window.loadProjectListLoading = false;
             return;
         }
         
@@ -12755,12 +12758,13 @@ window.openGuidelinesModal = function() {
     
         console.log('✅ guidelinesModal 요소 발견:', modal);
         
-        // 저장된 지침서 로드
+        // 저장된 지침서 로드 (저장된 값 우선, 없을 때만 기본값)
         const guidelinesText = document.getElementById('guidelinesText');
         if (guidelinesText) {
-            const savedGuidelines = localStorage.getItem('musicCreatorGuidelines') || '';
-            if (!savedGuidelines) {
-                // 기본 지침서 내용
+            const savedGuidelines = (localStorage.getItem('musicCreatorGuidelines') || localStorage.getItem('musicCreator_guidelines') || '').trim();
+            if (savedGuidelines.length > 0) {
+                guidelinesText.value = savedGuidelines;
+            } else {
                 const defaultGuidelines = `# 뮤직모리 제작 지침서
 
 ## 기본 원칙
@@ -12778,8 +12782,6 @@ window.openGuidelinesModal = function() {
 - 비유와 은유 활용
 - 듣는 이의 감정을 자극하는 표현`;
                 guidelinesText.value = defaultGuidelines;
-            } else {
-                guidelinesText.value = savedGuidelines;
             }
         }
         

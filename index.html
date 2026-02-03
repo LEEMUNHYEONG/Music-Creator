@@ -324,6 +324,77 @@
     <!-- Sidebar Overlay -->
     <div class="sidebar-overlay" id="sidebarOverlay" style="display: none !important; pointer-events: none !important; opacity: 0 !important; visibility: hidden !important; z-index: -9999 !important;"></div>
 
+    <!-- Guidelines Modal (body 직계 자식으로 화면 최상위 표시) -->
+    <div class="modal-overlay" id="guidelinesModal" style="display: none;">
+        <div class="modal guidelines-modal-inner">
+            <div class="modal-header">
+                <h3 class="modal-title">📋 뮤직모리 제작 지침서</h3>
+                <button class="modal-close" onclick="closeGuidelinesModal()" aria-label="닫기">×</button>
+            </div>
+            <div class="modal-body">
+                <p class="guidelines-modal-desc">이 지침서는 AI가 가사, 프롬프트, 마케팅 자료 생성 시 참조합니다. 수정 후 저장하면 모든 생성 과정에 반영됩니다.</p>
+                <textarea id="guidelinesText" class="guidelines-textarea" placeholder="지침서 내용을 입력하세요. 마크다운 형식 사용 가능."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="resetGuidelines()">🔄 기본값 복원</button>
+                <button type="button" class="btn btn-primary" onclick="saveGuidelines(); closeGuidelinesModal();">💾 저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Project Reference Modal (body 직계 자식으로 화면 최상위 표시) -->
+    <div class="modal-overlay" id="projectReferenceModal" style="display: none;">
+        <div class="modal" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3 class="modal-title">💾 저장된 프로젝트에서 참조</h3>
+                <button class="modal-close" onclick="closeProjectReferenceModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
+                    저장된 프로젝트를 선택하면 해당 프로젝트의 가사와 스타일 프롬프트를 참고할 수 있습니다.
+                </p>
+                
+                <div class="form-group">
+                    <label>프로젝트 선택</label>
+                    <div id="projectReferenceList" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 10px;">
+                        <!-- 프로젝트 목록이 여기에 동적으로 로드됩니다 -->
+                    </div>
+                </div>
+                
+                <div id="selectedProjectPreview" style="display: none; margin-top: 20px; padding: 15px; background: var(--bg-secondary); border-radius: 8px;">
+                    <h4 style="margin-bottom: 10px; font-size: 1rem;">선택된 프로젝트 정보</h4>
+                    <div style="margin-bottom: 10px;">
+                        <strong>제목:</strong> <span id="previewProjectTitle">-</span>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <strong>장르:</strong> <span id="previewProjectGenres">-</span>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <strong>저장일:</strong> <span id="previewProjectDate">-</span>
+                    </div>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <strong>참고할 내용:</strong>
+                        <div style="margin-top: 5px; display: flex; gap: 10px; flex-wrap: wrap;">
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="checkbox" id="referenceProjectLyrics" checked>
+                                <span>가사</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                                <input type="checkbox" id="referenceProjectStyle" checked>
+                                <span>스타일 프롬프트</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeProjectReferenceModal()">취소</button>
+                <button class="btn btn-primary" onclick="applyProjectReference()" id="applyProjectReferenceBtn" disabled>적용</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Content Wrapper -->
     <div class="main-wrapper" id="mainWrapper">
     <header>
@@ -3128,79 +3199,6 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
         </div>
     </div>
 
-    <!-- Guidelines Modal -->
-    <div class="modal-overlay" id="guidelinesModal">
-        <div class="modal">
-            <div class="modal-header">
-                <h3 class="modal-title">📋 뮤직모리 제작 지침서</h3>
-                <button class="modal-close" onclick="closeGuidelinesModal()">×</button>
-            </div>
-            <div class="modal-body">
-                <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
-                    이 지침서는 AI가 가사, 프롬프트, 마케팅 자료 생성 시 참조합니다. 수정 후 저장하면 모든 생성 과정에 반영됩니다.
-                </p>
-                <textarea id="guidelinesText" style="min-height: 400px; font-size: 0.85rem;"></textarea>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="resetGuidelines()">🔄 기본값 복원</button>
-                <button class="btn btn-primary" onclick="saveGuidelines(); closeGuidelinesModal();">💾 저장</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Project Reference Modal -->
-    <div class="modal-overlay" id="projectReferenceModal">
-        <div class="modal" style="max-width: 700px;">
-            <div class="modal-header">
-                <h3 class="modal-title">💾 저장된 프로젝트에서 참조</h3>
-                <button class="modal-close" onclick="closeProjectReferenceModal()">×</button>
-            </div>
-            <div class="modal-body">
-                <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
-                    저장된 프로젝트를 선택하면 해당 프로젝트의 가사와 스타일 프롬프트를 참고할 수 있습니다.
-                </p>
-                
-                <div class="form-group">
-                    <label>프로젝트 선택</label>
-                    <div id="projectReferenceList" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 10px;">
-                        <!-- 프로젝트 목록이 여기에 동적으로 로드됩니다 -->
-                    </div>
-                </div>
-                
-                <div id="selectedProjectPreview" style="display: none; margin-top: 20px; padding: 15px; background: var(--bg-secondary); border-radius: 8px;">
-                    <h4 style="margin-bottom: 10px; font-size: 1rem;">선택된 프로젝트 정보</h4>
-                    <div style="margin-bottom: 10px;">
-                        <strong>제목:</strong> <span id="previewProjectTitle">-</span>
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <strong>장르:</strong> <span id="previewProjectGenres">-</span>
-                    </div>
-                    <div style="margin-bottom: 15px;">
-                        <strong>저장일:</strong> <span id="previewProjectDate">-</span>
-                    </div>
-                    
-                    <div style="margin-bottom: 10px;">
-                        <strong>참고할 내용:</strong>
-                        <div style="margin-top: 5px; display: flex; gap: 10px; flex-wrap: wrap;">
-                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                <input type="checkbox" id="referenceProjectLyrics" checked>
-                                <span>가사</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
-                                <input type="checkbox" id="referenceProjectStyle" checked>
-                                <span>스타일 프롬프트</span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeProjectReferenceModal()">취소</button>
-                <button class="btn btn-primary" onclick="applyProjectReference()" id="applyProjectReferenceBtn" disabled>적용</button>
-            </div>
-        </div>
-    </div>
-
     <!-- API Settings Modal -->
     <div class="modal-overlay" id="apiSettingsModal" style="display: none;">
         <div class="modal api-settings-modal-inner">
@@ -5005,19 +5003,21 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                     }
                     
                     // 모든 모달 완전히 숨기기 (API 키 설정 모달은 제외 - 사용자가 열어둔 경우 유지)
+                    // 단, classList에 'show'가 있는 모달은 사용자가 연 모달이므로 숨기지 않음
                     const modals = ['guidelinesModal', 'projectReferenceModal'];
                     modals.forEach(modalId => {
                         const modal = document.getElementById(modalId);
-                        if (modal) {
+                        if (modal && !modal.classList.contains('show')) {
                             modal.style.cssText = 'display: none !important; pointer-events: none !important; z-index: -9999 !important;';
                             modal.classList.remove('show');
                         }
                     });
                     // apiSettingsModal은 절대 건드리지 않음 (openAPISettings/closeAPISettings로만 제어)
                     
-                    // .modal-overlay 중 API 설정 모달이 아닌 것만 숨기기
+                    // .modal-overlay 중 API 설정 모달이 아닌 것, 그리고 사용자가 연 모달(show)이 아닌 것만 숨기기
                     document.querySelectorAll('.modal-overlay').forEach(overlay => {
                         if (overlay.id === 'apiSettingsModal') return;
+                        if (overlay.classList.contains('show')) return; // 사용자가 연 모달은 유지
                         overlay.style.cssText = 'display: none !important; pointer-events: none !important; z-index: -9999 !important;';
                         overlay.classList.remove('show');
                     });
@@ -5040,24 +5040,15 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                 }
             }
             
-            // 즉시 실행 (스크립트가 실행되는 순간)
+            // 로드 시점에만 실행 (지침서/참조 모달을 연 뒤에는 실행하지 않도록 반복 타이머 제거)
             forceHideOverlays();
-            
-            // DOMContentLoaded 시에도 실행
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', forceHideOverlays, { once: true });
             }
-            
-            // 추가 안전장치: 여러 시점에서 실행
-            setTimeout(forceHideOverlays, 0);
-            setTimeout(forceHideOverlays, 50);
-            setTimeout(forceHideOverlays, 100);
-            setTimeout(forceHideOverlays, 300);
-            setTimeout(forceHideOverlays, 500);
-            setTimeout(forceHideOverlays, 1000);
-            
-            // window.load 시에도 실행
-            window.addEventListener('load', forceHideOverlays, { once: true });
+            window.addEventListener('load', function onLoad() {
+                window.removeEventListener('load', onLoad);
+                forceHideOverlays();
+            }, { once: true });
         })();
     </script>
     
