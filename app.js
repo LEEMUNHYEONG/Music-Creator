@@ -19,44 +19,20 @@ window.autoResizeTextarea = function(ta) {
 function extractLyricsOnly(lyrics) {
     if (!lyrics) return '';
     
-    const lines = lyrics.split('\n');
-    const lyricsOnly = [];
-    
-    lines.forEach((line) => {
-        const trimmed = line.trim();
-        
-        // 빈 줄은 그대로 유지
-        if (!trimmed) {
-            if (lyricsOnly.length > 0 && lyricsOnly[lyricsOnly.length - 1] !== '') {
-                lyricsOnly.push('');
-            }
-            return;
-        }
-        
-        // [ ] 형식으로 시작하고 끝나는 줄은 지시어로 간주하여 제외
-        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-            return; // 지시어 제외
-        }
-        
-        // 실제 가사 줄만 추가
-        lyricsOnly.push(trimmed);
-    });
-    
-    // 가사만 추출한 내용
-    let lyricsContent = lyricsOnly.join('\n');
-    
-    // 연속된 빈 줄을 하나로 정리
-    lyricsContent = lyricsContent.replace(/\n{3,}/g, '\n\n');
-    
-    // 앞뒤 공백 제거
-    return lyricsContent.trim();
+    // 괄호로 시작하고 끝나는 지시어 제거 ([Verse], (Chorus) 등)
+    return lyrics
+        .replace(/\[[\s\S]*?\]/g, '')
+        .replace(/\([\s\S]*?\)/g, '')
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line !== '')
+        .join('\n');
 }
 
 // ═══════════════════════════════════════════════════════════════
 // 영어→한글 번역 (씬별 개요 필드용)
 // ═══════════════════════════════════════════════════════════════
 let sceneOverviewTranslationCache = {}; // 번역 캐시 (성능 향상)
-// [MOVED] extraction block
 
 // ═══════════════════════════════════════════════════════════════
 // 전역 프로젝트 상태
@@ -64,7 +40,6 @@ let sceneOverviewTranslationCache = {}; // 번역 캐시 (성능 향상)
 window.currentProject = null;
 window.currentProjectId = null;
 window.editMode = false;  // 수정 모드 상태 (false = 읽기 전용, true = 수정 가능)
-// [MOVED] extraction block
 
 // ═══════════════════════════════════════════════════════════════
 // 단계 이동 함수
@@ -769,12 +744,17 @@ window.restoreStepData = function(step) {
                                             <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">장면 설명:</label>
                                             <textarea class="scene-description" data-index="${index}" data-scene-index="${index}" style="width: 100%; min-height: 80px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; resize: vertical;">${escapeHtml(scene.scene || '')}</textarea>
                                         </div>
-                                        <div style="margin-bottom: 10px;">
-                                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">영어 프롬프트:</label>
+                                        <div style="margin-bottom: 15px;">
+                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                                <label style="color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">⛵ Midjourney Prompt (EN):</label>
+                                                <button id="copySceneOverviewEnBtn_${index}" class="btn btn-small btn-success" onclick="copySceneOverviewPromptEn(${index}, event)" title="영어 프롬프트 복사" style="padding: 4px 10px; font-size: 0.7rem;">
+                                                    <i class="fas fa-copy"></i> 복사
+                                                </button>
+                                            </div>
                                             <textarea id="scene_overview_${index}_en" class="scene-prompt-en-overview" data-index="${index}" data-scene-index="${index}" style="width: 100%; min-height: 120px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; font-family: monospace; resize: vertical;">${escapeHtml(existingPrompt)}</textarea>
                                         </div>
                                         <div>
-                                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">한글 프롬프트:</label>
+                                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">⛵ Midjourney (한글):</label>
                                             <textarea id="scene_overview_${index}_ko" class="scene-prompt-ko-overview" data-index="${index}" data-scene-index="${index}" style="width: 100%; min-height: 120px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; resize: vertical;">${escapeHtml(existingPromptKo)}</textarea>
                                         </div>
                                     </div>
@@ -833,7 +813,6 @@ window.restoreStepData = function(step) {
         console.error('단계 데이터 복원 오류:', error);
     }
 };
-// [MOVED] extraction block
 
 // 저장 후 닫기: 모든 내용 저장 후 창 닫기 (브라우저 정책상 창이 닫히지 않을 수 있음)
 window.saveAndClose = function() {
@@ -1315,8 +1294,6 @@ const sidebarResizeObserver = new ResizeObserver(function(entries) {
         sidebarResizeObserver.observe(sidebar);
     }
 }, 1000);
-// [MOVED] extraction block
-// [MOVED] extraction block
 
 // ═══════════════════════════════════════════════════════════════
 // 3단계: Gemini 정밀 분석 함수
@@ -1693,7 +1670,6 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
-// [MOVED] extraction block
 
 // 선택된 개선안 개수 업데이트
 window.updateSelectedCount = function() {
@@ -1991,7 +1967,6 @@ ${improvementsText}
               '3. 잠시 후 다시 시도해주세요');
     }
 };
-// [MOVED] extraction block
 
 // ═══════════════════════════════════════════════════════════════
 // 5단계: 음원 업로드 및 분석 함수들
@@ -2419,7 +2394,6 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? '...' : ''}
         }
     }
 };
-// [MOVED] extraction block
 
 // ═══════════════════════════════════════════════════════════════
 // 5단계: 최종 평가 요약 생성 함수
@@ -3189,7 +3163,6 @@ K-Pop Ballad, emotional, melancholic, 75 BPM, soft female vocals, breathy tone, 
               '해결방법: API 키를 확인하고 다시 시도해주세요.');
     }
 };
-// [MOVED] extraction block
 
 // ═══════════════════════════════════════════════════════════════
 // 파트별 보컬 스타일 지정 함수들
@@ -3866,86 +3839,6 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? '...' : ''}
               '3. 잠시 후 다시 시도해주세요');
     }
 };
-// [MOVED] extraction block
-                        </div>
-                        <div>
-                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">한글 프롬프트:</label>
-                            <textarea 
-                                id="scene_overview_${index}_ko" 
-                                class="scene-prompt-ko-overview" 
-                                data-index="${index}"
-                                data-scene-index="${index}"
-                                onchange="syncSceneOverviewPromptTranslation(${index}, 'ko')"
-                                style="width: 100%; min-height: 120px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; resize: vertical;"
-                                placeholder="한글 프롬프트를 입력하세요...">${existingPromptKo}</textarea>
-                        </div>
-                    </div>
-                `;
-            });
-            container.innerHTML = html;
-            
-            // 씬에 promptKo가 있으면 한글 프롬프트에 설정, 없으면 영어에서 번역
-            scenes.forEach((scene, index) => {
-                const enEl = document.getElementById(`scene_overview_${index}_en`);
-                const koEl = document.getElementById(`scene_overview_${index}_ko`);
-                
-                // 씬에 promptKo가 있으면 한글 프롬프트에 설정
-                if (koEl && scene.promptKo) {
-                    koEl.value = scene.promptKo;
-                    // currentScenes도 업데이트
-                    if (window.currentScenes && window.currentScenes[index]) {
-                        window.currentScenes[index].promptKo = scene.promptKo;
-                    }
-                }
-                
-                // 영어 프롬프트가 있고 한글 프롬프트가 없으면 한글로 번역
-                if (enEl && enEl.value && (!koEl || !koEl.value)) {
-                    translateEnglishToKoreanForScene('prompt', enEl.value).then(translated => {
-                        if (koEl && translated) {
-                            koEl.value = translated;
-                            // currentScenes도 업데이트
-                            if (window.currentScenes && window.currentScenes[index]) {
-                                window.currentScenes[index].promptKo = translated;
-                            }
-                        }
-                    }).catch(err => {
-                        console.error('자동 번역 오류:', err);
-                    });
-                }
-            });
-        }
-        
-        if (mvSceneOverviewSection) {
-            mvSceneOverviewSection.style.display = 'block';
-        }
-        
-        window.currentScenes = scenes;
-        
-        console.log('✅ MV 프롬프트 생성 완료:', scenes.length, '개 씬', useAI ? '(AI 생성)' : '(기본 방식)');
-        
-    } catch (error) {
-        console.error('❌ MV 프롬프트 생성 오류:', error);
-        console.error('오류 스택:', error.stack);
-        setGeneratingUI(false);
-
-        let errorMessage = 'MV 프롬프트 생성 중 오류가 발생했습니다.';
-        if (error.message) {
-            errorMessage += `\n\n오류: ${error.message}`;
-        }
-        
-        // handleAPIError가 있으면 사용, 없으면 기본 메시지
-        if (typeof window.handleAPIError === 'function') {
-            try {
-                const errorInfo = await window.handleAPIError(error, 'MV 프롬프트 생성');
-                alert(`${errorMessage}\n\n${errorInfo.userMessage || ''}\n\n상세: ${errorInfo.error || error.message}`);
-            } catch (e) {
-                alert(errorMessage);
-            }
-        } else {
-            alert(errorMessage);
-        }
-    }
-};
 
 // ═══════════════════════════════════════════════════════════════
 // 씬 다양성 보장 함수
@@ -4526,70 +4419,7 @@ window.downloadMVPrompts = function() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 };
-// [MOVED] extraction block
-\`\`\`
-
-**매우 중요:**
-- **가사 내용을 가장 우선적으로 반영하세요** - 각 프롬프트에 가사에서 묘사되는 장면, 감정, 상황을 구체적으로 포함하세요
-- 각 프롬프트는 40단어 이상
-- 가사의 감정과 내용을 시각적으로 표현
-- 설정값(시대, 국가, 장소, 조명, 카메라, 분위기, 인물)은 가사 내용과 자연스럽게 융합
-- 영어 프롬프트는 순수 영어만 (한글 없음)
-- 한글 프롬프트는 자연스러운 한글로 작성
-- JSON 형식만 출력`;
-
-                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
-                const response = await fetch(geminiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: {
-                            temperature: 0.8,
-                            topK: 40,
-                            topP: 0.95,
-                            maxOutputTokens: 4096,
-                        }
-                    })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                    
-                    console.log('🤖 MV 상세 프롬프트 AI 응답 수신:', aiResponse.substring(0, 300) + '...');
-                    
-                    // JSON 추출
-                    let jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-                    if (jsonMatch) {
-                        const aiPrompts = JSON.parse(jsonMatch[0]);
-                        
-                        combinedEn = aiPrompts.combinedEn || '';
-                        combinedKo = aiPrompts.combinedKo || '';
-                        backgroundEn = aiPrompts.backgroundEn || '';
-                        backgroundKo = aiPrompts.backgroundKo || '';
-                        characterEn = aiPrompts.characterEn || '';
-                        characterKo = aiPrompts.characterKo || '';
-                        
-                        console.log('✅ MV 상세 프롬프트 AI 생성 완료');
-                        
-                        // 한글 프롬프트가 없으면 영어에서 번역
-                        if (!combinedKo && combinedEn) {
-                            combinedKo = await translateEnglishToKoreanForScene('prompt', combinedEn) || '';
-                        }
-                        if (!backgroundKo && backgroundEn) {
-                            backgroundKo = await translateEnglishToKoreanForScene('background', backgroundEn) || '';
-                        }
-                        if (!characterKo && characterEn) {
-                            characterKo = await translateEnglishToKoreanForScene('character', characterEn) || '';
-                        }
-                    }
-                }
-            } catch (aiError) {
-                console.warn('⚠️ MV 상세 프롬프트 AI 생성 실패, 기본 방식으로 전환:', aiError);
-            }
-        }
-        
+\`\        
         // AI 생성 실패 시 기본 방식으로 생성
         if (!combinedEn || !backgroundEn || !characterEn) {
             // 설정 정보를 기반으로 프롬프트 구성 요소 생성
@@ -5078,75 +4908,7 @@ window.syncScenePromptTranslation = async function(sceneIndex, sourceLang) {
         console.error('씬 프롬프트 상호 번역 오류:', error);
     }
 };
-// [MOVED] extraction block
-\`\`\`
-
-**매우 중요:**
-- **전체 가사 내용을 가장 우선적으로 반영하세요** - 각 프롬프트에 전체 가사에서 묘사되는 장면, 감정, 상황을 구체적으로 포함하세요
-- **MV 프롬프트 상세 설정을 반드시 반영하세요** - 시대, 국가, 장소, 조명, 카메라, 분위기, 인물 정보를 전체 가사 내용과 자연스럽게 융합
-- 각 프롬프트는 60단어 이상의 상세한 묘사
-- 가사의 감정과 내용을 시각적으로 표현
-- **인물 상세 정보(성별, 나이, 인종, 외모/스타일)는 모든 프롬프트에서 일관되게 반영되어야 합니다**
-- **미드저니 고화질 실사진 키워드는 필수로 포함**하세요 (각 프롬프트 설명에 명시된 키워드들)
-- 영어 프롬프트는 순수 영어만 (한글 없음)
-- 한글 프롬프트는 자연스러운 한글로 작성
-- JSON 형식만 출력`;
-
-                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
-                const response = await fetch(geminiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: {
-                            temperature: 0.8,
-                            topK: 40,
-                            topP: 0.95,
-                            maxOutputTokens: 4096,
-                        }
-                    })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                    
-                    console.log('🤖 AI 응답 수신:', aiResponse.substring(0, 300) + '...');
-                    
-                    // JSON 추출
-                    let jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-                    if (jsonMatch) {
-                        const aiPrompts = JSON.parse(jsonMatch[0]);
-                        
-                        // 영어 프롬프트
-                        thumbnailEn = aiPrompts.thumbnailEn || aiPrompts.thumbnail || '';
-                        backgroundEn = aiPrompts.backgroundEn || aiPrompts.background || '';
-                        characterEn = aiPrompts.characterEn || aiPrompts.character || '';
-                        
-                        // 한글 프롬프트
-                        thumbnailKo = aiPrompts.thumbnailKo || '';
-                        backgroundKo = aiPrompts.backgroundKo || '';
-                        characterKo = aiPrompts.characterKo || '';
-                        
-                        console.log('✅ AI 프롬프트 생성 완료');
-                        
-                        // 한글 프롬프트가 없으면 영어에서 번역
-                        if (!thumbnailKo && thumbnailEn) {
-                            thumbnailKo = await translateEnglishToKoreanForScene('thumbnail', thumbnailEn) || '';
-                        }
-                        if (!backgroundKo && backgroundEn) {
-                            backgroundKo = await translateEnglishToKoreanForScene('background', backgroundEn) || '';
-                        }
-                        if (!characterKo && characterEn) {
-                            characterKo = await translateEnglishToKoreanForScene('character', characterEn) || '';
-                        }
-                    }
-                }
-            } catch (aiError) {
-                console.warn('⚠️ AI 프롬프트 생성 실패, 기본 방식으로 전환:', aiError);
-            }
-        }
-        
+\`\        
         // AI 생성 실패 시 기본 방식으로 생성
         if (!thumbnailEn || !backgroundEn || !characterEn) {
             console.log('📝 기본 방식으로 프롬프트 생성...');
@@ -6571,7 +6333,6 @@ window.getMVLocationValues = function() {
     return Array.from(activeTags).map(btn => btn.getAttribute('data-value')).filter(v => !!v);
 };
 
-// [MOVED] extraction block
 
 window.getMVLocationEnString = function() {
     const vals = window.getMVLocationValues();
@@ -8079,7 +7840,6 @@ window.resetAllSteps = function() {
         alert('전체 초기화 중 오류가 발생했습니다:\n\n' + error.message);
     }
 };
-// [MOVED] extraction block
 
 window.testAPIConnection = async function() {
     try {
@@ -8760,7 +8520,6 @@ if (typeof document !== 'undefined') {
         }, 500);
     }
 }
-// [MOVED] extraction block
 
 // SRT 자막 내용 복사
 window.copySRTContent = function(event) {
