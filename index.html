@@ -3,9 +3,15 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="AI 기반 가사 제작 & 수노 프롬프트 & 마케팅 자료 생성기">
-    <meta name="theme-color" content="#8b5cf6">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Music Creator">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="description" content="AI 기반 가사 제작 &amp; 수노 프롬프트 &amp; 마케팅 자료 생성기">
+    <meta name="theme-color" content="#1a73e8" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#89b4fa" media="(prefers-color-scheme: dark)">
     <script>
         // HTTP/HTTPS 환경에서만 manifest.json 로드 (file:// 프로토콜에서는 CORS 오류 방지)
         if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
@@ -18,7 +24,13 @@
     <title>🎵 Music Creator - AI 가사 & 수노 프롬프트 생성기</title>
     <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <link id="main-styles" rel="stylesheet" href="./styles.css">
+    <link id="main-styles" rel="stylesheet" href="./styles.css?v=20260222b">
+    <!-- Firebase CDN (compat mode) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-analytics-compat.js"></script>
     <script>
         (function(){
             function injectFallbackStyles() {
@@ -47,9 +59,8 @@
         /* 단계 완료 표시 */
         .step.step-complete .step-number { background: var(--success); color: white; }
         .step.step-complete .step-number::after { content: ' ✓'; font-size: 0.7em; }
-        /* 다크/라이트 테마 */
-        body.theme-dark { --bg-primary: #1a1a2e; --bg-secondary: #16213e; --bg-card: #0f3460; --bg-input: #1a1a2e; --text-primary: #e8e8e8; --text-secondary: #a0a0a0; --border: #2a2a4a; --accent: #a78bfa; --accent-dark: #7c3aed; }
-        /* 레이아웃 깨짐 방지: 가사 지역·태그 그리드 */
+        /* 다크/라이트 테마 (Google AI Studio 스타일) */
+        body.theme-dark { --bg-primary: #131314; --bg-secondary: #1e1f22; --bg-card: #1e1f22; --bg-input: #282a2d; --text-primary: #e3e3e3; --text-secondary: #c4c7c5; --border: #444746; --accent: #a8c7fa; --accent-dark: #7cacf8; }
         .tag-container {
             display: flex;
             flex-wrap: wrap;
@@ -89,6 +100,119 @@
         }
         .progress-steps .step-icon i {
             font-size: 1em;
+        }
+        /* 지침서/참조 등 공통 모달 오버레이 (표시 시 화면 전체 덮기) */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            pointer-events: none;
+        }
+        .modal-overlay.show {
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+        .modal-overlay .modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-overlay .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        .modal-overlay .modal-title { margin: 0; font-size: 1.125rem; font-weight: 600; color: var(--text-primary); }
+        .modal-overlay .modal-close {
+            width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+            padding: 0; border: none; border-radius: 8px; background: transparent;
+            color: var(--text-secondary); font-size: 1.25rem; cursor: pointer;
+        }
+        .modal-overlay .modal-close:hover { background: var(--bg-input); color: var(--text-primary); }
+        .modal-overlay .modal-body { padding: 20px; flex: 1; min-height: 0; overflow: auto; }
+        .modal-overlay .modal-footer {
+            display: flex; gap: 10px; justify-content: flex-end;
+            padding: 16px 20px; border-top: 1px solid var(--border); flex-shrink: 0;
+        }
+        /* 지침서 모달 전용: 넓은 본문 영역 + 균형 잡힌 레이아웃 */
+        #guidelinesModal .modal {
+            max-width: 720px;
+            width: 92vw;
+            max-height: 88vh;
+            min-height: 520px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        #guidelinesModal .modal-header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 18px 20px;
+            flex-shrink: 0;
+        }
+        #guidelinesModal .modal-body {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 0;
+            padding: 20px;
+            overflow: hidden;
+        }
+        #guidelinesModal .guidelines-desc {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            line-height: 1.5;
+            margin: 0 0 14px 0;
+            flex-shrink: 0;
+        }
+        #guidelinesModal #guidelinesText {
+            flex: 1;
+            min-height: 280px;
+            width: 100%;
+            padding: 16px 18px;
+            font-size: 0.9rem;
+            line-height: 1.65;
+            color: var(--text-primary);
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            resize: vertical;
+            font-family: 'Pretendard', 'Noto Sans KR', -apple-system, sans-serif;
+            box-sizing: border-box;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        #guidelinesModal #guidelinesText:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12);
+        }
+        #guidelinesModal #guidelinesText::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.8;
+        }
+        #guidelinesModal .modal-footer {
+            border-top: 1px solid var(--border);
+            padding: 16px 20px;
+            gap: 12px;
+            flex-shrink: 0;
         }
         /* API 키 설정 모달: 배경 + 전체 디자인 */
         #apiSettingsModal.modal-overlay {
@@ -256,17 +380,42 @@
         body.theme-dark #apiSettingsModal .modal {
             background: var(--bg-card) !important;
         }
+
+        /* 심플 테마용 배경 정리 */
+        .bg-animation, .sound-waves {
+            display: none !important;
+            opacity: 0 !important;
+        }
+
+        /* 태그 버튼 선택 상태 */
+        .tag-btn.active {
+            background-color: var(--accent) !important;
+            color: #fff !important;
+            border-color: var(--accent-dark) !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transform: translateY(-1px);
+        }
+        
+        /* 버튼 클릭 피드백 클래스 */
+        .btn-clicked {
+            transform: scale(0.95);
+            opacity: 0.8;
+            filter: brightness(1.2);
+            transition: all 0.1s ease;
+        }
+
+        /* MV 프롬프트 생성 버튼 로딩/처리 중 상태 */
+        .btn-processing {
+            background-color: #ffc107 !important; /* Warning yellow */
+            color: #000 !important;
+            cursor: wait;
+        }
     </style>
 </head>
 <body>
     <div class="bg-animation"></div>
     <div class="sound-waves" id="soundWaves"></div>
 
-    <!-- Sidebar Toggle Button -->
-    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" 
-            aria-label="사이드바 열기" aria-expanded="false">
-        <i class="fas fa-bars" aria-hidden="true"></i>
-    </button>
 
     <!-- Left Sidebar (드래그 및 리사이즈 가능) -->
     <aside class="sidebar open" id="sidebar">
@@ -332,14 +481,20 @@
     <div class="main-wrapper" id="mainWrapper">
     <header>
         <div class="header-top">
-            <!-- 첫 번째 행: 제목 -->
+            <!-- 첫 번째 행: 제목 (with sidebar toggle) -->
             <div class="header-row-1">
+                <!-- 사이드바 토글 버튼 (헤더 내부 배치) -->
+                <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()"
+                        aria-label="사이드바 열기" aria-expanded="false">
+                    <i class="fas fa-bars" aria-hidden="true"></i>
+                </button>
                 <div class="header-center">
-                    <div class="logo-main">
+                    <div class="logo-main" title="Music Creator: AI와 함께하는 창의적인 음악 제작 여정">
                         <span class="logo-icon"><i class="fas fa-music"></i></span>
                         <div>
-                            <h1 class="logo" style="margin: 0; font-size: 3rem;">Music Creator</h1>
-                            <p class="logo-subtitle" style="margin: 0; font-size: 0.75rem; text-align: center;">AI 기반 가사 제작 & 수노 프롬프트 & 마케팅 자료 생성기</p>
+                            <h1 class="logo" style="margin: 0;">Music Creator <span class="app-version">v1.2.44</span>
+                            <!-- Internal Deploy Date: 2026-02-26 08:55:12 --></h1>
+                            <p class="logo-subtitle" style="margin: 0; text-align: center;">AI 기반 가사 제작 &amp; 수노 프롬프트 &amp; 마케팅 자료 생성기</p>
                         </div>
                     </div>
                     <div class="current-song-title" id="currentSongTitle" style="display: none; margin: 8px 0 0 0;">
@@ -368,10 +523,10 @@
                     </div>
                 </div>
                 <div class="header-right">
-                    <div class="header-menu-dropdown" style="position: relative;">
-                        <button type="button" class="btn btn-header-icon" id="adminMenuTrigger" onclick="toggleAdminMenu(event)" title="관리자 메뉴 (API, 백업, 복구, 초기화 등)">
+                    <div class="header-menu-dropdown" id="adminMenuDropdown" style="position: relative; display: none;">
+                        <button type="button" class="btn btn-header-icon" id="adminMenuTrigger" onclick="toggleAdminMenu(event)" title="설정 메뉴 (지침서, 백업, 복구, 초기화 등)">
                             <span class="btn-icon"><i class="fas fa-cog"></i></span>
-                            <span class="btn-text">관리자</span>
+                            <span class="btn-text">설정</span>
                             <span class="btn-icon" style="margin-left: 4px; font-size: 0.65rem;"><i class="fas fa-chevron-down"></i></span>
                         </button>
                         <div id="headerMenuContent" class="admin-menu-content" style="display: none; position: absolute; top: 100%; right: 0; left: auto; margin-top: 6px; min-width: 200px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); z-index: 9999; padding: 8px 0; overflow: hidden;">
@@ -384,6 +539,11 @@
                             </button>
                             <button type="button" class="admin-menu-item" onclick="handleHeaderButtonClick('manualBackup', event); closeAdminMenu();">
                                 <i class="fas fa-download"></i> 백업
+                            </button>
+                            <!-- 복원 기능용 숨김 파일 입력 및 버튼 -->
+                            <input type="file" id="importFile" accept=".json" style="display: none;" onchange="if(typeof window.handleImport === 'function') { window.handleImport(event); } this.value = '';">
+                            <button type="button" class="admin-menu-item" onclick="if(typeof window.importProjects === 'function') { window.importProjects(); } else { document.getElementById('importFile').click(); } closeAdminMenu();">
+                                <i class="fas fa-upload"></i> 복원
                             </button>
                             <div style="height: 1px; background: var(--border); margin: 6px 0;"></div>
                             <button type="button" class="admin-menu-item" onclick="handleHeaderButtonClick('resetCurrentStep', event); closeAdminMenu();">
@@ -400,10 +560,15 @@
                             </button>
                         </div>
                     </div>
-                    <button class="btn btn-header-icon btn-edit" id="editModeToggleBtn" onclick="if(typeof window.toggleEditMode === 'function') { window.toggleEditMode(); } else { alert('⚠️ 수정 모드 기능을 사용할 수 없습니다.\\n\\n페이지를 새로고침(F5) 후 다시 시도해주세요.'); }" 
-                            title="수정 모드 전환" aria-label="수정 모드 전환">
-                        <span class="btn-icon" aria-hidden="true"><i class="fas fa-edit"></i></span>
-                        <span class="btn-text" id="editModeToggleText">수정</span>
+                    <button class="btn btn-header-icon" id="helpModalBtn" onclick="openHelpModal()" 
+                            title="도움말 — 단계별 가이드 및 팁" aria-label="도움말 열기">
+                        <span class="btn-icon" aria-hidden="true"><i class="fas fa-question-circle"></i></span>
+                        <span class="btn-text">도움말</span>
+                    </button>
+                    <button class="btn btn-header-icon" id="boardPanelBtn" onclick="if(typeof window.openBoardPanel === 'function') { window.openBoardPanel(); } else { alert('게시판 기능을 불러오는 중입니다.'); }" 
+                            title="질문 게시판 (Q&A)" aria-label="게시판 열기">
+                        <span class="btn-icon" aria-hidden="true"><i class="fas fa-clipboard-list"></i></span>
+                        <span class="btn-text">게시판</span>
                     </button>
                     <button class="btn btn-header-icon btn-save" onclick="handleHeaderButtonClick('saveCurrentProject', event)" 
                             title="현재 프로젝트 저장 (Ctrl+S)" aria-label="현재 프로젝트 저장">
@@ -414,6 +579,24 @@
                         <span class="btn-icon"><i class="fas fa-moon" id="themeToggleIcon"></i></span>
                         <span class="btn-text" id="themeToggleText">다크</span>
                     </button>
+                    <button class="btn btn-header-icon" id="headerLoginBtn" onclick="showAuthOverlay(); showAuthTab('login');" title="로그인" style="display:none;">
+                        <span class="btn-icon"><i class="fas fa-sign-in-alt"></i></span>
+                        <span class="btn-text">로그인</span>
+                    </button>
+                    <!-- 사용자 정보 & 관리자 패널 버튼 (Firebase 로그인 후 표시) -->
+                    <button type="button" id="headerUserInfo" class="btn btn-header-icon" style="cursor:default;">
+                        <i class="fas fa-user-circle" style="color:var(--accent);"></i>
+                        <span id="headerUserName" style="font-weight:600;color:var(--text-primary);"></span>
+                        <span id="headerUserRole" style="color:var(--text-secondary);font-size:0.78rem;"></span>
+                    </button>
+                    <button class="btn btn-header-icon" id="adminPanelBtn" onclick="openAdminPanel()" title="회원 관리 패널" style="display:none;">
+                        <span class="btn-icon"><i class="fas fa-users-cog"></i></span>
+                        <span class="btn-text">회원관리</span>
+                    </button>
+                    <button class="btn btn-header-icon" id="headerLogoutBtn" onclick="doLogout()" title="로그아웃" style="display:none;">
+                        <span class="btn-icon"><i class="fas fa-sign-out-alt"></i></span>
+                        <span class="btn-text">로그아웃</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -422,41 +605,41 @@
     <div class="container">
         <!-- Progress Steps -->
         <div class="progress-steps" id="progressSteps">
-            <div class="step" data-step="1">
-                <span class="step-drag-handle" title="드래그하여 순서 변경" draggable="true"><i class="fas fa-grip-vertical"></i></span>
+            <div class="step active" data-step="1" onclick="goToStep(1, false, true)" style="cursor: pointer;">
+                <span class="step-drag-handle" title="드래그하여 순서 변경" draggable="true" onclick="event.stopPropagation()"><i class="fas fa-grip-vertical"></i></span>
                 <span class="step-icon"><i class="fas fa-pen"></i></span>
                 <span class="step-number">1</span>
-                <span class="step-label" onclick="goToStep(1, false, true)">가사 작성</span>
+                <span class="step-label">가사 작성</span>
             </div>
-            <div class="step" data-step="2">
-                <span class="step-drag-handle" title="드래그하여 순서 변경" draggable="true"><i class="fas fa-grip-vertical"></i></span>
+            <div class="step" data-step="2" onclick="goToStep(2, false, true)" style="cursor: pointer;">
+                <span class="step-drag-handle" title="드래그하여 순서 변경" draggable="true" onclick="event.stopPropagation()"><i class="fas fa-grip-vertical"></i></span>
                 <span class="step-icon"><i class="fas fa-magic"></i></span>
                 <span class="step-number">2</span>
-                <span class="step-label" onclick="goToStep(2, false, true)">수노 변환</span>
+                <span class="step-label">수노 변환</span>
             </div>
-            <div class="step" data-step="3">
-                <span class="step-drag-handle" title="드래그하여 순서 변경" draggable="true"><i class="fas fa-grip-vertical"></i></span>
+            <div class="step" data-step="3" onclick="goToStep(3, false, true)" style="cursor: pointer;">
+                <span class="step-drag-handle" title="드래그하여 순서 변경" draggable="true" onclick="event.stopPropagation()"><i class="fas fa-grip-vertical"></i></span>
                 <span class="step-icon"><i class="fas fa-chart-line"></i></span>
                 <span class="step-number">3</span>
-                <span class="step-label" onclick="goToStep(3, false, true)">AI 분석</span>
+                <span class="step-label">AI 분석</span>
             </div>
-            <div class="step" data-step="4">
-                <span class="step-drag-handle" title="드래그하여 순서 변경" draggable="true"><i class="fas fa-grip-vertical"></i></span>
+            <div class="step" data-step="4" onclick="goToStep(4, false, true)" style="cursor: pointer;">
+                <span class="step-drag-handle" title="드래그하여 순서 변경" draggable="true" onclick="event.stopPropagation()"><i class="fas fa-grip-vertical"></i></span>
                 <span class="step-icon"><i class="fas fa-lightbulb"></i></span>
                 <span class="step-number">4</span>
-                <span class="step-label" onclick="goToStep(4, false, true)">개선안</span>
+                <span class="step-label">개선안</span>
             </div>
-            <div class="step" data-step="5">
-                <span class="step-drag-handle" title="드래그하여 순서 변경" draggable="true"><i class="fas fa-grip-vertical"></i></span>
+            <div class="step" data-step="5" onclick="goToStep(5, false, true)" style="cursor: pointer;">
+                <span class="step-drag-handle" title="드래그하여 순서 변경" draggable="true" onclick="event.stopPropagation()"><i class="fas fa-grip-vertical"></i></span>
                 <span class="step-icon"><i class="fas fa-file-export"></i></span>
                 <span class="step-number">5</span>
-                <span class="step-label" onclick="goToStep(5, false, true)">최종 출력</span>
+                <span class="step-label">최종 출력</span>
             </div>
-            <div class="step" data-step="6">
-                <span class="step-drag-handle" title="드래그하여 순서 변경" draggable="true"><i class="fas fa-grip-vertical"></i></span>
+            <div class="step" data-step="6" onclick="goToStep(6, false, true)" style="cursor: pointer;">
+                <span class="step-drag-handle" title="드래그하여 순서 변경" draggable="true" onclick="event.stopPropagation()"><i class="fas fa-grip-vertical"></i></span>
                 <span class="step-icon"><i class="fas fa-bullhorn"></i></span>
                 <span class="step-number">6</span>
-                <span class="step-label" onclick="goToStep(6, false, true)">마케팅</span>
+                <span class="step-label">마케팅</span>
             </div>
         </div>
 
@@ -467,52 +650,36 @@
                     <div class="card-icon">✍️</div>
                     <div>
                         <h2 class="card-title">가사 작성</h2>
-                        <p class="card-subtitle">직접 작성하거나 AI가 생성해드립니다</p>
+                        <p class="card-subtitle">노래의 주제를 정하고 영감을 주는 가사를 만듭니다</p>
                     </div>
-                    <button class="btn btn-small btn-save-step" onclick="saveCurrentProject(); showCopyIndicator('✅ 1단계: 가사 작성이 저장되었습니다!');" title="이 단계 저장">
+                    <button class="btn btn-small btn-save-step" onclick="saveCurrentProject(); showCopyIndicator('✅ 1단계: 가사 작성이 저장되었습니다!');" title="현재 단계의 가사와 설정을 브라우저에 저장합니다 (나중에 다시 불러올 수 있습니다)">
                         <i class="fas fa-save"></i> 저장
                     </button>
                 </div>
 
                 <!-- Mode Tabs -->
                 <div class="mode-tabs">
-                    <button class="mode-tab active" data-mode="manual" onclick="if(typeof window.switchLyricsMode === 'function') { window.switchLyricsMode('manual'); } else { alert('⚠️ 모드 전환 기능을 사용할 수 없습니다.\\n\\n페이지를 새로고침(F5) 후 다시 시도해주세요.'); }">✍️ 직접 작성</button>
-                    <button class="mode-tab" data-mode="ai" onclick="if(typeof window.switchLyricsMode === 'function') { window.switchLyricsMode('ai'); } else { alert('⚠️ 모드 전환 기능을 사용할 수 없습니다.\\n\\n페이지를 새로고침(F5) 후 다시 시도해주세요.'); }">🤖 AI 생성</button>
+                    <button class="mode-tab active" data-mode="manual" onclick="if(typeof window.switchLyricsMode === 'function') { window.switchLyricsMode('manual'); } else { alert('⚠️ 모드 전환 기능을 사용할 수 없습니다.'); }" title="자신만의 독창적인 가사를 직접 입력하거나 수정합니다">✍️ 직접 작성</button>
+                    <button class="mode-tab" data-mode="ai" onclick="if(typeof window.switchLyricsMode === 'function') { window.switchLyricsMode('ai'); } else { alert('⚠️ 모드 전환 기능을 사용할 수 없습니다.'); }" title="장르와 주제만 입력하면 AI가 멋진 가사를 제안해드립니다">🤖 AI 생성</button>
                 </div>
 
                 <!-- Manual Mode -->
                 <div class="lyrics-mode active" id="manualMode">
                     <div class="form-group">
                         <label>곡 제목 (한글/영어)</label>
-                        <input type="text" id="songTitle" placeholder="예: 별빛 아래서 (Under the Starlight)">
+                        <input type="text" id="songTitle" placeholder="예: 별빛 아래서 (Under the Starlight)" title="프로젝트를 식별할 수 있는 아름다운 제목을 입력해주세요">
+                        <p class="help-text" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">💡 제목은 사이드바 목록과 저장 파일 이름에 사용됩니다.</p>
                     </div>
 
                     <div class="form-group">
-                        <label>가사 내용 <span style="color: var(--accent); font-size: 0.85rem; font-weight: normal;">(지시어 포함 가능)</span></label>
-                        <textarea id="originalLyrics" placeholder="여기에 가사를 입력해주세요. 지시어를 포함하여 작성할 수 있습니다.
-
-예시 (지시어 포함):
-[Intro]
-[Tempo: 68 BPM] [Vocal: Breathless whisper] [Reverb: Wide stereo]
-어둠 속에 빛나는 별처럼
-너의 눈동자가 날 비춰
-
-[Verse 1]
-[Tempo: 72 BPM] [Vocal: Soft and warm] [Instruments: Soft piano]
-이 밤이 영원하길 바라며
-너의 손을 잡아"></textarea>
+                        <label>가사 내용 <span style="color: var(--accent); font-size: 0.85rem; font-weight: normal;">(지시어 포함 가능, 3절 분량)</span></label>
+                        <textarea id="originalLyrics" placeholder="여기에 가사를 입력해주세요. [Intro], [Verse], [Chorus] 등의 지시어를 사용하면 AI가 더 정확하게 이해합니다." style="min-height: 320px; resize: vertical; line-height: 1.6;" title="노래의 핵심이 되는 가사를 입력하거나 다듬어주세요"></textarea>
+                        <p class="help-text" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">💡 [Chorus] 처럼 대괄호를 사용해 곡의 구조를 명시하면 수노 AI가 더 잘 인식합니다.</p>
                     </div>
 
                     <div class="form-group">
-                        <label>🎵 수노 스타일 프롬프트 <span style="color: var(--accent); font-size: 0.85rem; font-weight: normal;">(선택사항)</span></label>
-                        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;">
-                            <button type="button" class="btn btn-small btn-secondary" onclick="applyStylePreset('ballad')">발라드</button>
-                            <button type="button" class="btn btn-small btn-secondary" onclick="applyStylePreset('poprock')">팝 록</button>
-                            <button type="button" class="btn btn-small btn-secondary" onclick="applyStylePreset('rnb')">R&B</button>
-                            <button type="button" class="btn btn-small btn-secondary" onclick="applyStylePreset('kpop')">K-Pop</button>
-                            <button type="button" class="btn btn-small btn-secondary" onclick="applyStylePreset('acoustic')">어쿠스틱</button>
-                        </div>
-                        <textarea id="manualStylePrompt" placeholder="전체 노래에 대한 스타일 프롬프트를 작성하세요. 장르, 분위기, 박자, 보컬, 악기 등을 포함할 수 있습니다.
+                        <label>🎵 수노 스타일 프롬프트 <span style="color: var(--accent); font-size: 0.85rem; font-weight: normal;">(선택사항, 최대 1000자)</span></label>
+                        <textarea id="manualStylePrompt" maxlength="1000" oninput="var c=document.getElementById('manualStylePromptCount');if(c)c.textContent=this.value.length;" placeholder="전체 노래에 대한 스타일 프롬프트를 작성하세요. 장르, 분위기, 박자, 보컬, 악기 등을 포함할 수 있습니다.
 
 예시:
 K-Pop Ballad, emotional, 72 BPM, soft and warm vocals, piano and strings, intimate atmosphere, studio quality, gentle reverb, cinematic, heartfelt, melancholic undertones
@@ -520,14 +687,19 @@ K-Pop Ballad, emotional, 72 BPM, soft and warm vocals, piano and strings, intima
 또는:
 Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadium atmosphere, dynamic, punchy, anthemic
 
-💡 팁: 장르, 분위기, 템포(BPM), 보컬 스타일, 악기, 분위기, 음질 등을 자유롭게 조합하여 작성하세요." style="min-height: 120px;"></textarea>
+💡 팁: 장르, 분위기, 템포(BPM), 보컬 스타일, 악기, 분위기, 음질 등을 자유롭게 조합하여 작성하세요." style="min-height: 260px; resize: vertical; line-height: 1.6;"></textarea>
                         <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 5px;">
-                            💡 이 프롬프트는 2단계 수노 변환 단계의 스타일 프롬프트에 자동으로 반영됩니다.
+                            💡 이 프롬프트는 2단계 수노 변환 단계의 스타일 프롬프트에 자동으로 반영됩니다. <span id="manualStylePromptCount" style="color: var(--accent); font-weight: 500;">0</span>/1000자
                         </p>
                     </div>
 
-                    <!-- 참고 가사 섹션 -->
-                    <div class="form-group" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+                    <!-- 직접 작성: 제목·가사·스타일만 표시. 참고 가사·장르·분위기·AI 생성 버튼 등은 AI 생성 선택 시에만 표시 -->
+                </div>
+
+                <!-- AI 생성 모드: 참고 가사(선택사항) + 장르·분위기·시대·테마 등 + AI로 4개 가사 생성하기 (직접 작성 선택 시에는 전부 숨김) -->
+                <div class="lyrics-mode" id="aiMode">
+                    <!-- 참고 가사 (선택사항) -->
+                    <div class="form-group" style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border);">
                         <label style="display: flex; justify-content: space-between; align-items: center;">
                             <span>📚 참고 가사 (선택사항)</span>
                             <button type="button" class="btn btn-small btn-secondary" onclick="toggleReferenceSection()" id="toggleReferenceBtn">
@@ -614,110 +786,11 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label>🌍 가사 지역 (선택사항)</label>
-                        <div class="tag-container" id="manualRegionTags">
-                            <!-- 대륙/지역 -->
-                            <button class="tag-btn" data-value="유럽">유럽</button>
-                            <button class="tag-btn" data-value="아시아">아시아</button>
-                            <button class="tag-btn" data-value="북미">북미</button>
-                            <button class="tag-btn" data-value="남미">남미</button>
-                            <button class="tag-btn" data-value="아프리카">아프리카</button>
-                            <button class="tag-btn" data-value="오세아니아">오세아니아</button>
-                            
-                            <!-- 아시아 국가 -->
-                            <button class="tag-btn" data-value="한국">한국</button>
-                            <button class="tag-btn" data-value="일본">일본</button>
-                            <button class="tag-btn" data-value="중국">중국</button>
-                            <button class="tag-btn" data-value="대만">대만</button>
-                            <button class="tag-btn" data-value="홍콩">홍콩</button>
-                            <button class="tag-btn" data-value="태국">태국</button>
-                            <button class="tag-btn" data-value="베트남">베트남</button>
-                            <button class="tag-btn" data-value="인도네시아">인도네시아</button>
-                            <button class="tag-btn" data-value="필리핀">필리핀</button>
-                            <button class="tag-btn" data-value="싱가포르">싱가포르</button>
-                            <button class="tag-btn" data-value="말레이시아">말레이시아</button>
-                            <button class="tag-btn" data-value="인도">인도</button>
-                            
-                            <!-- 유럽 국가 -->
-                            <button class="tag-btn" data-value="프랑스">프랑스</button>
-                            <button class="tag-btn" data-value="영국">영국</button>
-                            <button class="tag-btn" data-value="독일">독일</button>
-                            <button class="tag-btn" data-value="이탈리아">이탈리아</button>
-                            <button class="tag-btn" data-value="스페인">스페인</button>
-                            <button class="tag-btn" data-value="네덜란드">네덜란드</button>
-                            <button class="tag-btn" data-value="벨기에">벨기에</button>
-                            <button class="tag-btn" data-value="스위스">스위스</button>
-                            <button class="tag-btn" data-value="오스트리아">오스트리아</button>
-                            <button class="tag-btn" data-value="그리스">그리스</button>
-                            <button class="tag-btn" data-value="포르투갈">포르투갈</button>
-                            <button class="tag-btn" data-value="스웨덴">스웨덴</button>
-                            <button class="tag-btn" data-value="노르웨이">노르웨이</button>
-                            <button class="tag-btn" data-value="덴마크">덴마크</button>
-                            <button class="tag-btn" data-value="핀란드">핀란드</button>
-                            <button class="tag-btn" data-value="러시아">러시아</button>
-                            <button class="tag-btn" data-value="체코">체코</button>
-                            <button class="tag-btn" data-value="폴란드">폴란드</button>
-                            
-                            <!-- 북미 국가 -->
-                            <button class="tag-btn" data-value="미국">미국</button>
-                            <button class="tag-btn" data-value="캐나다">캐나다</button>
-                            <button class="tag-btn" data-value="멕시코">멕시코</button>
-                            
-                            <!-- 한국 지역 -->
-                            <button class="tag-btn" data-value="서울">서울</button>
-                            <button class="tag-btn" data-value="부산">부산</button>
-                            <button class="tag-btn" data-value="인천">인천</button>
-                            <button class="tag-btn" data-value="대구">대구</button>
-                            <button class="tag-btn" data-value="대전">대전</button>
-                            <button class="tag-btn" data-value="광주">광주</button>
-                            <button class="tag-btn" data-value="울산">울산</button>
-                            <button class="tag-btn" data-value="경기도">경기도</button>
-                            <button class="tag-btn" data-value="강원도">강원도</button>
-                            <button class="tag-btn" data-value="충청도">충청도</button>
-                            <button class="tag-btn" data-value="전라도">전라도</button>
-                            <button class="tag-btn" data-value="경상도">경상도</button>
-                            <button class="tag-btn" data-value="제주도">제주도</button>
-                            
-                            <!-- 주요 도시 -->
-                            <button class="tag-btn" data-value="뉴욕">뉴욕</button>
-                            <button class="tag-btn" data-value="로스앤젤레스">로스앤젤레스</button>
-                            <button class="tag-btn" data-value="파리">파리</button>
-                            <button class="tag-btn" data-value="런던">런던</button>
-                            <button class="tag-btn" data-value="도쿄">도쿄</button>
-                            <button class="tag-btn" data-value="베이징">베이징</button>
-                            <button class="tag-btn" data-value="상하이">상하이</button>
-                            <button class="tag-btn" data-value="방콕">방콕</button>
-                            <button class="tag-btn" data-value="싱가포르">싱가포르</button>
-                            <button class="tag-btn" data-value="홍콩">홍콩</button>
-                            <button class="tag-btn" data-value="시드니">시드니</button>
-                            <button class="tag-btn" data-value="멜버른">멜버른</button>
-                            <button class="tag-btn" data-value="베를린">베를린</button>
-                            <button class="tag-btn" data-value="로마">로마</button>
-                            <button class="tag-btn" data-value="마드리드">마드리드</button>
-                            <button class="tag-btn" data-value="암스테르담">암스테르담</button>
-                            <button class="tag-btn" data-value="바르셀로나">바르셀로나</button>
-                            <button class="tag-btn" data-value="비엔나">비엔나</button>
-                            <button class="tag-btn" data-value="프라하">프라하</button>
-                            <button class="tag-btn" data-value="부다페스트">부다페스트</button>
-                            <button class="tag-btn" data-value="리스본">리스본</button>
-                            <button class="tag-btn" data-value="아테네">아테네</button>
-                            <button class="tag-btn" data-value="모스크바">모스크바</button>
-                            <button class="tag-btn" data-value="스톡홀름">스톡홀름</button>
-                            <button class="tag-btn" data-value="오슬로">오슬로</button>
-                            <button class="tag-btn" data-value="코펜하겐">코펜하겐</button>
-                            <button class="tag-btn" data-value="헬싱키">헬싱키</button>
-                            <button class="tag-btn custom-tag-btn" data-container="manualRegionTags" onclick="showCustomTagInput('manualRegionTags')" style="background: var(--accent); color: white; border: 2px dashed white;">➕ 기타(추가)</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- AI Generation Mode -->
-                <div class="lyrics-mode" id="aiMode">
-                    <!-- AI Options -->
+                    <!-- AI Options: 장르·분위기·시대·테마 등 + AI로 4개 가사 생성하기 -->
                     <div class="ai-options-grid">
                         <div class="form-group">
                             <label><i class="fas fa-clock"></i> 시대 (다중 선택 가능)</label>
+                            <p class="help-text" style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px;">💡 곡의 배경이 되는 시대를 선택하세요. 가사의 어휘와 분위기에 반영됩니다.</p>
                             <div class="tag-container" id="eraTags">
                                 <!-- 과거 시대 -->
                                 <button class="tag-btn" data-value="원시시대">원시시대</button>
@@ -790,6 +863,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
 
                         <div class="form-group">
                             <label>💕 테마/소재 (다중 선택 가능)</label>
+                            <p class="help-text" style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px;">💡 곡이 다루고자 하는 핵심 테마나 문학적 영감을 선택하세요.</p>
                             <div class="tag-container" id="themeTags">
                                 <button class="tag-btn" data-value="첫사랑">첫사랑</button>
                                 <button class="tag-btn" data-value="이별">이별</button>
@@ -898,6 +972,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
 
                         <div class="form-group">
                             <label>👤 화자 시점</label>
+                            <p class="help-text" style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px;">💡 누가 누구에게 이야기하는지, 곡의 시점을 정의합니다.</p>
                             <div class="tag-container" id="perspectiveTags">
                                 <button class="tag-btn" data-value="남성 1인칭">남성 1인칭</button>
                                 <button class="tag-btn" data-value="여성 1인칭">여성 1인칭</button>
@@ -1059,6 +1134,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
 
                     <div class="form-group">
                         <label>🌍 가사 지역 (다중 선택 가능)</label>
+                        <p class="help-text" style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px;">💡 특정 도시나 국가의 정서를 가사에 담고 싶을 때 선택하세요.</p>
                         <div class="tag-container" id="regionTags">
                             <!-- 대륙/지역 -->
                             <button class="tag-btn" data-value="유럽">유럽</button>
@@ -1172,7 +1248,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                 </div>
 
                 <!-- Common: Genre & Mood Selection -->
-                <div id="commonOptions">
+                <div id="commonOptions" style="display: none;">
                     <div class="form-group">
                         <label>🎸 장르 선택 (다중 선택 가능)</label>
                         <div class="tag-container" id="genreTags">
@@ -1358,7 +1434,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
 
                     <!-- AI 가사 생성 버튼 -->
                     <div class="btn-group" style="margin-top: 25px;">
-                        <button class="btn btn-primary" onclick="if(typeof window.generateAILyrics === 'function') { window.generateAILyrics(); } else { alert('⚠️ AI 가사 생성 기능을 사용할 수 없습니다.\\n\\n페이지를 새로고침(F5) 후 다시 시도해주세요.'); }" style="width: 100%; padding: 12px; font-size: 1rem;">
+                        <button class="btn btn-primary" onclick="if(typeof window.generateAILyrics === 'function') { window.generateAILyrics(); } else { alert('⚠️ AI 가사 생성 기능을 사용할 수 없습니다.'); }" style="width: 100%; padding: 12px; font-size: 1rem;" title="선택한 옵션을 바탕으로 ChatGPT가 4가지 서로 다른 스타일의 가사를 생성합니다">
                             <i class="fas fa-robot"></i> AI로 4개 가사 생성하기
                         </button>
                     </div>
@@ -1449,9 +1525,9 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                         <div class="card-icon">🎼</div>
                         <div>
                             <h2 class="card-title">수노 AI 가사 변환 <span class="ai-badge">💬 ChatGPT</span></h2>
-                            <p class="card-subtitle">AI가 지침서 기준으로 구조 태그와 지시어를 추가합니다</p>
+                            <p class="card-subtitle">AI가 지침서(Wiki)를 참고하여 수노에 최적화된 구조 태그를 추가합니다</p>
                         </div>
-                        <button class="btn btn-small btn-save-step" onclick="saveCurrentProject(); showCopyIndicator('✅ 2단계: 수노 변환이 저장되었습니다!');" title="이 단계 저장">
+                        <button class="btn btn-small btn-save-step" onclick="saveCurrentProject(); showCopyIndicator('✅ 2단계: 수노 변환이 저장되었습니다!');" title="이 단계의 영문 가사와 변환 설정을 저장합니다">
                             <i class="fas fa-save"></i> 저장
                         </button>
                     </div>
@@ -1470,17 +1546,19 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                         <label style="display: flex; justify-content: space-between; align-items: center;">
                             <span>수노용 가사 (편집 가능)</span>
                             <div style="display: flex; gap: 5px;">
+                                <button class="btn btn-small btn-success" onclick="copyForSuno('sunoLyrics', 'stylePrompt')" title="Suno용 통합 복사"><i class="fas fa-copy"></i> 통합 복사</button>
                                 <button class="btn btn-small btn-secondary" onclick="saveSunoLyricsHistory()" title="이력에 저장"><i class="fas fa-save"></i> 저장</button>
                                 <button class="btn btn-small btn-secondary" onclick="copyToClipboard('sunoLyrics', '수노 가사', event)" title="가사 복사"><i class="fas fa-copy"></i> 복사</button>
                             </div>
                         </label>
-                        <textarea id="sunoLyrics" class="step2-lyrics-textarea" style="min-height: 120px; overflow-y: auto; resize: none;" oninput="if(typeof window.autoResizeTextarea==='function')window.autoResizeTextarea(this);"></textarea>
+                        <textarea id="sunoLyrics" class="step2-lyrics-textarea" style="min-height: 120px; overflow-y: auto; resize: none;" oninput="if(typeof window.autoResizeTextarea==='function')window.autoResizeTextarea(this);" title="수노 앱의 'Lyrics' 칸에 붙여넣을 가사입니다. 자유롭게 수정하세요."></textarea>
+                        <p class="help-text" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">💡 <b>[Intro], [Chorus]</b> 등 대괄호 태그는 AI가 노래의 구조를 이해하는 데 핵심적인 역할을 합니다.</p>
                         
                         <!-- 수노 가사 이력 -->
                         <div id="sunoLyricsHistorySection" style="margin-top: 15px; display: none;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                                 <span style="font-weight: 600; color: var(--primary);"><i class="fas fa-history"></i> 수노 가사 이력</span>
-                                <button class="btn btn-small btn-danger" onclick="clearSunoLyricsHistory()" style="font-size: 0.75rem;"><i class="fas fa-trash"></i> 전체 삭제</button>
+                                <button type="button" class="btn btn-small btn-danger" onclick="event.preventDefault(); clearSunoLyricsHistory()" style="font-size: 0.75rem;"><i class="fas fa-trash"></i> 전체 삭제</button>
                             </div>
                             <div id="sunoLyricsHistoryList" style="max-height: 200px; overflow-y: auto; background: var(--bg-input); border-radius: 8px; padding: 10px;"></div>
                         </div>
@@ -1617,6 +1695,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
 
                     <div class="form-group">
                         <label><i class="fas fa-tachometer-alt"></i> 템포 (BPM)</label>
+                        <p class="help-text" style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px;">💡 곡의 속도를 선택하세요. 수노 AI가 비트의 빠르기를 결정합니다.</p>
                         <div class="tempo-slider-container">
                             <div class="tempo-slider-wrapper">
                                 <input type="range" id="tempoSlider" min="40" max="200" value="80" step="1" class="tempo-slider">
@@ -1637,6 +1716,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
 
                     <div class="form-group">
                         <label><i class="fas fa-guitar"></i> 악기 구성 (다중 선택 가능)</label>
+                        <p class="help-text" style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px;">💡 어떤 악기의 사운드를 배경음악에 넣을지 선택하세요.</p>
                         <div class="instrument-scroll-container">
                             <div class="tag-container" id="instrumentTags">
                             <!-- 건반 악기 -->
@@ -1824,13 +1904,13 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                         <div id="stylePromptHistorySection" style="margin-top: 15px; display: none;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                                 <span style="font-weight: 600; color: var(--accent);"><i class="fas fa-history"></i> 스타일 프롬프트 이력</span>
-                                <button class="btn btn-small btn-danger" onclick="clearStylePromptHistory()" style="font-size: 0.75rem;"><i class="fas fa-trash"></i> 전체 삭제</button>
+                                <button type="button" class="btn btn-small btn-danger" onclick="event.preventDefault(); clearStylePromptHistory()" style="font-size: 0.75rem;"><i class="fas fa-trash"></i> 전체 삭제</button>
                             </div>
                             <div id="stylePromptHistoryList" style="max-height: 200px; overflow-y: auto; background: var(--bg-input); border-radius: 8px; padding: 10px;"></div>
                         </div>
                     </div>
 
-                    <button class="btn btn-secondary" onclick="generateStylePromptAI()">✨ AI로 프롬프트 생성</button>
+                    <button class="btn btn-secondary" onclick="generateStylePromptAI()" title="위에서 선택한 모든 옵션과 현재 가사의 분위기를 분석하여 최적의 수노 스타일 프롬프트를 생성합니다">✨ AI로 프롬프트 생성</button>
                 </div>
             </div>
             
@@ -1883,11 +1963,11 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
             <div id="analysisResult" style="display: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <div>
-                        <h3>🔍 Gemini 정밀 분석</h3>
-                        <p>2단계에서 생성된 가사와 스타일 프롬프트를 정밀 분석하고 개선 사항을 제안합니다.</p>
+                        <h3>🔍 Gemini & ChatGPT 정밀 분석</h3>
+                        <p>2단계에서 생성된 가사와 스타일 프롬프트의 품질을 다각도로 평가하고 최적의 개선안을 제안합니다.</p>
                     </div>
                     <div style="display: flex; gap: 10px;">
-                        <button class="btn btn-primary" id="startAnalysisBtn" onclick="if(typeof window.startGeminiAnalysis === 'function') { window.startGeminiAnalysis(); } else { alert('⚠️ 분석 기능을 사용할 수 없습니다.\\n\\n페이지를 새로고침(F5) 후 다시 시도해주세요.'); }">
+                        <button class="btn btn-primary" id="startAnalysisBtn" onclick="if(typeof window.startGeminiAnalysis === 'function') { window.startGeminiAnalysis(); } else { alert('⚠️ 분석 기능을 사용할 수 없습니다.'); }" title="Gemini와 ChatGPT를 동시에 사용하여 가사의 완성도와 스타일의 적합성을 분석합니다.">
                             <i class="fas fa-magic"></i> 분석 시작
                         </button>
                         <button class="btn btn-small btn-save-step" onclick="saveCurrentProject(); showCopyIndicator('✅ 3단계: AI 분석이 저장되었습니다!');" title="이 단계 저장">
@@ -1933,8 +2013,8 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                 </div>
 
                 <div class="btn-group" style="justify-content: center;">
-                    <button class="btn btn-secondary" onclick="if(typeof window.goToStep === 'function') { window.goToStep(2); } else { alert('⚠️ 단계 이동 기능을 사용할 수 없습니다.\\n\\n페이지를 새로고침(F5) 후 다시 시도해주세요.'); }">← 이전</button>
-                    <button class="btn btn-primary" id="nextStepBtn" onclick="if(typeof window.goToStep4AndApplyImprovements === 'function') { window.goToStep4AndApplyImprovements(); } else { alert('⚠️ 개선안 반영 기능을 사용할 수 없습니다.\\n\\n페이지를 새로고침(F5) 후 다시 시도해주세요.'); }">🔧 개선안 반영 →</button>
+                    <button class="btn btn-secondary" onclick="if(typeof window.goToStep === 'function') { window.goToStep(2); } else { alert('⚠️ 단계 이동 기능을 사용할 수 없습니다.'); }">← 이전</button>
+                    <button class="btn btn-primary" id="nextStepBtn" onclick="if(typeof window.goToStep4AndApplyImprovements === 'function') { window.goToStep4AndApplyImprovements(); } else { alert('⚠️ 개선안 반영 기능을 사용할 수 없습니다.'); }" title="AI가 제안한 모든 개선 사항을 가사와 프롬프트에 즉시 적용하고 다음 단계로 이동합니다">🔧 개선안 반영 →</button>
                 </div>
                 <div class="step-footer">
                     <p>🎵 Music Creator - AI 가사 & 수노 프롬프트 & 마케팅 자료 생성기</p>
@@ -1952,6 +2032,12 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
             </div>
 
             <div class="card" id="improvementCard" style="display: none;">
+                <div class="auth-header">
+                    <h2><i class="fas fa-music"></i> Music Creator</h2>
+                    <button type="button" class="auth-close-btn" onclick="hideAuthOverlay()" title="닫기 (읽기 모드로 보기)">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
                 <div class="card-header">
                     <div class="card-icon">✅</div>
                     <div>
@@ -1972,8 +2058,8 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                             <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">3단계에서 분석된 개선 사항 - 적용할 항목을 선택하세요</p>
                         </div>
                         <div style="display: flex; gap: 8px;">
-                            <button class="btn btn-small btn-secondary" onclick="if(typeof window.selectAllImprovements === 'function') { window.selectAllImprovements(); } else { alert('⚠️ 기능을 사용할 수 없습니다.\\n\\n페이지를 새로고침(F5) 후 다시 시도해주세요.'); }" style="font-size: 0.75rem;">전체 선택</button>
-                            <button class="btn btn-small btn-secondary" onclick="if(typeof window.deselectAllImprovements === 'function') { window.deselectAllImprovements(); } else { alert('⚠️ 기능을 사용할 수 없습니다.\\n\\n페이지를 새로고침(F5) 후 다시 시도해주세요.'); }" style="font-size: 0.75rem;">전체 해제</button>
+                            <button class="btn btn-small btn-secondary" onclick="if(typeof window.selectAllImprovements === 'function') { window.selectAllImprovements(); } else { alert('⚠️ 기능을 사용할 수 없습니다.'); }" style="font-size: 0.75rem;" title="모든 제안 사항을 선택합니다">전체 선택</button>
+                            <button class="btn btn-small btn-secondary" onclick="if(typeof window.deselectAllImprovements === 'function') { window.deselectAllImprovements(); } else { alert('⚠️ 기능을 사용할 수 없습니다.'); }" style="font-size: 0.75rem;" title="모든 제안 사항 선택을 해제합니다">전체 해제</button>
                         </div>
                     </div>
                     <div id="geminiSuggestionsSummary" style="padding: 15px; font-size: 0.9rem; color: var(--text-secondary); overflow-x: hidden; max-width: 100%; box-sizing: border-box;">
@@ -1982,13 +2068,13 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                     <div style="padding: 15px; border-top: 1px solid var(--border); background: var(--bg-card);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                             <span style="font-weight: 600; color: var(--text-primary);">
-                                선택된 개선안: <span id="selectedImprovementsCount">0</span>개
+                                선택된 개선안: <span id="selectedImprovementCount">0</span>개
                             </span>
                             <div style="display: flex; gap: 8px;">
-                                <button class="btn btn-primary btn-small" onclick="if(typeof window.applySelectedImprovements === 'function') { window.applySelectedImprovements(); } else { alert('⚠️ 기능을 사용할 수 없습니다.\\n\\n페이지를 새로고침(F5) 후 다시 시도해주세요.'); }" id="applySelectedBtn">
+                                <button class="btn btn-primary btn-small" onclick="if(typeof window.applySelectedImprovements === 'function') { window.applySelectedImprovements(); } else { alert('⚠️ 기능을 사용할 수 없습니다.'); }" id="applySelectedBtn" title="선택한 개선 사항만 현재 가사와 스타일 프롬프트에 반영합니다">
                                     ✅ 선택한 항목만 적용
                                 </button>
-                                <button class="btn btn-success btn-small" onclick="if(typeof window.applyAllImprovements === 'function') { window.applyAllImprovements(); } else { alert('⚠️ 기능을 사용할 수 없습니다.\\n\\n페이지를 새로고침(F5) 후 다시 시도해주세요.'); }" id="applyAllBtn">
+                                <button class="btn btn-success btn-small" onclick="if(typeof window.applyAllImprovements === 'function') { window.applyAllImprovements(); } else { alert('⚠️ 기능을 사용할 수 없습니다.'); }" id="applyAllBtn" title="모든 추천 개선 사항을 한 번에 반영합니다">
                                     ✅ 전체 적용
                                 </button>
                             </div>
@@ -2128,6 +2214,10 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                     
                     <!-- Suno에 복사할 가사와 스타일 -->
                     <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <h4 style="margin: 0; color: var(--text-primary);"><i class="fas fa-music"></i> Suno AI 복사 패널</h4>
+                            <button class="btn btn-small btn-success" onclick="copyForSuno('finalLyrics', 'finalStyle')" title="스타일 프롬프트와 가사를 통합하여 복사합니다"><i class="fas fa-copy"></i> Suno용 통합 복사 (스타일+가사)</button>
+                        </div>
                         <div style="margin-bottom: 15px;">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                 <label style="font-weight: 600; color: var(--text-primary);">📝 Suno 가사란에 복사할 내용:</label>
@@ -2147,20 +2237,20 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                             <div id="intermediateStylePreview" style="padding: 10px; background: var(--bg-input); border-radius: 6px; font-size: 0.85rem; color: var(--text-secondary); max-height: 100px; overflow-y: auto; white-space: pre-wrap; font-family: 'Consolas', 'Monaco', monospace;"></div>
                         </div>
                         <div style="margin-top: 15px; padding: 10px; background: var(--accent); color: white; border-radius: 6px; text-align: center; font-size: 0.9rem;">
-                            <a href="https://suno.com" target="_blank" style="color: white; text-decoration: underline; font-weight: 600;">🌐 Suno 웹사이트에서 음원 생성하기</a>
+                            <a href="https://suno.com" target="_blank" style="color: white; text-decoration: underline; font-weight: 600;" title="수노(Suno) 웹사이트를 새 창에서 엽니다">🌐 Suno 웹사이트에서 음원 생성하기</a>
                         </div>
                     </div>
                     
                     <div class="btn-group" style="flex-direction: column; gap: 10px;">
                         <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
                             <label style="display: block; margin-bottom: 10px; font-weight: 600;">Suno에서 다운로드한 음원 업로드 및 분석</label>
-                            <div class="audio-upload-area" onclick="const fileInput = document.getElementById('intermediateAudioFileInput'); if(fileInput) { fileInput.click(); } else { alert('⚠️ 파일 입력 요소를 찾을 수 없습니다.'); }" style="cursor: pointer; padding: 20px; border: 2px dashed var(--border); border-radius: 8px; text-align: center; background: var(--bg-input);">
-                                <input type="file" id="intermediateAudioFileInput" accept="audio/*" style="display: none;" onchange="if(typeof window.handleIntermediateAudioUpload === 'function') { window.handleIntermediateAudioUpload(event); } else { alert('⚠️ 음원 업로드 기능을 사용할 수 없습니다.\\n\\n페이지를 새로고침(F5) 후 다시 시도해주세요.'); }">
+                            <div class="audio-upload-area" onclick="const fileInput = document.getElementById('intermediateAudioFileInput'); if(fileInput) { fileInput.click(); } else { alert('⚠️ 파일 입력 요소를 찾을 수 없습니다.'); }" style="cursor: pointer; padding: 20px; border: 2px dashed var(--border); border-radius: 8px; text-align: center; background: var(--bg-input);" title="Suno에서 생성한 MP3/WAV 파일을 여기에 드래그하거나 클릭하여 업로드하세요">
+                                <input type="file" id="intermediateAudioFileInput" accept="audio/*" style="display: none;" onchange="if(typeof window.handleIntermediateAudioUpload === 'function') { window.handleIntermediateAudioUpload(event); } else { alert('⚠️ 음원 업로드 기능을 사용할 수 없습니다.'); }">
                                 <div style="font-size: 2rem; margin-bottom: 10px;">🎵</div>
                                 <div style="color: var(--text-secondary);">클릭하여 음원 파일 업로드</div>
                                 <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 5px;">MP3, WAV, M4A 등 지원</div>
                             </div>
-                            <button class="btn btn-primary" id="analyzeIntermediateAudioBtn" onclick="if(typeof window.analyzeIntermediateAudio === 'function') { window.analyzeIntermediateAudio(); } else { alert('⚠️ 음원 분석 기능을 사용할 수 없습니다.\\n\\n페이지를 새로고침(F5) 후 다시 시도해주세요.'); }" style="width: 100%; margin-top: 10px; display: none;">
+                            <button class="btn btn-primary" id="analyzeIntermediateAudioBtn" onclick="if(typeof window.analyzeIntermediateAudio === 'function') { window.analyzeIntermediateAudio(); } else { alert('⚠️ 음원 분석 기능을 사용할 수 없습니다.'); }" style="width: 100%; margin-top: 10px; display: none;" title="업로드된 음원을 Gemini AI로 분석하여 가사와 프롬프트를 자동으로 최적화합니다">
                                 🔍 음원 분석 및 최종 가사 반영
                             </button>
                             <div id="intermediateVersionProgress" style="display: none; margin-top: 15px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);"></div>
@@ -2304,13 +2394,13 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                     </div>
 
                     <div class="marketing-tabs" role="tablist">
-                        <button type="button" class="marketing-tab active" role="tab" data-tab="youtube" onclick="showMarketingTab('youtube')" aria-selected="true">유튜브 설명란</button>
-                        <button type="button" class="marketing-tab" role="tab" data-tab="tiktok" onclick="showMarketingTab('tiktok')" aria-selected="false">틱톡 설명란</button>
-                        <button type="button" class="marketing-tab" role="tab" data-tab="hashtags" onclick="showMarketingTab('hashtags')" aria-selected="false">해시태그</button>
-                        <button type="button" class="marketing-tab" role="tab" data-tab="thumbnails" onclick="showMarketingTab('thumbnails')" aria-selected="false">썸네일 문구</button>
-                        <button type="button" class="marketing-tab" role="tab" data-tab="mv" onclick="showMarketingTab('mv')" aria-selected="false">MV 프롬프트</button>
-                        <button type="button" class="marketing-tab" role="tab" data-tab="srt" onclick="showMarketingTab('srt')" aria-selected="false">SRT 자막</button>
-                        <button type="button" class="marketing-tab" role="tab" data-tab="upload" onclick="showMarketingTab('upload')" aria-selected="false">업로드 가이드</button>
+                        <button type="button" class="marketing-tab active" role="tab" data-tab="youtube" onclick="showMarketingTab('youtube')" aria-selected="true" title="유튜브 업로드용 상세 설명과 타임라인">유튜브 설명란</button>
+                        <button type="button" class="marketing-tab" role="tab" data-tab="tiktok" onclick="showMarketingTab('tiktok')" aria-selected="false" title="틱톡/쇼츠용 짧고 강렬한 캡션">틱톡 설명란</button>
+                        <button type="button" class="marketing-tab" role="tab" data-tab="hashtags" onclick="showMarketingTab('hashtags')" aria-selected="false" title="조회수 상승을 위한 추천 해시태그">해시태그</button>
+                        <button type="button" class="marketing-tab" role="tab" data-tab="thumbnails" onclick="showMarketingTab('thumbnails')" aria-selected="false" title="클릭을 부르는 썸네일 카피 문구">썸네일 문구</button>
+                        <button type="button" class="marketing-tab" role="tab" data-tab="mv" onclick="showMarketingTab('mv')" aria-selected="false" title="미드저니/런웨이용 뮤직비디오 생성 프롬프트">MV 프롬프트</button>
+                        <button type="button" class="marketing-tab" role="tab" data-tab="srt" onclick="showMarketingTab('srt')" aria-selected="false" title="영상 자막용 SRT 파일 내용">SRT 자막</button>
+                        <button type="button" class="marketing-tab" role="tab" data-tab="upload" onclick="showMarketingTab('upload')" aria-selected="false" title="플랫폼별 업로드 최적화 가이드">업로드 가이드</button>
                     </div>
 
                     <!-- YouTube -->
@@ -2347,6 +2437,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                         <!-- MV Settings -->
                         <div class="mv-settings">
                             <h4>뮤직비디오 설정</h4>
+                            <p class="help-text" style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 15px;">💡 노래의 길이와 장면 전환 간격에 따라 필요한 이미지 수를 자동으로 계산합니다.</p>
                             <div class="mv-settings-grid">
                                 <div class="form-group">
                                     <label for="mvMinutes">노래 총 길이</label>
@@ -2377,7 +2468,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                             <!-- MV 프롬프트 상세 설정 -->
                             <div class="mv-detail-block">
                                 <h4>MV 프롬프트 상세 설정</h4>
-                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                                <div class="mv-detail-grid">
                                     <div class="form-group">
                                         <label style="display: block; margin-bottom: 8px; font-size: 0.9rem; color: var(--text-primary); font-weight: 600;">⏰ 시대</label>
                                         <select id="mvEra" class="mv-setting-select" onchange="saveMVSettings()">
@@ -2416,69 +2507,6 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                             <option value="africa">아프리카</option>
                                             <option value="generic">지역 불명 (일반적 배경)</option>
                                         </select>
-                                    </div>
-                                    
-                                    <div class="form-group">
-                                        <label style="display: block; margin-bottom: 8px; font-size: 0.9rem; color: var(--text-primary); font-weight: 600;">📍 장소 유형 (배경, 다중 선택 가능)</label>
-                                        <div class="tag-container mv-setting-tags" id="mvLocationTags" style="max-height: 200px; overflow-y: auto; padding: 10px; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--border);">
-                                            <button type="button" class="tag-btn" data-value="city">도시 (도심, 거리)</button>
-                                            <button type="button" class="tag-btn" data-value="urban-night">도시 야경 (네온)</button>
-                                            <button type="button" class="tag-btn" data-value="beach">해변</button>
-                                            <button type="button" class="tag-btn" data-value="mountain">산, 자연</button>
-                                            <button type="button" class="tag-btn" data-value="forest">숲</button>
-                                            <button type="button" class="tag-btn" data-value="desert">사막</button>
-                                            <button type="button" class="tag-btn" data-value="indoor">실내 (방, 스튜디오)</button>
-                                            <button type="button" class="tag-btn" data-value="rooftop">옥상</button>
-                                            <button type="button" class="tag-btn" data-value="subway">지하철, 지하</button>
-                                            <button type="button" class="tag-btn" data-value="cafe">카페</button>
-                                            <button type="button" class="tag-btn" data-value="restaurant">레스토랑</button>
-                                            <button type="button" class="tag-btn" data-value="park">공원</button>
-                                            <button type="button" class="tag-btn" data-value="bridge">다리</button>
-                                            <button type="button" class="tag-btn" data-value="warehouse">창고, 공장</button>
-                                            <button type="button" class="tag-btn" data-value="abandoned">버려진 장소</button>
-                                            <button type="button" class="tag-btn" data-value="abstract">추상적 배경</button>
-                                            <button type="button" class="tag-btn" data-value="river">강, 강변</button>
-                                            <button type="button" class="tag-btn" data-value="lake">호수</button>
-                                            <button type="button" class="tag-btn" data-value="sea">바다, 해상</button>
-                                            <button type="button" class="tag-btn" data-value="sky">하늘, 구름</button>
-                                            <button type="button" class="tag-btn" data-value="street">거리, 골목</button>
-                                            <button type="button" class="tag-btn" data-value="alley">골목길</button>
-                                            <button type="button" class="tag-btn" data-value="building">빌딩, 건물</button>
-                                            <button type="button" class="tag-btn" data-value="rooftop-night">옥상 야경</button>
-                                            <button type="button" class="tag-btn" data-value="station">역, 터미널</button>
-                                            <button type="button" class="tag-btn" data-value="airport">공항</button>
-                                            <button type="button" class="tag-btn" data-value="car">차 안, 이동 수단</button>
-                                            <button type="button" class="tag-btn" data-value="train">기차 안</button>
-                                            <button type="button" class="tag-btn" data-value="bar">바, 펍</button>
-                                            <button type="button" class="tag-btn" data-value="club">클럽, 나이트</button>
-                                            <button type="button" class="tag-btn" data-value="concert">공연장, 라이브</button>
-                                            <button type="button" class="tag-btn" data-value="school">학교, 교실</button>
-                                            <button type="button" class="tag-btn" data-value="library">도서관</button>
-                                            <button type="button" class="tag-btn" data-value="museum">미술관, 박물관</button>
-                                            <button type="button" class="tag-btn" data-value="church">교회, 성당</button>
-                                            <button type="button" class="tag-btn" data-value="temple">사찰, 절</button>
-                                            <button type="button" class="tag-btn" data-value="hospital">병원</button>
-                                            <button type="button" class="tag-btn" data-value="hotel">호텔, 로비</button>
-                                            <button type="button" class="tag-btn" data-value="bedroom">침실, 침대</button>
-                                            <button type="button" class="tag-btn" data-value="kitchen">주방</button>
-                                            <button type="button" class="tag-btn" data-value="bathroom">욕실</button>
-                                            <button type="button" class="tag-btn" data-value="balcony">발코니, 테라스</button>
-                                            <button type="button" class="tag-btn" data-value="garden">정원, 뜰</button>
-                                            <button type="button" class="tag-btn" data-value="farm">농장, 들판</button>
-                                            <button type="button" class="tag-btn" data-value="vineyard">포도밭</button>
-                                            <button type="button" class="tag-btn" data-value="snow">눈, 설원</button>
-                                            <button type="button" class="tag-btn" data-value="rain">비, 빗속</button>
-                                            <button type="button" class="tag-btn" data-value="sunset">일몰, 석양</button>
-                                            <button type="button" class="tag-btn" data-value="sunrise">일출</button>
-                                            <button type="button" class="tag-btn" data-value="night-sky">밤하늘, 별</button>
-                                            <button type="button" class="tag-btn" data-value="underwater">수중, 물속</button>
-                                            <button type="button" class="tag-btn" data-value="stadium">경기장, 스타디움</button>
-                                            <button type="button" class="tag-btn" data-value="parking">주차장</button>
-                                            <button type="button" class="tag-btn" data-value="bridge-night">다리 야경</button>
-                                            <button type="button" class="tag-btn" data-value="rooftop-pool">루프탑 풀</button>
-                                            <button type="button" class="tag-btn" data-value="rooftop-garden">옥상 정원</button>
-                                        </div>
-                                        <p style="margin: 8px 0 0 0; font-size: 0.75rem; color: var(--text-secondary);">선택한 장소 유형이 각 씬 프롬프트 배경에 반영됩니다.</p>
                                     </div>
                                     
                                     <div class="form-group">
@@ -2540,6 +2568,115 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                             <option value="gentle">부드러운</option>
                                         </select>
                                     </div>
+                                    
+                                    <div class="form-group mv-location-fullwidth">
+                                        <label style="display: block; margin-bottom: 8px; font-size: 0.9rem; color: var(--text-primary); font-weight: 600;">📍 장소 유형 (배경, 다중 선택 가능)</label>
+                                        <div class="tag-container mv-setting-tags" id="mvLocationTags">
+                                            <button type="button" class="tag-btn" data-value="city">도시 (도심, 거리)</button>
+                                            <button type="button" class="tag-btn" data-value="urban-night">도시 야경 (네온)</button>
+                                            <button type="button" class="tag-btn" data-value="beach">해변</button>
+                                            <button type="button" class="tag-btn" data-value="mountain">산, 자연</button>
+                                            <button type="button" class="tag-btn" data-value="forest">숲</button>
+                                            <button type="button" class="tag-btn" data-value="desert">사막</button>
+                                            <button type="button" class="tag-btn" data-value="indoor">실내 (방, 스튜디오)</button>
+                                            <button type="button" class="tag-btn" data-value="rooftop">옥상</button>
+                                            <button type="button" class="tag-btn" data-value="subway">지하철, 지하</button>
+                                            <button type="button" class="tag-btn" data-value="cafe">카페</button>
+                                            <button type="button" class="tag-btn" data-value="restaurant">레스토랑</button>
+                                            <button type="button" class="tag-btn" data-value="park">공원</button>
+                                            <button type="button" class="tag-btn" data-value="bridge">다리</button>
+                                            <button type="button" class="tag-btn" data-value="warehouse">창고, 공장</button>
+                                            <button type="button" class="tag-btn" data-value="abandoned">버려진 장소</button>
+                                            <button type="button" class="tag-btn" data-value="abstract">추상적 배경</button>
+                                            <button type="button" class="tag-btn" data-value="river">강, 강변</button>
+                                            <button type="button" class="tag-btn" data-value="lake">호수</button>
+                                            <button type="button" class="tag-btn" data-value="sea">바다, 해상</button>
+                                            <button type="button" class="tag-btn" data-value="sky">하늘, 구름</button>
+                                            <button type="button" class="tag-btn" data-value="street">거리, 골목</button>
+                                            <button type="button" class="tag-btn" data-value="alley">골목길</button>
+                                            <button type="button" class="tag-btn" data-value="building">빌딩, 건물</button>
+                                            <button type="button" class="tag-btn" data-value="rooftop-night">옥상 야경</button>
+                                            <button type="button" class="tag-btn" data-value="station">역, 터미널</button>
+                                            <button type="button" class="tag-btn" data-value="airport">공항</button>
+                                            <button type="button" class="tag-btn" data-value="car">차 안, 이동 수단</button>
+                                            <button type="button" class="tag-btn" data-value="train">기차 안</button>
+                                            <button type="button" class="tag-btn" data-value="bar">바, 펍</button>
+                                            <button type="button" class="tag-btn" data-value="club">클럽, 나이트</button>
+                                            <button type="button" class="tag-btn" data-value="concert">공연장, 라이브</button>
+                                            <button type="button" class="tag-btn" data-value="school">학교, 교실</button>
+                                            <button type="button" class="tag-btn" data-value="library">도서관</button>
+                                            <button type="button" class="tag-btn" data-value="museum">미술관, 박물관</button>
+                                            <button type="button" class="tag-btn" data-value="church">교회, 성당</button>
+                                            <button type="button" class="tag-btn" data-value="temple">사찰, 절</button>
+                                            <button type="button" class="tag-btn" data-value="hospital">병원</button>
+                                            <button type="button" class="tag-btn" data-value="hotel">호텔, 로비</button>
+                                            <button type="button" class="tag-btn" data-value="bedroom">침실, 침대</button>
+                                            <button type="button" class="tag-btn" data-value="kitchen">주방</button>
+                                            <button type="button" class="tag-btn" data-value="bathroom">욕실</button>
+                                            <button type="button" class="tag-btn" data-value="balcony">발코니, 테라스</button>
+                                            <button type="button" class="tag-btn" data-value="garden">정원, 뜰</button>
+                                            <button type="button" class="tag-btn" data-value="farm">농장, 들판</button>
+                                            <button type="button" class="tag-btn" data-value="vineyard">포도밭</button>
+                                            <button type="button" class="tag-btn" data-value="snow">눈, 설원</button>
+                                            <button type="button" class="tag-btn" data-value="rain">비, 빗속</button>
+                                            <button type="button" class="tag-btn" data-value="sunset">일몰, 석양</button>
+                                            <button type="button" class="tag-btn" data-value="sunrise">일출</button>
+                                            <button type="button" class="tag-btn" data-value="night-sky">밤하늘, 별</button>
+                                            <button type="button" class="tag-btn" data-value="underwater">수중, 물속</button>
+                                            <button type="button" class="tag-btn" data-value="stadium">경기장, 스타디움</button>
+                                            <button type="button" class="tag-btn" data-value="parking">주차장</button>
+                                            <button type="button" class="tag-btn" data-value="bridge-night">다리 야경</button>
+                                            <button type="button" class="tag-btn" data-value="rooftop-pool">루프탑 풀</button>
+                                            <button type="button" class="tag-btn" data-value="rooftop-garden">옥상 정원</button>
+                                        </div>
+                                        <p style="margin: 8px 0 0 0; font-size: 0.75rem; color: var(--text-secondary);">💡 선택한 장소 유형이 각 씬 프롬프트 배경에 반영됩니다.</p>
+                                        <div class="form-group" style="margin-top: 12px;">
+                                            <label style="display: block; margin-bottom: 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">✏️ 기타 추가 (장소 유형 직접 입력)</label>
+                                            <input type="text" id="mvLocationCustom" placeholder="예: 오래된 극장, 수면 풀, 공원 벤치 (쉼표로 구분)" style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-input); color: var(--text-primary); font-size: 0.9rem;" onchange="if(typeof saveMVSettings==='function')saveMVSettings();">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 인물 동작 유형 (다중 선택) -->
+                                <div class="mv-setting-block" style="margin-top: 20px;">
+                                    <div class="form-group">
+                                        <label style="display: block; margin-bottom: 8px; font-size: 0.95rem; color: var(--text-primary); font-weight: 600;">🎬 인물 동작 유형 (다중 선택 가능)</label>
+                                        <div class="tag-container mv-setting-tags" id="mvActionTags">
+                                            <button type="button" class="tag-btn" data-value="walking">걷기</button>
+                                            <button type="button" class="tag-btn" data-value="running">뛰기</button>
+                                            <button type="button" class="tag-btn" data-value="sitting">앉기</button>
+                                            <button type="button" class="tag-btn" data-value="standing">서 있기</button>
+                                            <button type="button" class="tag-btn" data-value="dancing">춤</button>
+                                            <button type="button" class="tag-btn" data-value="singing">노래하기</button>
+                                            <button type="button" class="tag-btn" data-value="playing-instrument">악기 연주</button>
+                                            <button type="button" class="tag-btn" data-value="looking-up">하늘 보기</button>
+                                            <button type="button" class="tag-btn" data-value="looking-down">내리보기</button>
+                                            <button type="button" class="tag-btn" data-value="embracing">포옹</button>
+                                            <button type="button" class="tag-btn" data-value="holding-hands">손 잡기</button>
+                                            <button type="button" class="tag-btn" data-value="lying-down">누워 있기</button>
+                                            <button type="button" class="tag-btn" data-value="jumping">점프</button>
+                                            <button type="button" class="tag-btn" data-value="crying">울기</button>
+                                            <button type="button" class="tag-btn" data-value="smiling">미소</button>
+                                            <button type="button" class="tag-btn" data-value="looking-away">멀리 보기</button>
+                                            <button type="button" class="tag-btn" data-value="close-up-face">얼굴 클로즈업</button>
+                                            <button type="button" class="tag-btn" data-value="silhouette">실루엣</button>
+                                            <button type="button" class="tag-btn" data-value="back-view">등 보기</button>
+                                            <button type="button" class="tag-btn" data-value="group-standing">그룹 서 있기</button>
+                                            <button type="button" class="tag-btn" data-value="driving">운전/차 안</button>
+                                            <button type="button" class="tag-btn" data-value="phone">휴대폰 보기</button>
+                                            <button type="button" class="tag-btn" data-value="reading">책 읽기</button>
+                                            <button type="button" class="tag-btn" data-value="writing">쓰기/일기</button>
+                                            <button type="button" class="tag-btn" data-value="running-toward">달려오기</button>
+                                            <button type="button" class="tag-btn" data-value="wave">손 흔들기</button>
+                                            <button type="button" class="tag-btn" data-value="kiss">키스</button>
+                                            <button type="button" class="tag-btn" data-value="confetti">축하/설렁</button>
+                                        </div>
+                                        <p style="margin: 8px 0 0 0; font-size: 0.75rem; color: var(--text-secondary);">💡 선택한 동작이 각 씬의 인물 동작에 반영되며, 가사에 맞게 자동 선택됩니다.</p>
+                                        <div class="form-group" style="margin-top: 12px;">
+                                            <label style="display: block; margin-bottom: 6px; font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">✏️ 기타 추가 (인물 동작 직접 입력)</label>
+                                            <input type="text" id="mvActionCustom" placeholder="예: 창밖 바라보기, 계단 오르기, 꽃 받기 (쉼표로 구분)" style="width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-input); color: var(--text-primary); font-size: 0.9rem;" onchange="if(typeof saveMVSettings==='function')saveMVSettings();">
+                                        </div>
+                                    </div>
                                 </div>
                                 
                                 <!-- 인물 정보 입력 -->
@@ -2565,7 +2702,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                 </div>
                             </div>
                             <div class="btn-group">
-                                <button class="btn btn-primary" id="mvGenerateBtn" onclick="handleMVGenerateClick(event)"><span class="mv-generate-btn-text">🎬 MV 프롬프트 생성</span></button>
+                                <button class="btn btn-primary" id="mvGenerateBtn" onclick="handleMVGenerateClick(event)" title="설정된 노래 길이와 옵션을 바탕으로 씬별 이미지를 생성하기 위한 미드저니 프롬프트를 만듭니다"><span class="mv-generate-btn-text">🎬 MV 프롬프트 생성</span></button>
                             </div>
                         </div>
 
@@ -2587,6 +2724,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                 <p style="margin: 0 0 20px 0; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6;">
                                     각 씬의 배경, 인물, 장소 등을 확인하고 수정할 수 있습니다. 수정 후 "저장" 버튼을 클릭하고, 모든 씬을 확인한 후 "확정 및 프롬프트 생성" 버튼을 클릭하세요.
                                 </p>
+                                <div id="mvPromptsReviewContainer" style="margin-bottom: 20px;"></div>
                                 <div id="mvSceneOverviewContainer" style="max-height: 600px; overflow-y: auto; margin-bottom: 20px;"></div>
                                 <div class="btn-group" style="justify-content: center;">
                                     <button class="btn btn-success" onclick="saveAndConfirmMVPrompts()" style="padding: 12px 24px; font-size: 1rem; font-weight: 600;">
@@ -3134,20 +3272,136 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
 
     <!-- Guidelines Modal -->
     <div class="modal-overlay" id="guidelinesModal">
-        <div class="modal">
+        <div class="modal guidelines-modal-inner">
             <div class="modal-header">
                 <h3 class="modal-title">📋 뮤직모리 제작 지침서</h3>
-                <button class="modal-close" onclick="closeGuidelinesModal()">×</button>
+                <button type="button" class="modal-close" onclick="closeGuidelinesModal()" aria-label="닫기">×</button>
             </div>
             <div class="modal-body">
-                <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 0.9rem;">
-                    이 지침서는 AI가 가사, 프롬프트, 마케팅 자료 생성 시 참조합니다. 수정 후 저장하면 모든 생성 과정에 반영됩니다.
-                </p>
-                <textarea id="guidelinesText" style="min-height: 400px; font-size: 0.85rem;"></textarea>
+                <p class="guidelines-desc">이 지침서는 AI가 가사, 프롬프트, 마케팅 자료 생성 시 참조합니다. 수정 후 저장하면 모든 생성 과정에 반영됩니다.</p>
+                <textarea id="guidelinesText" placeholder="지침서 내용을 입력하세요. 마크다운 형식 사용 가능."></textarea>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="resetGuidelines()">🔄 기본값 복원</button>
-                <button class="btn btn-primary" onclick="saveGuidelines(); closeGuidelinesModal();">💾 저장</button>
+                <input type="file" id="importGuidelinesFile" accept=".json" style="display: none;" onchange="if(typeof window.handleImportGuidelines === 'function') { window.handleImportGuidelines(event); } else { alert('기능을 초기화 중입니다. 잠시 후 다시 시도해주세요.'); }">
+                <button type="button" class="btn btn-secondary" onclick="exportGuidelines()">💾 백업</button>
+                <button type="button" class="btn btn-secondary" onclick="triggerImportGuidelines()">📥 복원</button>
+                <div style="flex: 1;"></div>
+                <button type="button" class="btn btn-secondary" onclick="resetGuidelines()">🔄 기본값 복원</button>
+                <button type="button" class="btn btn-primary" onclick="saveGuidelines(); closeGuidelinesModal();">💾 저장</button>
+            </div>
+        </div>
+    </div>
+    <!-- Help Guide Modal (뮤직모리 사용 설명서) -->
+    <div class="modal-overlay" id="stepOrderHelpModal">
+        <div class="modal" style="max-width: 800px; max-height: 85vh; display: flex; flex-direction: column;">
+            <div class="modal-header" style="flex-shrink: 0;">
+                <h3 class="modal-title">📖 뮤직모리 사용 설명서</h3>
+                <button type="button" class="modal-close" onclick="const m1=document.getElementById('stepOrderHelpModal'); m1.classList.remove('show'); setTimeout(()=>m1.style.display='none', 200);" aria-label="닫기">×</button>
+            </div>
+            <div class="modal-body" style="overflow-y: auto; padding-right: 15px;">
+                
+                <div style="background: var(--bg-input); padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid var(--accent);">
+                    <h4 style="margin: 0 0 8px 0; color: var(--text-primary);"><i class="fas fa-info-circle"></i> 뮤직모리란?</h4>
+                    <p style="margin: 0; color: var(--text-secondary); line-height: 1.5; font-size: 0.95rem;">
+                        뮤직모리(Music Creator)는 작사부터 Suno AI 음악 생성 프롬프트, 곡 평가, 뮤직비디오 씬 기획까지 <strong>노래 제작의 모든 과정을 6단계로 자동화</strong>하여 돕는 AI 기반 워크플로우 툴입니다.
+                    </p>
+                </div>
+
+                <style>
+                    .help-step-card {
+                        background: var(--bg-card);
+                        border: 1px solid var(--border);
+                        border-radius: 8px;
+                        padding: 16px;
+                        margin-bottom: 12px;
+                    }
+                    .help-step-title {
+                        color: var(--accent);
+                        font-weight: 600;
+                        font-size: 1.05rem;
+                        margin-bottom: 8px;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                    }
+                    .help-list {
+                        margin: 0;
+                        padding-left: 20px;
+                        color: var(--text-secondary);
+                        line-height: 1.6;
+                        font-size: 0.9rem;
+                    }
+                    .help-list strong {
+                        color: var(--text-primary);
+                    }
+                </style>
+
+                <h4 style="margin: 0 0 15px 0; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 8px;">🚀 6단계 핵심 프로세스</h4>
+
+                <div class="help-step-card">
+                    <div class="help-step-title"><span style="background: var(--accent); color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem;">1</span> 1단계: 곡 정보 및 기초 가사</div>
+                    <ul class="help-list">
+                        <li><strong>곡 기본 정보 작성:</strong> 만들고자 하는 노래의 제목, 장르, 분위기, 대상, 시점 등을 선택합니다.</li>
+                        <li><strong>가사/프롬프트 초안 작성:</strong> 직접 가사를 입력하거나, 원하는 분위기를 설명하는 프롬프트를 작성합니다.</li>
+                        <li><strong>AI 생성 기능:</strong> 우측 하단의 [✨ 마법봉] 버튼을 누르면 AI가 선택한 태그를 바탕으로 멋진 가사나 프롬프트를 자동 생성해 줍니다.</li>
+                    </ul>
+                </div>
+
+                <div class="help-step-card">
+                    <div class="help-step-title"><span style="background: var(--accent); color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem;">2</span> 2단계: Suno 프롬프트 변환</div>
+                    <ul class="help-list">
+                        <li><strong>Suno 최적화:</strong> 1단계에서 작성한 내용을 Suno AI(음악 생성 AI)가 찰떡같이 알아들을 수 있는 <strong>[Meta Tags]</strong> 구조로 자동 변환합니다.</li>
+                        <li><strong>스타일 프롬프트:</strong> 곡의 악기 구성, 보컬 스타일, 템포 등을 정밀하게 조율할 수 있습니다.</li>
+                        <li><strong>보컬 파트 지정 (신기능):</strong> Verse, Chorus 등 각 구간별로 부를 보컬(남/녀/AI)을 디테일하게 나눌 수 있습니다.</li>
+                    </ul>
+                </div>
+
+                <div class="help-step-card">
+                    <div class="help-step-title"><span style="background: var(--accent); color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem;">3</span> 3단계: AI 분석 및 평가</div>
+                    <ul class="help-list">
+                        <li><strong>전문가 빙의 분석:</strong> 작성된 가사와 스타일 프롬프트를 AI가 프로듀서의 시각에서 평가합니다.</li>
+                        <li><strong>구조/라임/일관성:</strong> 항목별로 100점 만점 기준으로 점수를 매기며, 어느 부분이 부족하고 어떻게 고치면 좋을지 <strong>개선 피드백</strong>을 제공합니다.</li>
+                    </ul>
+                </div>
+
+                <div class="help-step-card">
+                    <div class="help-step-title"><span style="background: var(--accent); color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem;">4</span> 4단계: 분석 결과 반영 및 확정</div>
+                    <ul class="help-list">
+                        <li><strong>원클릭 개선:</strong> 3단계에서 지적받은 개선점을 바탕으로 AI가 더 나은 가사와 스타일을 제안합니다.</li>
+                        <li>마음에 들 경우 <strong>[현재 내용으로 확정]</strong> 버튼을 눌러 프로젝트의 최종본으로 픽스합니다.</li>
+                    </ul>
+                </div>
+
+                <div class="help-step-card">
+                    <div class="help-step-title"><span style="background: var(--accent); color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem;">5</span> 5단계: 최종 가사/프롬프트 출력</div>
+                    <ul class="help-list">
+                        <li>확정된 모든 내용(Suno 메타 태그가 적용된 가사 + 스타일 프롬프트)을 এক눈에 확인합니다.</li>
+                        <li><strong>원클릭 복사:</strong> [가사 복사], [스타일 복사] 버튼을 눌러 Suno AI 사이트에 바로 붙여넣기 하여 곡 생성을 시작하세요!</li>
+                    </ul>
+                </div>
+
+                <div class="help-step-card">
+                    <div class="help-step-title"><span style="background: var(--accent); color: white; border-radius: 50%; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem;">6</span> 6단계: 뮤직비디오/마케팅 보조</div>
+                    <ul class="help-list">
+                        <li>완성된 곡을 바탕으로 유튜브 쇼츠, 틱톡 등에 올리기 좋은 문구를 생성합니다.</li>
+                        <li>Midjourney 등의 이미지 생성 AI에 넣을 수 있는 <strong>뮤비 씬(Scene) 프롬프트</strong>를 가사 구간별로 쪼개어 영문으로 만들어 줍니다.</li>
+                    </ul>
+                </div>
+
+                <h4 style="margin: 25px 0 15px 0; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 8px;">💡 화면 및 부가 기능 안내</h4>
+
+                <div class="help-step-card" style="margin-bottom: 0;">
+                    <ul class="help-list">
+                        <li><strong>사이드바 (좌상단 ☰ 메뉴):</strong> 지금까지 저장한 프로젝트들을 관리합니다. 클릭하여 불러오거나, 드래그하여 순서를 바꿀 수 있습니다. 현재 작업 중인 프로젝트는 보라색 테두리로 강조됩니다.</li>
+                        <li><strong>우상단 메뉴 패널:</strong> 관리자 기능, 모드 전환, 저장(Ctrl+S) 기능을 수행할 수 있습니다.</li>
+                        <li><strong>제작 지침서 (관리자 메뉴 내):</strong> AI가 프롬프트를 생성할 때 지켜야 할 "나만의 특별한 규칙"을 마크다운으로 작성해 둘 수 있습니다. (예: "가사는 무조건 존댓말로 써줘")</li>
+                        <li><strong>복제/삭제:</strong> 사이드바 목록의 각 프로젝트 항목 우측에 위치하며, 기존 프로젝트를 기반으로 새로운 버전을 시도해보기 좋습니다.</li>
+                    </ul>
+                </div>
+
+            </div>
+            <div class="modal-footer" style="flex-shrink: 0; display: flex; justify-content: flex-end; padding-top: 15px; border-top: 1px solid var(--border);">
+                <button type="button" class="btn btn-primary" onclick="const m2=document.getElementById('stepOrderHelpModal'); m2.classList.remove('show'); setTimeout(()=>m2.style.display='none', 200);">닫기</button>
             </div>
         </div>
     </div>
@@ -3218,8 +3472,8 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                     <p>
                         • <strong>Gemini API 키</strong>: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>에서 무료로 발급<br>
                         • <strong>OpenAI API 키</strong>: <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">OpenAI Platform</a>에서 발급 (유료)<br>
-                        • API 키는 암호화되어 브라우저에 저장되며 외부로 전송되지 않습니다.<br>
-                        • <strong class="api-notice-security">보안을 위해 API 키는 소스 코드에 포함되지 않습니다.</strong>
+                        • API 키는 <strong>Firebase 서버</strong>에 암호화 저장 — 브라우저에 저장되지 않습니다.<br>
+                        • <strong class="api-notice-security">🔒 연결 테스트는 서버 API를 통해 안전하게 검증됩니다.</strong>
                     </p>
                 </div>
 
@@ -3229,6 +3483,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                     <p>Google AI Studio에서 발급받은 키 입력</p>
                     <div id="geminiKeyError" class="api-key-msg api-key-error" style="display: none;"></div>
                     <div id="geminiKeySuccess" class="api-key-msg api-key-success" style="display: none;">✅ 올바른 형식의 API 키입니다.</div>
+                    <div id="geminiApiStatus" style="display:none;font-size:0.85rem;margin-top:4px;padding:6px 10px;border-radius:8px;background:var(--bg-input);"></div>
                 </div>
 
                 <div class="form-group">
@@ -3237,7 +3492,11 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                     <p>OpenAI Platform에서 발급받은 키 입력</p>
                     <div id="openaiKeyError" class="api-key-msg api-key-error" style="display: none;"></div>
                     <div id="openaiKeySuccess" class="api-key-msg api-key-success" style="display: none;">✅ 올바른 형식의 API 키입니다.</div>
+                    <div id="chatApiStatus" style="display:none;font-size:0.85rem;margin-top:4px;padding:6px 10px;border-radius:8px;background:var(--bg-input);"></div>
                 </div>
+
+                <!-- 연결 테스트 결과 요약 -->
+                <div id="apiTestResult" style="display:none;margin-top:8px;padding:10px 14px;border-radius:10px;font-size:0.9rem;font-weight:600;background:var(--bg-input);text-align:center;"></div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="resetAPIKeys()">기본값</button>
@@ -3247,37 +3506,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
         </div>
     </div>
 
-    <!-- 단계 순서 설정 안내 모달 -->
-    <div class="modal-overlay" id="stepOrderHelpModal" style="display: none;">
-        <div class="modal" style="max-width: 500px;">
-            <div class="modal-header">
-                <h3 class="modal-title">📋 단계 순서 변경 안내</h3>
-                <button class="modal-close" onclick="document.getElementById('stepOrderHelpModal').style.display='none'">×</button>
-            </div>
-            <div class="modal-body">
-                <p style="color: var(--text-secondary); margin-bottom: 15px; line-height: 1.6;">
-                    각 단계 메뉴의 <strong style="color: var(--accent);">⋮⋮</strong> 아이콘을 드래그하여 원하는 순서로 변경할 수 있습니다.
-                </p>
-                <div style="background: var(--bg-secondary); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                    <strong style="color: var(--text-primary); display: block; margin-bottom: 10px;">사용 방법:</strong>
-                    <ol style="color: var(--text-secondary); line-height: 1.8; margin-left: 20px;">
-                        <li>각 단계 메뉴 왼쪽의 <strong>⋮⋮</strong> 아이콘에 마우스를 올립니다</li>
-                        <li>아이콘을 클릭한 상태로 드래그합니다</li>
-                        <li>원하는 위치에서 놓으면 순서가 변경됩니다</li>
-                        <li>변경된 순서는 자동으로 저장됩니다</li>
-                    </ol>
-                </div>
-                <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 12px; border-radius: 8px;">
-                    <p style="color: var(--success); margin: 0; font-size: 0.9rem;">
-                        💡 팁: 단계 레이블을 클릭하면 해당 단계로 이동하고, 드래그 핸들을 사용하면 순서를 변경할 수 있습니다.
-                    </p>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-primary" onclick="document.getElementById('stepOrderHelpModal').style.display='none'">확인</button>
-            </div>
-        </div>
-    </div>
+
 
     </div><!-- End Main Wrapper -->
 
@@ -4058,92 +4287,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
             };
             
             // 2단계에서 3단계로 이동
-            window.goToStep2To3 = function() {
-                const sunoLyrics = document.getElementById('sunoLyrics')?.value || '';
-                const stylePrompt = document.getElementById('stylePrompt')?.value || '';
-                
-                if (!sunoLyrics.trim()) {
-                    alert('수노 가사를 먼저 생성해주세요.');
-                    return;
-                }
-                
-                // 3단계로 이동
-                if (typeof window.goToStep === 'function') {
-                    window.goToStep(3, true, false);
-                } else {
-                    goToStepTemporary(3, true, false);
-                }
-            };
-            
-            // 3단계에서 4단계로 이동 (개선안 반영)
-            window.goToStep4AndApplyImprovements = function() {
-                // 4단계로 이동
-                if (typeof window.goToStep === 'function') {
-                    window.goToStep(4, true, false);
-                } else {
-                    goToStepTemporary(4, true, false);
-                }
-                
-                // 개선안 카드 표시
-                const improvementCard = document.getElementById('improvementCard');
-                const improvementLoading = document.getElementById('improvementLoading');
-                if (improvementCard && improvementLoading) {
-                    improvementLoading.style.display = 'none';
-                    improvementCard.style.display = 'block';
-                }
-            };
-            
-            // 4단계 확정 완료
-            window.confirmFinalizedContent = function() {
-                const finalizedLyrics = document.getElementById('finalizedLyrics')?.value || '';
-                const finalizedStyle = document.getElementById('finalizedStyle')?.value || '';
-                
-                if (!finalizedLyrics.trim()) {
-                    alert('확정된 가사를 먼저 입력해주세요.');
-                    return;
-                }
-                
-                // 5단계로 이동
-                if (typeof window.goToStep === 'function') {
-                    window.goToStep(5, true, false);
-                } else {
-                    goToStepTemporary(5, true, false);
-                }
-                
-                // 5단계에 데이터 표시
-                const finalLyricsEl = document.getElementById('finalLyrics');
-                const finalStyleEl = document.getElementById('finalStyle');
-                
-                if (finalLyricsEl && finalizedLyrics) {
-                    finalLyricsEl.textContent = finalizedLyrics;
-                }
-                if (finalStyleEl && finalizedStyle) {
-                    finalStyleEl.textContent = finalizedStyle;
-                }
-            };
-            
-            // 마케팅 단계로 이동
-            window.goToMarketingStep = function() {
-                // 6단계로 이동
-                if (typeof window.goToStep === 'function') {
-                    window.goToStep(6, true, false);
-                } else {
-                    goToStepTemporary(6, true, false);
-                }
-                
-                // 마케팅 결과 표시 (있는 경우)
-                const marketingResult = document.getElementById('marketingResult');
-                const marketingLoading = document.getElementById('marketingLoading');
-                if (marketingResult && marketingLoading) {
-                    // 이미 데이터가 있으면 표시
-                    if (window.currentProject && window.currentProject.data && window.currentProject.data.marketing) {
-                        marketingLoading.style.display = 'none';
-                        marketingResult.style.display = 'block';
-                    } else {
-                        alert('마케팅 자료 생성 기능은 app.js 파일 복구 후 사용 가능합니다.');
-                    }
-                }
-            };
+            // (Redundant functions removed, using stepX.js versions instead)
             
             // 복사 함수 (임시)
             window.copyToClipboard = function(elementId, label, event) {
@@ -4204,7 +4348,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
             };
             
             window.resetAll = function() {
-                if (confirm('모든 내용을 초기화하시겠습니까?')) {
+                const doReset = () => {
                     // 폼 초기화
                     const inputs = document.querySelectorAll('input[type="text"], textarea');
                     inputs.forEach(input => {
@@ -4225,6 +4369,12 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                     }
                     
                     alert('모든 내용이 초기화되었습니다.');
+                };
+
+                if (typeof window.showConfirm === 'function') {
+                    window.showConfirm('모든 내용을 초기화하시겠습니까?', doReset);
+                } else if (confirm('모든 내용을 초기화하시겠습니까?')) {
+                    doReset();
                 }
             };
             
@@ -4264,6 +4414,18 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
             
             // 상단 메뉴 버튼 클릭 핸들러
             window.handleHeaderButtonClick = function(functionName, event) {
+                // ─── 인증 체크 ───
+                const restrictedActions = [
+                    'saveCurrentProject', 'manualBackup', 'resetCurrentStep', 'resetAllSteps', 'resetStepOrder',
+                    'generateLyrics', 'generateSunoPrompt', 'improveLyrics', 'improveSunoPrompt', 'analyzeLyrics',
+                    'generateMarketingMaterials', 'generateMVPrompts'
+                ];
+                if (restrictedActions.includes(functionName)) {
+                    if (typeof window.ensureAuthenticated === 'function') {
+                        if (!window.ensureAuthenticated()) return;
+                    }
+                }
+
                 if (event) {
                     event.preventDefault();
                     event.stopPropagation();
@@ -4388,7 +4550,14 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                     'openStepOrderHelp': () => {
                         const modal = document.getElementById('stepOrderHelpModal');
                         if (modal) {
-                            modal.style.display = 'flex';
+                            // 강제 숨김 스크립트의 !important를 무시하기 위해 직접 스타일 주입
+                            modal.style.setProperty('display', 'flex', 'important');
+                            modal.style.setProperty('pointer-events', 'auto', 'important');
+                            modal.style.setProperty('z-index', '100000', 'important');
+                            modal.style.setProperty('opacity', '1', 'important');
+                            
+                            // 애니메이션을 위해 show 클래스도 추가
+                            modal.classList.add('show');
                         } else {
                             alert('도움말 모달을 찾을 수 없습니다.');
                         }
@@ -4464,40 +4633,74 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
             };
             
             // MV 프롬프트 생성 버튼 클릭 핸들러 (진행 표시는 generateSceneOverview 내부에서 처리)
-            window.handleMVGenerateClick = function(event) {
-                if (event) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                }
-                console.log('🎬 MV 프롬프트 생성 버튼 클릭됨');
+             window.handleMVGenerateClick = function(event) {
+                 if (event) {
+                     event.preventDefault();
+                     event.stopPropagation();
+                 }
+                 console.log('🎬 MV 프롬프트 생성 버튼 클릭됨');
 
-                if (typeof window.generateSceneOverview === 'function') {
-                    console.log('✅ generateSceneOverview 함수 발견, 실행 중...');
-                    try {
-                        window.generateSceneOverview().catch(function(err) {
-                            console.error('❌ generateSceneOverview 실행 오류:', err);
-                            alert('MV 프롬프트 생성 중 오류가 발생했습니다:\n\n' + (err.message || err));
-                        });
-                    } catch (e) {
-                        console.error('❌ generateSceneOverview 호출 오류:', e);
-                        alert('MV 프롬프트 생성 함수 호출 중 오류가 발생했습니다:\n\n' + e.message);
-                    }
-                } else {
-                    console.error('❌ generateSceneOverview 함수를 찾을 수 없습니다.');
-                    alert('MV 프롬프트 생성 기능을 불러오는 중입니다.\n\n페이지를 새로고침하거나 잠시 후 다시 시도해주세요.');
-                    
-                    // 1초 후 재시도
-                    setTimeout(() => {
-                        if (typeof window.generateSceneOverview === 'function') {
-                            console.log('✅ 재시도: generateSceneOverview 함수 발견');
-                            window.generateSceneOverview().catch(err => {
-                                console.error('❌ 재시도 실행 오류:', err);
-                                alert('MV 프롬프트 생성 중 오류가 발생했습니다:\n\n' + (err.message || err));
-                            });
-                        }
-                    }, 1000);
-                }
-            };
+                 const btn = document.getElementById('mvGenerateBtn');
+                 const originalHTML = btn ? btn.innerHTML : '';
+                 
+                 // 즉각적인 시각적 피드백
+                 if (btn) {
+                     btn.classList.add('btn-processing');
+                     btn.innerHTML = '<span>⏳ 생성 중...</span>';
+                     btn.disabled = true;
+                 }
+
+                 if (typeof window.generateSceneOverview === 'function') {
+                     console.log('✅ generateSceneOverview 함수 발견, 실행 중...');
+                     try {
+                         window.generateSceneOverview().then(() => {
+                            // 성공 시 복구
+                            if (btn) {
+                                btn.classList.remove('btn-processing');
+                                btn.innerHTML = originalHTML;
+                                btn.disabled = false;
+                            }
+                         }).catch(function(err) {
+                             console.error('❌ generateSceneOverview 실행 오류:', err);
+                             alert('MV 프롬프트 생성 중 오류가 발생했습니다:\n\n' + (err.message || err));
+                             if (btn) {
+                                 btn.classList.remove('btn-processing');
+                                 btn.innerHTML = originalHTML;
+                                 btn.disabled = false;
+                             }
+                         });
+                     } catch (e) {
+                         console.error('❌ generateSceneOverview 호출 오류:', e);
+                         alert('MV 프롬프트 생성 함수 호출 중 오류가 발생했습니다:\n\n' + e.message);
+                         if (btn) {
+                             btn.classList.remove('btn-processing');
+                             btn.innerHTML = originalHTML;
+                             btn.disabled = false;
+                         }
+                     }
+                 } else {
+                     console.error('❌ generateSceneOverview 함수를 찾을 수 없습니다.');
+                     alert('MV 프롬프트 생성 기능을 불러오는 중입니다.\n\n페이지를 새로고침하거나 잠시 후 다시 시도해주세요.');
+                     
+                     if (btn) {
+                         btn.classList.remove('btn-processing');
+                         btn.innerHTML = originalHTML;
+                         btn.disabled = false;
+                     }
+
+                     // 1초 후 재시도
+                     setTimeout(() => {
+                         if (typeof window.generateSceneOverview === 'function') {
+                             console.log('✅ 재시도: generateSceneOverview 함수 발견');
+                             window.generateSceneOverview().catch(err => {
+                                 console.error('❌ 재시도 실행 오류:', err);
+                                 alert('MV 프롬프트 생성 중 오류가 발생했습니다:\n\n' + (err.message || err));
+                             });
+                         }
+                     }, 1000);
+                 }
+             };
+
             
             // 페이지 로드 시 MV 설정 로드
             if (document.readyState === 'loading') {
@@ -4942,7 +5145,25 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
         window.restoreFromBackupFile = restoreFromBackupFile;
     </script>
     
-    <script src="app.js" onerror="console.error('❌ app.js 파일을 로드할 수 없습니다. 파일 경로를 확인하세요.');"></script>
+    <!-- 개발자용 테스트 스크립트 먼저 로드 (파일 없음 - 주석 처리)
+    <script src="js/dev-tools.js?v=20260222a"></script>
+    -->
+
+    <!-- 커스텀 JS 파일 로드 -->
+    <script src="js/ux.js?v=20260222a"></script>
+    <script src="js/api.js?v=20260222a"></script>
+    <script src="js/storage.js?v=20260222g"></script>
+    <!-- <script src="js/tags.js?v=20260222a"></script> (파일 없음) -->
+    
+    <!-- 각 단계별 스크립트 모듈 추가 -->
+    <script src="js/step1.js?v=20260222a"></script>
+    <script src="js/step2.js?v=20260222a"></script>
+    <script src="js/step3.js?v=20260222a"></script>
+    <script src="js/step4.js?v=20260222a"></script>
+    <script src="js/step5.js?v=20260222a"></script>
+    <script src="js/step6.js?v=20260222a"></script>
+    <script src="app.js?v=20260222h" onerror="console.error('❌ app.js 파일을 로드할 수 없습니다. 파일 경로 거시기');"></script>
+
     <script>
         // app.js 로드 후 프로젝트 목록 로드 시도
         (function() {
@@ -5008,23 +5229,28 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                         sidebarOverlay.removeAttribute('onclick'); // onclick 제거로 클릭 방지
                     }
                     
-                    // 모든 모달 완전히 숨기기 (API 키 설정 모달은 제외 - 사용자가 열어둔 경우 유지)
+                    // 모든 모달 완전히 숨기기 (API 키 설정 모달은 제외 - 사용자가 열어둔 모달은 유지)
                     const modals = ['guidelinesModal', 'projectReferenceModal'];
                     modals.forEach(modalId => {
                         const modal = document.getElementById(modalId);
-                        if (modal) {
+                        if (modal && !modal.classList.contains('show')) {
                             modal.style.cssText = 'display: none !important; pointer-events: none !important; z-index: -9999 !important;';
                             modal.classList.remove('show');
                         }
                     });
                     // apiSettingsModal은 절대 건드리지 않음 (openAPISettings/closeAPISettings로만 제어)
                     
-                    // .modal-overlay 중 API 설정 모달이 아닌 것만 숨기기
+                    // .modal-overlay 중 API 설정 모달이 아닌 것, 그리고 사용자가 연 모달(show)이 아닌 것만 숨기기
                     document.querySelectorAll('.modal-overlay').forEach(overlay => {
                         if (overlay.id === 'apiSettingsModal') return;
+                        if (overlay.id === 'logoutConfirmBox') return; // 로그아웃 확인 박스 보호
+                        if (overlay.classList.contains('show')) return; // 지침서/참조 등 사용자가 연 모달은 유지
                         overlay.style.cssText = 'display: none !important; pointer-events: none !important; z-index: -9999 !important;';
                         overlay.classList.remove('show');
                     });
+                    
+                    // logoutConfirmBox는 절대 건드리지 않음 (doLogout/doLogoutCancel로만 제어)
+                    // (div이므로 .modal-overlay 선택자에 해당 안 되지만 명시적으로 보호)
                     
                     // body와 html이 클릭 가능한지 확인
                     document.body.style.pointerEvents = 'auto';
@@ -5110,7 +5336,449 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
             }
         });
     </script>
+
+    <!-- ════════════════════════════════════════════════════════
+         인증 오버레이 (로그인/가입/승인대기 화면)
+    ════════════════════════════════════════════════════════ -->
+    <div id="authOverlay" style="display:none;position:fixed;inset:0;z-index:99999;background:var(--bg-primary);align-items:center;justify-content:center;">
+        <div style="width:100%;max-width:440px;padding:20px;">
+            <!-- 로고 -->
+            <div style="text-align:center;margin-bottom:32px;">
+                <div style="font-size:3rem;">🎵</div>
+                <h1 style="margin:8px 0 4px;font-size:2rem;font-weight:700;color:var(--text-primary);">Music Creator</h1>
+                <p style="color:var(--text-secondary);font-size:0.9rem;margin:0;">AI 기반 가사 제작 & 수노 프롬프트 생성기</p>
+            </div>
+
+            <!-- 탭 -->
+            <div style="display:flex;gap:8px;margin-bottom:24px;">
+                <button class="auth-tab-btn active" data-tab="login" onclick="showAuthTab('login')" style="flex:1;padding:10px;border-radius:9999px;border:1px solid var(--border);background:var(--accent);color:white;font-weight:600;cursor:pointer;">로그인</button>
+                <button class="auth-tab-btn" data-tab="signup" onclick="showAuthTab('signup')" style="flex:1;padding:10px;border-radius:9999px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);font-weight:600;cursor:pointer;">회원 가입</button>
+            </div>
+
+            <!-- 로그인 패널 -->
+            <div id="auth-login" class="auth-panel" style="display:block;background:var(--bg-card);border-radius:24px;padding:28px;border:1px solid var(--border);">
+                <div class="form-group" style="margin-bottom:16px;">
+                    <label style="display:block;font-size:0.9rem;font-weight:500;margin-bottom:8px;color:var(--text-primary);">이메일</label>
+                    <input type="email" id="loginEmail" placeholder="example@email.com" style="width:100%;padding:12px 16px;border-radius:12px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:0.95rem;box-sizing:border-box;">
+                </div>
+                <div class="form-group" style="margin-bottom:20px;">
+                    <label style="display:block;font-size:0.9rem;font-weight:500;margin-bottom:8px;color:var(--text-primary);">비밀번호</label>
+                    <input type="password" id="loginPassword" placeholder="비밀번호 입력" style="width:100%;padding:12px 16px;border-radius:12px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:0.95rem;box-sizing:border-box;">
+                </div>
+                <div id="loginMessage" class="auth-message" style="display:none;padding:10px 14px;border-radius:10px;font-size:0.875rem;margin-bottom:16px;"></div>
+                <button id="loginBtn" onclick="doLogin()" style="width:100%;padding:13px;border-radius:9999px;background:var(--accent);color:white;border:none;font-size:1rem;font-weight:600;cursor:pointer;"><i class="fas fa-sign-in-alt"></i> 로그인</button>
+                <div style="text-align:center;margin-top:14px;">
+                    <button onclick="doResetPassword()" style="background:none;border:none;color:var(--text-secondary);font-size:0.85rem;cursor:pointer;text-decoration:underline;">비밀번호를 잊으셨나요?</button>
+                </div>
+            </div>
+
+            <!-- 회원 가입 패널 -->
+            <div id="auth-signup" class="auth-panel" style="display:none;background:var(--bg-card);border-radius:24px;padding:28px;border:1px solid var(--border);">
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label style="display:block;font-size:0.9rem;font-weight:500;margin-bottom:8px;color:var(--text-primary);">이름</label>
+                    <input type="text" id="signupName" placeholder="홍길동" style="width:100%;padding:12px 16px;border-radius:12px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:0.95rem;box-sizing:border-box;">
+                </div>
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label style="display:block;font-size:0.9rem;font-weight:500;margin-bottom:8px;color:var(--text-primary);">이메일</label>
+                    <input type="email" id="signupEmail" placeholder="example@email.com" style="width:100%;padding:12px 16px;border-radius:12px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:0.95rem;box-sizing:border-box;">
+                </div>
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label style="display:block;font-size:0.9rem;font-weight:500;margin-bottom:8px;color:var(--text-primary);">비밀번호 (6자 이상)</label>
+                    <input type="password" id="signupPassword" placeholder="비밀번호" style="width:100%;padding:12px 16px;border-radius:12px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:0.95rem;box-sizing:border-box;">
+                </div>
+                <div class="form-group" style="margin-bottom:20px;">
+                    <label style="display:block;font-size:0.9rem;font-weight:500;margin-bottom:8px;color:var(--text-primary);">비밀번호 확인</label>
+                    <input type="password" id="signupPasswordConfirm" placeholder="비밀번호 재입력" style="width:100%;padding:12px 16px;border-radius:12px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:0.95rem;box-sizing:border-box;">
+                </div>
+                <div id="signupMessage" class="auth-message" style="display:none;padding:10px 14px;border-radius:10px;font-size:0.875rem;margin-bottom:16px;"></div>
+                <button id="signupBtn" onclick="doSignup()" style="width:100%;padding:13px;border-radius:9999px;background:var(--accent);color:white;border:none;font-size:1rem;font-weight:600;cursor:pointer;"><i class="fas fa-user-plus"></i> 회원 가입</button>
+                <p style="text-align:center;color:var(--text-secondary);font-size:0.82rem;margin-top:12px;">⏳ 가입 후 관리자 승인이 완료되면 서비스를 이용할 수 있습니다.</p>
+            </div>
+
+            <!-- 승인 대기 패널 -->
+            <div id="auth-pending" class="auth-panel" style="display:none;background:var(--bg-card);border-radius:24px;padding:32px;border:1px solid var(--border);text-align:center;">
+                <div style="font-size:3rem;margin-bottom:16px;">⏳</div>
+                <h3 style="color:var(--text-primary);margin:0 0 12px;">승인 대기 중</h3>
+                <p style="color:var(--text-secondary);font-size:0.9rem;margin:0 0 24px;">회원 가입이 완료되었습니다.<br>관리자 승인 후 서비스를 이용하실 수 있습니다.</p>
+
+                <!-- 로그아웃 버튼 -->
+                <button onclick="doLogout()" id="pendingLogoutBtn"
+                    style="padding:10px 24px;border-radius:9999px;background:transparent;border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;font-size:0.9rem;">
+                    <i class="fas fa-sign-out-alt"></i> 로그아웃
+                </button>
+
+                <!-- 인라인 로그아웃 확인 박스 -->
+                <div id="logoutConfirmBox" style="display:none;margin-top:20px;padding:18px 20px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:16px;">
+                    <p style="margin:0 0 16px;color:var(--text-primary);font-size:0.95rem;font-weight:600;">로그아웃 하시겠습니까?</p>
+                    <div style="display:flex;gap:10px;justify-content:center;">
+                        <button onclick="doLogoutCancel()"
+                            style="padding:10px 22px;border-radius:9999px;background:var(--bg-input);border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;font-size:0.9rem;font-weight:500;">
+                            취소
+                        </button>
+                        <button onclick="doLogoutConfirmed()"
+                            style="padding:10px 22px;border-radius:9999px;background:var(--error,#d93025);border:none;color:white;cursor:pointer;font-size:0.9rem;font-weight:600;">
+                            <i class="fas fa-sign-out-alt"></i> 로그아웃
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════
+         관리자 패널 (사용자 승인/거절)
+    ════════════════════════════════════════════════════════ -->
+    <div id="adminPanel" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;">
+        <div style="background:var(--bg-card);border-radius:24px;width:90%;max-width:760px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;border:1px solid var(--border);">
+            <!-- 헤더 -->
+            <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+                <h3 style="margin:0;font-size:1.1rem;color:var(--text-primary);"><i class="fas fa-users-cog" style="color:var(--accent);margin-right:8px;"></i>회원 관리 패널</h3>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="refreshAdminPanel()" style="padding:8px 16px;border-radius:9999px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;font-size:0.85rem;"><i class="fas fa-sync"></i> 새로고침</button>
+                    <button onclick="closeAdminPanel()" style="padding:8px 16px;border-radius:9999px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;font-size:0.85rem;"><i class="fas fa-times"></i> 닫기</button>
+                </div>
+            </div>
+            <!-- 탭 -->
+            <div style="display:flex;gap:8px;padding:16px 24px;border-bottom:1px solid var(--border);flex-shrink:0;">
+                <button class="admin-tab-btn active" data-tab="pending" onclick="switchAdminTab('pending')" style="padding:8px 20px;border-radius:9999px;background:var(--accent);color:white;border:none;cursor:pointer;font-size:0.9rem;font-weight:500;">⏳ 승인 대기</button>
+                <button class="admin-tab-btn" data-tab="all" onclick="switchAdminTab('all')" style="padding:8px 20px;border-radius:9999px;background:var(--bg-input);color:var(--text-primary);border:none;cursor:pointer;font-size:0.9rem;font-weight:500;">👥 전체 회원</button>
+                <button class="admin-tab-btn" data-tab="config" onclick="switchAdminTab('config')" style="padding:8px 20px;border-radius:9999px;background:var(--bg-input);color:var(--text-primary);border:none;cursor:pointer;font-size:0.9rem;font-weight:500;">⚙️ API 설정</button>
+            </div>
+            <!-- 내용 -->
+            <div style="flex:1;overflow-y:auto;padding:20px 24px;">
+                <div id="adminTab-pending" class="admin-tab-content">
+                    <div id="pendingUsersList"></div>
+                </div>
+                <div id="adminTab-all" class="admin-tab-content" style="display:none;">
+                    <div id="allUsersList"></div>
+                </div>
+                <div id="adminTab-config" class="admin-tab-content" style="display:none;">
+                    <div style="background:var(--bg-input); padding:24px; border-radius:16px; border:1px solid var(--border);">
+                        <h4 style="margin:0 0 16px; color:var(--text-primary);">공용 API 키 설정</h4>
+                        <p style="margin:0 0 20px; color:var(--text-secondary); font-size:0.85rem; line-height:1.6;">
+                            사용자들이 개별적으로 API 키를 입력하지 않아도 AI 기능을 사용할 수 있도록 관리자 공용 키를 설정합니다.<br>
+                            개별 사용자가 자신의 키를 입력한 경우, 해당 사용자의 키가 우선적으로 사용됩니다.
+                        </p>
+                        
+                        <div style="margin-bottom:16px;">
+                            <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:8px; color:var(--text-primary);">ChatGPT (OpenAI) API Key</label>
+                            <input type="password" id="adminOpenAIApiKey" placeholder="sk-..." style="width:100%; padding:12px 16px; border-radius:12px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); font-size:0.95rem; box-sizing:border-box;">
+                        </div>
+                        
+                        <div style="margin-bottom:20px;">
+                            <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:8px; color:var(--text-primary);">Gemini API Key</label>
+                            <input type="password" id="adminGeminiApiKey" placeholder="AIza..." style="width:100%; padding:12px 16px; border-radius:12px; border:1px solid var(--border); background:var(--bg-card); color:var(--text-primary); font-size:0.95rem; box-sizing:border-box;">
+                        </div>
+                        
+                        <button onclick="saveGlobalSettings()" style="padding:12px 24px; border-radius:9999px; background:var(--accent); color:white; border:none; font-weight:600; cursor:pointer;">
+                            <i class="fas fa-save"></i> 설정 저장하기
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div> <!-- adminPanel 닫기 -->
+
+    <!-- 게시판 (Q&A) 패널 -->
+    <div id="boardPanel" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;">
+        <div class="modal" style="width: 90vw; max-width: 800px; height: 85vh; display: flex; flex-direction: column; background: var(--bg-card); border-radius: 20px; overflow: hidden; border: 1px solid var(--border);">
+            <div class="modal-header" style="padding: 18px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary);">
+                <h3 class="modal-title font-bold" style="margin: 0; font-size: 1.15rem;"><i class="fas fa-clipboard-list" style="color: var(--accent); margin-right: 8px;"></i> 질문 및 답변 게시판</h3>
+                <button class="modal-close" onclick="closeBoardPanel()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">&times;</button>
+            </div>
+            
+            <div id="boardListSection" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0;">
+                <div style="padding: 16px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary);">
+                    <div style="font-size: 0.85rem; color: var(--text-secondary);">자유롭게 질문하고 관리자의 답변을 확인하세요.</div>
+                    <button class="btn btn-primary btn-small" onclick="showBoardWriteForm()">
+                        <i class="fas fa-pen"></i> 질문하기
+                    </button>
+                </div>
+                <div id="boardContainer" style="flex: 1; overflow-y: auto; padding: 20px;">
+                    <!-- 게시글 목록이 여기에 동적으로 추가됨 -->
+                    <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                        <i class="fas fa-spinner fa-spin fa-2x"></i><br><br>게시물 목록을 불러오는 중입니다...
+                    </div>
+                </div>
+            </div>
+
+            <!-- 글쓰기 / 상세보기 폼 (내부 섹션) -->
+            <div id="boardDetailSection" style="display: none; flex: 1; flex-direction: column; overflow-y: auto; padding: 24px;">
+                <button class="btn btn-small" onclick="showBoardList()" style="align-self: flex-start; margin-bottom: 15px; background: transparent; border: 1px solid var(--border); color: var(--text-secondary);">
+                    <i class="fas fa-arrow-left"></i> 목록으로
+                </button>
+                
+                <div id="boardWriteForm">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div class="form-group">
+                            <label for="boardNickname" style="display: block; font-weight: 600; margin-bottom: 8px;">별칭 (Nickname)</label>
+                            <input type="text" id="boardNickname" placeholder="익명" style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-input); color: var(--text-primary);">
+                        </div>
+                        <div class="form-group">
+                            <label for="boardPassword" style="display: block; font-weight: 600; margin-bottom: 8px;">비밀번호 (Password)</label>
+                            <input type="password" id="boardPassword" placeholder="글 삭제/수정용" style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-input); color: var(--text-primary);">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                        <div style="flex: 1;">
+                            <label for="boardTitle" style="display: block; font-weight: 600; margin-bottom: 8px;">제목</label>
+                            <input type="text" id="boardTitle" placeholder="질문 제목을 입력하세요." style="width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-input); color: var(--text-primary);">
+                        </div>
+                        <div style="padding-top: 25px;">
+                            <label class="checkbox-container" style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-secondary);">
+                                <input type="checkbox" id="boardIsPrivate" style="width: 16px; height: 16px; cursor: pointer;">
+                                <i class="fas fa-lock"></i> 비공개
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="boardContent" style="display: block; font-weight: 600; margin-bottom: 8px;">내용</label>
+                        <textarea id="boardContent" placeholder="질문 내용을 상세히 입력하세요." style="width: 100%; min-height: 180px; padding: 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-input); color: var(--text-primary); resize: vertical;"></textarea>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label style="display: block; font-weight: 600; margin-bottom: 8px;">이미지 첨부 (Option)</label>
+                        <input type="file" id="boardImageInput" accept="image/*" style="display: none;" onchange="handleBoardImageSelect(event)">
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <button type="button" class="btn btn-small" onclick="document.getElementById('boardImageInput').click()" style="background: var(--bg-secondary); border: 1px solid var(--border);"><i class="fas fa-image"></i> 이미지 선택</button>
+                            <span id="boardImageFileName" style="font-size: 0.8rem; color: var(--text-secondary);">선택된 파일 없음</span>
+                        </div>
+                        <div id="boardImagePreview" style="margin-top: 10px; display: none;">
+                            <img id="boardImagePreviewImg" src="" style="max-width: 100px; max-height: 100px; border-radius: 6px; border: 1px solid var(--border);">
+                            <button type="button" onclick="clearBoardImageSelection()" style="background: var(--error); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 0.7rem; cursor: pointer; margin-left: -10px; vertical-align: top;">&times;</button>
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px; display: flex; gap: 12px; justify-content: flex-end;">
+                        <button class="btn btn-secondary" onclick="showBoardList()" style="padding: 10px 24px; border-radius: 9999px;">취소</button>
+                        <button class="btn btn-primary" onclick="submitBoardPost()" style="padding: 10px 30px; border-radius: 9999px; background: var(--accent); color: white; border: none; font-weight: 600;">등록하기</button>
+                    </div>
+                </div>
+
+                <div id="boardReadForm" style="display: none;">
+                    <div style="padding: 20px; background: var(--bg-secondary); border-radius: 12px; margin-bottom: 24px; border: 1px solid var(--border);">
+                        <div id="viewBoardTitle" style="font-size: 1.25rem; font-weight: 700; margin-bottom: 10px; color: var(--text-primary);">제목</div>
+                        <div id="viewBoardMeta" style="font-size: 0.82rem; color: var(--text-secondary); display: flex; flex-wrap: wrap; gap: 15px;">
+                            <span><i class="fas fa-user"></i> <span id="viewBoardNickname">별칭</span></span>
+                            <span><i class="fas fa-calendar-alt"></i> <span id="viewBoardDate">작성일</span></span>
+                        </div>
+                    </div>
+                    <div id="viewBoardImageContainer" style="margin-bottom: 20px; display: none; text-align: center;">
+                        <img id="viewBoardImage" src="" style="max-width: 100%; border-radius: 12px; border: 1px solid var(--border); cursor: pointer;" onclick="window.open(this.src)">
+                    </div>
+                    <div id="viewBoardContent" style="white-space: pre-wrap; line-height: 1.8; min-height: 120px; padding: 0 5px; color: var(--text-primary); font-size: 0.95rem;">내용</div>
+                    
+                    <div style="margin-top: 25px; display: flex; justify-content: flex-end; gap: 10px;">
+                        <button class="btn btn-small" id="btnEditBoard" onclick="showBoardEditForm()" style="background: var(--bg-secondary); border: 1px solid var(--border);">
+                            <i class="fas fa-edit"></i> 수정
+                        </button>
+                        <button class="btn btn-small" id="btnDeletePost" onclick="deleteBoardPost()" style="background: rgba(239, 68, 68, 0.1); color: var(--error); border: 1px solid var(--error);">
+                            <i class="fas fa-trash"></i> 삭제
+                        </button>
+                    </div>
+                    
+                    <div id="adminAnswerSection" style="margin-top: 40px; padding-top: 30px; border-top: 1px solid var(--border);">
+                        <div style="font-weight: 700; color: var(--accent); margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-comment-dots"></i> 관리자 답변
+                        </div>
+                        <div id="viewBoardAnswer" style="background: rgba(139, 92, 246, 0.05); padding: 20px; border-radius: 12px; border-left: 4px solid var(--accent); white-space: pre-wrap; color: var(--text-primary); line-height: 1.7; font-size: 0.92rem;">
+                            답변 대기 중입니다.
+                        </div>
+                        
+                        <!-- 관리자 전용 답변 입력창 -->
+                        <div id="adminAnswerInput" style="display: none; margin-top: 24px;">
+                            <label style="display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 10px; color: var(--text-secondary);">답변 작성 (관리자 전용)</label>
+                            <textarea id="boardAnswerText" placeholder="관리자님, 사용자에게 보여줄 답변 내용을 작성해 주세요." style="width: 100%; min-height: 150px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-input); color: var(--text-primary); resize: vertical;"></textarea>
+                            <div style="margin-top: 15px; text-align: right;">
+                                <button class="btn btn-primary" onclick="submitBoardAnswer()" style="padding: 10px 24px; border-radius: 9999px; background: var(--accent); color: white; border: none; font-weight: 600;">답변 등록</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════
+         커스텀 확인 모달 (Native confirm 대체)
+    ════════════════════════════════════════════════════════ -->
+    <!-- ════════════════════════════════════════════════════════
+         도움말 모달 (Help Modal)
+    ════════════════════════════════════════════════════════ -->
+    <div id="helpModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 800px; width: 90%; height: 80vh; display: flex; flex-direction: column; overflow: hidden;">
+            <!-- 헤더 -->
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:20px 24px; border-bottom:1px solid var(--border); flex-shrink:0;">
+                <h3 style="margin:0; font-size:1.4rem; color:var(--accent); display:flex; align-items:center; gap:10px;">
+                    <i class="fas fa-question-circle"></i> Music Creator 사용 가이드
+                </h3>
+                <button onclick="closeHelpModal()" style="background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:1.2rem;"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <!-- 탭 메뉴 -->
+            <div style="display:flex; gap:8px; padding:12px 24px; border-bottom:1px solid var(--border); overflow-x:auto; background:var(--bg-card); flex-shrink:0;">
+                <button class="help-tab-btn active" onclick="switchHelpTab('intro')">👋 시작하기</button>
+                <button class="help-tab-btn" onclick="switchHelpTab('step1')">📍 1단계</button>
+                <button class="help-tab-btn" onclick="switchHelpTab('step2')">📝 2단계</button>
+                <button class="help-tab-btn" onclick="switchHelpTab('step4')">🔮 4단계</button>
+                <button class="help-tab-btn" onclick="switchHelpTab('step6')">🎬 6단계</button>
+            </div>
+            
+            <!-- 내용 영역 -->
+            <div style="flex:1; overflow-y:auto; padding:30px 40px; line-height:1.7; color:var(--text-primary);">
+                <!-- [소개] -->
+                <div id="helpTab-intro" class="help-content">
+                    <h2 style="margin-top:0;">🚀 환영합니다!</h2>
+                    <p><strong>Music Creator</strong>는 AI 기술을 활용하여 작사, 스타일 기획, 오디오 분석, 마케팅 자료 및 뮤직비디오(MV) 프롬프트 제작까지 <strong>음악 제작의 전 과정</strong>을 돕는 통합 워크벤치입니다.</p>
+                    <div style="background:var(--bg-input); padding:20px; border-radius:12px; margin:20px 0; border:1px solid var(--border);">
+                        <h4 style="margin-top:0;"><i class="fas fa-magic"></i> 기본 워크플로우</h4>
+                        <ol style="margin-bottom:0; padding-left:20px;">
+                            <li><strong>기획</strong>: 장르와 주제를 정하고 기본 스타일을 잡습니다.</li>
+                            <li><strong>작사</strong>: AI의 도움을 받아 가사를 완성하고 한글/영문 버전을 준비합니다.</li>
+                            <li><strong>스타일</strong>: 음악의 상세한 사운드적 특징(악기, 비트 등)을 정의합니다.</li>
+                            <li><strong>분석 & 개선</strong>: Gemini AI가 가사를 평가하고 더 완벽하게 다듬어줍니다.</li>
+                            <li><strong>마케팅</strong>: 오디오를 분석하여 앨범 소개와 마케팅용 문구를 생성합니다.</li>
+                            <li><strong>비주얼</strong>: 뮤직비디오 제작을 위한 Midjourney/Runway 프롬프트를 만듭니다.</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <!-- [1단계] -->
+                <div id="helpTab-step1" class="help-content" style="display:none;">
+                    <h2 style="margin-top:0;">📍 1단계: 프로젝트 기획</h2>
+                    <p>음악의 뼈대를 잡는 단계입니다.</p>
+                    <ul>
+                        <li><strong>곡 제목</strong>: 프로젝트의 이름을 정합니다. (사이드바에 저장되는 이름입니다.)</li>
+                        <li><strong>장르 & 주제</strong>: 생각하고 계신 곡의 스타일과 내용을 간략히 입력하세요.</li>
+                        <li><strong>분위기(Mood)</strong>: '우울한', '청량한' 등 곡의 감성을 정의합니다.</li>
+                    </ul>
+                    <blockquote>TIP: 장르 선택 시 <strong>'사용자 지정'</strong>을 활용하면 독창적인 조합(예: K-Pop + Synthwave)이 가능합니다.</blockquote>
+                </div>
+
+                <!-- [2단계] -->
+                <div id="helpTab-step2" class="help-content" style="display:none;">
+                    <h2 style="margin-top:0;">📝 2단계: 번역 및 가사 생성</h2>
+                    <p>Suno AI 등 결과물에 직접 사용될 가사를 만드는 단계입니다.</p>
+                    <ul>
+                        <li><strong>한영 번역</strong>: 생성된 가사를 영문으로 번역하거나, 영문 가사를 한글로 해석할 수 있습니다.</li>
+                        <li><strong>구조화</strong>: [Intro], [Verse], [Chorus] 등 지시어를 포함하여 가사를 구조화하세요.</li>
+                        <li><strong>에디터 활용</strong>: AI가 생성한 가사를 바탕으로 자신만의 감성을 담아 직접 수정하는 것이 중요합니다.</li>
+                    </ul>
+                </div>
+
+                <!-- [4단계] -->
+                <div id="helpTab-step4" class="help-content" style="display:none;">
+                    <h2 style="margin-top:0;">🔮 4단계: Gemini AI 분석 및 개선</h2>
+                    <p>Gemini AI가 가사 전문가의 관점에서 프로젝트를 검토합니다.</p>
+                    <ul>
+                        <li><strong>정밀 분석</strong>: 가사의 문학적 완성도, 메시지 전달력, 압운 등을 점수로 보여줍니다.</li>
+                        <li><strong>자동 개선안</strong>: 분석 결과를 바탕으로 AI가 '더 나은 표현'을 제안합니다.</li>
+                        <li><strong>적용하기</strong>: 마음에 드는 개선안이 있다면 버튼 하나로 현재 가사에 반영할 수 있습니다.</li>
+                    </ul>
+                </div>
+
+                <!-- [6단계] -->
+                <div id="helpTab-step6" class="help-content" style="display:none;">
+                    <h2 style="margin-top:0;">🎬 6단계: MV 영상 프롬프트 제작</h2>
+                    <p>Midjourney와 Runway Gen-3를 사용하여 화려한 영상을 만들기 위한 설계도를 그립니다.</p>
+                    <ul>
+                        <li><strong>씬(Scene) 생성</strong>: 가사 내용에 맞춰 각 소절별 시각적 묘사를 자동으로 생성합니다.</li>
+                        <li><strong>Midjourney 연동</strong>: <code>--v 6.1</code>, <code>--ar 16:9</code> 등 전용 옵션이 포함된 고품질 프롬프트를 제공합니다.</li>
+                        <li><strong>Runway 최적화</strong>: 영상 생성 AI인 Runway에 최적화된 영어 묘사문을 별도로 생성합니다. (일관성 있는 인물/장소 유지)</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- 푸터 -->
+            <div style="background:var(--bg-input); padding:16px 24px; text-align:right; border-top:1px solid var(--border); flex-shrink:0;">
+                <button onclick="closeHelpModal()" class="btn btn-primary" style="padding:10px 30px; border-radius:12px; font-weight:600;">알겠습니다</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .help-tab-btn {
+            padding: 8px 18px;
+            border-radius: 9999px;
+            border: 1px solid var(--border);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .help-tab-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        .help-tab-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        .help-content h2 { margin-bottom: 24px; color: var(--accent); }
+        .help-content ul, .help-content ol { padding-left: 24px; margin-bottom: 24px; }
+        .help-content li { margin-bottom: 12px; }
+        .help-content blockquote { border-left: 4px solid var(--accent); padding: 12px 20px; background: rgba(59, 130, 246, 0.05); border-radius: 0 12px 12px 0; margin: 24px 0; font-style: italic; }
+    </style>
+
+    <style>
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100000;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        .modal-overlay.show {
+            display: flex;
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            transform: scale(0.9);
+            transition: transform 0.2s ease;
+        }
+        .modal-overlay.show .modal-content {
+            transform: scale(1);
+        }
+    </style>
+
+    <div id="adminToast" style="position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--text-primary);color:var(--bg-primary);padding:10px 24px;border-radius:9999px;font-size:0.9rem;opacity:0;transition:opacity 0.3s;pointer-events:none;"></div>
+
+    <!-- ════════════════════════════════════════════════════════
+         Firebase JS 파일
+    ════════════════════════════════════════════════════════ -->
+    <!-- 재생성 이력 모달 -->
+    <div id="historyModal" class="modal-overlay" onclick="if(event.target === this) this.style.display='none';">
+        <div class="modal-content" style="max-width: 500px; width: 90%; max-height: 80vh; display: flex; flex-direction: column;">
+            <div style="padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0;"><i class="fas fa-history"></i> 생성 이력</h3>
+                <button class="btn btn-small btn-secondary" onclick="document.getElementById('historyModal').style.display='none';" style="padding: 5px 10px;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="historyItemsContainer" style="flex: 1; overflow-y: auto; padding: 10px;">
+                <!-- 이력 항목이 여기에 표시됨 -->
+            </div>
+            <div style="padding: 15px; border-top: 1px solid var(--border); text-align: right;">
+                <button class="btn btn-secondary" onclick="document.getElementById('historyModal').style.display='none';">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./js/firebase-config.js"></script>
+    <script src="./js/auth.js?v=20260221b"></script>
+    <script src="./js/admin.js"></script>
+    <script src="./js/board.js"></script>
 </body>
 </html>
-
-

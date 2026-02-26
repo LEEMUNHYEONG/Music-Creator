@@ -1,0 +1,479 @@
+(function () {
+  "use strict";
+
+  const COLLECTION_BOARD = "board";
+  let selectedFile = null;
+  let isEditMode = false;
+  let editingPostId = null;
+  let revealedPosts = new Set(); // 비밀번호 확인된 비공개 포스트 세션 저장
+
+  // --- 전역 함수 등록 ---
+  window.openBoardPanel = function () {
+    const panel = document.getElementById("boardPanel");
+    if (panel) {
+      panel.style.display = "flex";
+      showBoardList();
+    }
+  };
+
+  window.closeBoardPanel = function () {
+    const panel = document.getElementById("boardPanel");
+    if (panel) panel.style.display = "none";
+  };
+
+  window.showBoardWriteForm = function (isEdit = false) {
+    const listSection = document.getElementById("boardListSection");
+    const detailSection = document.getElementById("boardDetailSection");
+    const writeForm = document.getElementById("boardWriteForm");
+    const readForm = document.getElementById("boardReadForm");
+
+    if (listSection) listSection.style.display = "none";
+    if (detailSection) detailSection.style.display = "flex";
+    if (writeForm) writeForm.style.display = "block";
+    if (readForm) readForm.style.display = "none";
+
+    isEditMode = isEdit;
+    const submitBtn = document.querySelector("#boardWriteForm .btn-primary");
+    if (submitBtn) submitBtn.textContent = isEdit ? "수정 완료" : "등록하기";
+
+    if (!isEdit) {
+      editingPostId = null;
+      // ─── 입력란 초기화 (기존 데이터 보존 로직 추가) ───
+      // 기존에 입력된 데이터가 있고, 새로 쓰는 도중에 실수로 호출된 경우를 대비해
+      // 제목이나 내용이 있을 때는 초기화를 건너뛰는 안전장치 (필요시)
+      document.getElementById("boardNickname").value =
+        window.currentUserData?.name || "";
+      document.getElementById("boardPassword").value = "";
+      document.getElementById("boardTitle").value = "";
+      document.getElementById("boardContent").value = "";
+      document.getElementById("boardIsPrivate").checked = false;
+      clearBoardImageSelection();
+    }
+  };
+
+  // ─── 입력란 데이터 보존을 위한 리팩토링 ───
+  function setBoardImage(file) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("이미지 파일만 첨부할 수 있습니다.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert("파일 크기는 5MB 이하여야 합니다.");
+      return;
+    }
+    selectedFile = file;
+    document.getElementById("boardImageFileName").textContent =
+      file.name || "pasted_image.png";
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const previewImg = document.getElementById("boardImagePreviewImg");
+      const previewContainer = document.getElementById("boardImagePreview");
+      if (previewImg && previewContainer) {
+        previewImg.src = e.target.result;
+        previewContainer.style.display = "block";
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  window.showBoardEditForm = function () {
+    const data = window.currentBoardPostData;
+    const id = window.currentBoardPostId;
+    if (!data || !id) return;
+
+    // 관리자가 아니면 비밀번호 확인
+    const isAdmin =
+      window.currentUserData && window.currentUserData.role === "admin";
+    if (!isAdmin) {
+      const inputPwd = prompt("수정을 위해 게시글 비밀번호를 입력하세요.");
+      if (inputPwd === null) return;
+      if (inputPwd !== data.password) {
+        alert("비밀번호가 일치하지 않습니다.");
+        return;
+      }
+    }
+
+    showBoardWriteForm(true);
+    editingPostId = id;
+
+    document.getElementById("boardNickname").value = data.nickname || "";
+    document.getElementById("boardPassword").value = data.password || "";
+    document.getElementById("boardTitle").value = data.title || "";
+    document.getElementById("boardContent").value = data.content || "";
+    document.getElementById("boardIsPrivate").checked = !!data.isPrivate;
+
+    if (data.imageUrl) {
+      const previewImg = document.getElementById("boardImagePreviewImg");
+      const previewContainer = document.getElementById("boardImagePreview");
+      if (previewImg && previewContainer) {
+        previewImg.src = data.imageUrl;
+        previewContainer.style.display = "block";
+      }
+      document.getElementById("boardImageFileName").textContent =
+        "기존 이미지 유지됨";
+    } else {
+      clearBoardImageSelection();
+    }
+  };
+
+  window.showBoardList = function () {
+    const listSection = document.getElementById("boardListSection");
+    const detailSection = document.getElementById("boardDetailSection");
+
+    if (listSection) listSection.style.display = "flex";
+    if (detailSection) detailSection.style.display = "none";
+
+    loadBoardPosts();
+  };
+
+  // --- 이미지 관련 핸들러 ---
+  window.handleBoardImageSelect = function (event) {
+    setBoardImage(event.target.files[0]);
+  };
+
+  window.clearBoardImageSelection = function () {
+    selectedFile = null;
+    const fileInput = document.getElementById("boardImageInput");
+    if (fileInput) fileInput.value = "";
+    document.getElementById("boardImageFileName").textContent =
+      "선택된 파일 없음";
+    document.getElementById("boardImagePreview").style.display = "none";
+  };
+
+  // --- Firestore & Storage 데이터 관리 ---
+  async function loadBoardPosts() {
+    const container = document.getElementById("boardContainer");
+    if (!container) return;
+
+    try {
+      const snapshot = await window.firebaseDb
+        .collection(COLLECTION_BOARD)
+        .orderBy("createdAt", "desc")
+        .get();
+
+      if (snapshot.empty) {
+        container.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--text-secondary);"><i class="fas fa-inbox fa-3x" style="opacity: 0.3; margin-bottom: 15px;"></i><br>아직 등록된 게시글이 없습니다.</div>`;
+        return;
+      }
+
+      container.innerHTML = "";
+      snapshot.forEach((doc) => {
+        container.appendChild(createPostCard(doc.id, doc.data()));
+      });
+    } catch (err) {
+      console.error("게시판 로드 오류:", err);
+      container.innerHTML = `<div style="color:var(--error); text-align:center; padding:20px;">❌ 데이터를 불러오지 못했습니다: ${err.message}</div>`;
+    }
+  }
+
+  function createPostCard(id, data) {
+    const card = document.createElement("div");
+    card.className = "board-post-card";
+    card.onclick = () => viewPostDetail(id, data);
+
+    const date = data.createdAt
+      ? new Date(data.createdAt.seconds * 1000).toLocaleDateString()
+      : "-";
+    const statusClass = data.answered ? "status-answered" : "status-pending";
+    const statusText = data.answered ? "답변완료" : "대기중";
+    const nickname = data.nickname || data.userName || "익명";
+    const lockIcon = data.isPrivate
+      ? '<i class="fas fa-lock board-post-lock"></i>'
+      : "";
+
+    card.innerHTML = `
+      <div class="board-post-title">
+        <span>${escapeHtml(data.title)} ${lockIcon}</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+          ${data.imageUrl ? '<i class="fas fa-image" style="color:var(--text-secondary); font-size:0.8rem;"></i>' : ""}
+          <span class="status-badge ${statusClass}">${statusText}</span>
+        </div>
+      </div>
+      <div class="board-post-meta">
+        <span class="board-post-nickname"><i class="fas fa-user-circle"></i> ${escapeHtml(nickname)}</span>
+        <span><i class="fas fa-calendar-alt"></i> ${date}</span>
+      </div>
+    `;
+    return card;
+  }
+
+  async function viewPostDetail(id, data) {
+    const listSection = document.getElementById("boardListSection");
+    const detailSection = document.getElementById("boardDetailSection");
+    const writeForm = document.getElementById("boardWriteForm");
+    const readForm = document.getElementById("boardReadForm");
+
+    listSection.style.display = "none";
+    detailSection.style.display = "flex";
+    writeForm.style.display = "none";
+    readForm.style.display = "block";
+
+    // 권한 확인 (관리자, 본인, 또는 비밀번호 확인됨)
+    const isAdmin =
+      window.currentUserData && window.currentUserData.role === "admin";
+    const isAuthor =
+      window.firebaseAuth.currentUser &&
+      window.firebaseAuth.currentUser.uid === data.userId;
+    const isRevealed = revealedPosts.has(id);
+    const canView = !data.isPrivate || isAdmin || isAuthor || isRevealed;
+
+    const contentArea = document.getElementById("viewBoardContent");
+    const imgContainer = document.getElementById("viewBoardImageContainer");
+    const answerSection = document.getElementById("adminAnswerSection");
+
+    if (!canView) {
+      contentArea.innerHTML = `
+        <div class="private-content-overlay">
+          <i class="fas fa-lock fa-3x" style="color: var(--warning); margin-bottom: 15px;"></i>
+          <p style="font-weight: 600; margin-bottom: 20px;">비공개 게시글입니다.</p>
+          <button class="btn btn-primary btn-small" onclick="revealPrivatePost('${id}')" style="background: var(--accent);">비밀번호 입력하고 보기</button>
+        </div>
+      `;
+      imgContainer.style.display = "none";
+      answerSection.style.display = "none";
+    } else {
+      contentArea.textContent = data.content;
+      const imgEl = document.getElementById("viewBoardImage");
+      if (data.imageUrl) {
+        imgEl.src = data.imageUrl;
+        imgContainer.style.display = "block";
+      } else {
+        imgContainer.style.display = "none";
+      }
+      answerSection.style.display = "block";
+    }
+
+    document.getElementById("viewBoardTitle").textContent =
+      (data.isPrivate ? "🔒 " : "") + data.title;
+    const date = data.createdAt
+      ? new Date(data.createdAt.seconds * 1000).toLocaleString()
+      : "-";
+    document.getElementById("viewBoardNickname").textContent =
+      data.nickname || data.userName || "익명";
+    document.getElementById("viewBoardDate").textContent = date;
+
+    const answerEl = document.getElementById("viewBoardAnswer");
+    if (data.answer) {
+      answerEl.textContent = data.answer;
+      answerEl.style.color = "var(--text-primary)";
+    } else {
+      answerEl.textContent = "관리자의 답변을 기다리고 있습니다.";
+      answerEl.style.color = "var(--text-secondary)";
+    }
+
+    const adminInput = document.getElementById("adminAnswerInput");
+    if (adminInput) {
+      adminInput.style.display = isAdmin ? "block" : "none";
+      document.getElementById("boardAnswerText").value = data.answer || "";
+    }
+
+    window.currentBoardPostId = id;
+    window.currentBoardPostData = data;
+  }
+
+  window.revealPrivatePost = function (id) {
+    const data = window.currentBoardPostData;
+    if (!data) return;
+    const inputPwd = prompt("게시글 비밀번호를 입력하세요.");
+    if (inputPwd === null) return;
+    if (inputPwd === data.password) {
+      revealedPosts.add(id);
+      viewPostDetail(id, data);
+    } else {
+      alert("비밀번호가 일치하지 않습니다.");
+    }
+  };
+
+  window.submitBoardPost = async function () {
+    if (typeof window.ensureAuthenticated === "function") {
+      if (!window.ensureAuthenticated()) return;
+    }
+    const nickname =
+      document.getElementById("boardNickname").value.trim() || "익명";
+    const password = document.getElementById("boardPassword").value.trim();
+    const title = document.getElementById("boardTitle").value.trim();
+    const content = document.getElementById("boardContent").value.trim();
+    const isPrivate = document.getElementById("boardIsPrivate").checked;
+
+    if (!title || !content || !password) {
+      alert("모든 필드를 입력해 주세요.");
+      return;
+    }
+
+    const submitBtn = document.querySelector("#boardWriteForm .btn-primary");
+    const originalBtnText = submitBtn ? submitBtn.innerHTML : "저장";
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 처리 중...';
+    }
+
+    try {
+      console.log("🔄 게시글 등록 시작...");
+      let imageUrl = isEditMode
+        ? window.currentBoardPostData
+          ? window.currentBoardPostData.imageUrl
+          : ""
+        : "";
+
+      if (selectedFile) {
+        console.log("📸 이미지 업로드 시도:", selectedFile.name);
+        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${selectedFile.name.split(".").pop()}`;
+
+        try {
+          const storageRef = window.firebaseStorage.ref();
+          const imageRef = storageRef.child(`board_images/${fileName}`);
+
+          console.log(
+            "📤 Storage 업로드 중... (Bucket: " +
+              window.firebaseStorage.app.options.storageBucket +
+              ")",
+          );
+          const uploadTask = await imageRef.put(selectedFile);
+          console.log("✅ Storage 업로드 완료");
+
+          imageUrl = await uploadTask.ref.getDownloadURL();
+          console.log("🔗 이미지 URL 획득 완료:", imageUrl);
+        } catch (storageErr) {
+          console.error("❌ Storage 업로드 중 오류 발생:", storageErr);
+          if (storageErr.code === "storage/unauthorized") {
+            throw new Error(
+              "이미지 업로드 권한이 없습니다. (보안 규칙 확인 필요)",
+            );
+          } else if (
+            storageErr.name === "FirebaseError" &&
+            storageErr.message.includes("CORS")
+          ) {
+            throw new Error(
+              "이미지 서버(CORS) 설정 오류가 발생했습니다. 관리자에게 문의하세요.",
+            );
+          } else {
+            throw new Error(
+              "이미지 업로드에 실패했습니다: " +
+                (storageErr.message || storageErr.code),
+            );
+          }
+        }
+      }
+
+      const postData = {
+        title,
+        content,
+        nickname,
+        password,
+        isPrivate,
+        imageUrl,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      };
+
+      console.log("📝 Firestore 데이터 저장 중...");
+      if (!isEditMode) {
+        postData.userId = window.firebaseAuth.currentUser?.uid || "anonymous";
+        postData.userName = window.currentUserData?.name || "익명";
+        postData.answered = false;
+        postData.answer = "";
+        postData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        await window.firebaseDb.collection(COLLECTION_BOARD).add(postData);
+      } else {
+        await window.firebaseDb
+          .collection(COLLECTION_BOARD)
+          .doc(editingPostId)
+          .update(postData);
+      }
+
+      console.log("✅ 게시글 처리 완료");
+      alert(isEditMode ? "수정되었습니다." : "등록되었습니다.");
+      showBoardList();
+    } catch (err) {
+      console.error("❌ 게시글 등록 실패:", err);
+      // alert는 브라우저를 블로킹하므로 showToast 등이 있으면 더 좋으나, 현재 alert 사용 중
+      alert(
+        "❌ 오류 발생: " + (err.message || "알 수 없는 오류가 발생했습니다."),
+      );
+    } finally {
+      console.log("🔚 버튼 상태 복원");
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnText;
+      }
+    }
+  };
+
+  window.deleteBoardPost = async function () {
+    const postId = window.currentBoardPostId;
+    const postData = window.currentBoardPostData;
+    if (!postId || !postData) return;
+
+    const isAdmin =
+      window.currentUserData && window.currentUserData.role === "admin";
+    if (!isAdmin) {
+      const inputPwd = prompt("삭제를 위해 비밀번호를 입력하세요.");
+      if (inputPwd === null) return;
+      if (inputPwd !== postData.password) {
+        alert("비밀번호가 일치하지 않습니다.");
+        return;
+      }
+    }
+
+    if (!confirm("정말 이 게시글을 삭제하시겠습니까?")) return;
+
+    try {
+      await window.firebaseDb.collection(COLLECTION_BOARD).doc(postId).delete();
+      if (postData.imageUrl) {
+        try {
+          await window.firebaseStorage.refFromURL(postData.imageUrl).delete();
+        } catch (e) {}
+      }
+      alert("삭제되었습니다.");
+      showBoardList();
+    } catch (err) {
+      alert("❌ 삭제 오류: " + err.message);
+    }
+  };
+
+  window.submitBoardAnswer = async function () {
+    const postId = window.currentBoardPostId;
+    const answer = document.getElementById("boardAnswerText").value.trim();
+    if (!postId || !answer) return;
+    try {
+      await window.firebaseDb.collection(COLLECTION_BOARD).doc(postId).update({
+        answer,
+        answered: true,
+        answeredAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      alert("답변이 등록되었습니다.");
+      viewPostDetail(postId, {
+        ...window.currentBoardPostData,
+        answer,
+        answered: true,
+      });
+    } catch (err) {
+      alert("❌ 답변 등록 오류: " + err.message);
+    }
+  };
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // ─── 붙여넣기 이벤트 바인딩 ───
+  document.addEventListener("DOMContentLoaded", () => {
+    const contentArea = document.getElementById("boardContent");
+    if (contentArea) {
+      contentArea.addEventListener("paste", function (e) {
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf("image") !== -1) {
+            const blob = items[i].getAsFile();
+            setBoardImage(blob);
+            // 이미지를 붙여넣었으므로 텍스트 입력을 막고 싶다면 e.preventDefault();
+            // 하지만 텍스트와 함께 사용하는 경우가 많으므로 막지 않음
+          }
+        }
+      });
+    }
+  });
+})();
