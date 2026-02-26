@@ -1,0 +1,12 @@
+[
+  {
+    "origin": [
+      "https://music-creator-app-92d15.web.app",
+      "http://localhost:8001",
+      "http://localhost:8080"
+    ],
+    "method": ["GET", "POST", "PUT", "DELETE", "HEAD"],
+    "responseHeader": ["Content-Type", "x-goog-resumable"],
+    "maxAgeSeconds": 3600
+  }
+]
