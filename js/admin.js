@@ -9,23 +9,47 @@
   const COLLECTION_USERS = "users";
 
   // ─── 관리자 패널 열기/닫기 ──────────────────────────────────
-  window.openAdminPanel = function () {
+  // showConfig: true면 ⚙️ API 설정 탭을 표시하고 해당 탭으로 이동
+  //             false(기본)면 API 설정 탭 숨김 — 사용자 관리 탭만 표시
+  window.openAdminPanel = function (showConfig) {
     const userData = window.currentUserData;
     if (!userData || userData.role !== "admin") {
       alert("⚠️ 관리자 권한이 필요합니다.");
       return;
     }
     const panel = document.getElementById("adminPanel");
-    if (panel) {
-      panel.style.display = "flex";
-      loadPendingUsers();
-      loadAllUsers();
+    if (!panel) return;
+
+    // ⚙️ API 설정 탭 버튼 표시 여부 제어
+    const configTabBtn = document.querySelector(
+      ".admin-tab-btn[data-tab='config']",
+    );
+    if (configTabBtn) {
+      configTabBtn.style.display = showConfig ? "" : "none";
+    }
+
+    panel.style.display = "flex";
+    loadPendingUsers();
+    loadAllUsers();
+
+    // showConfig=true면 API 설정 탭으로 바로 이동, 아니면 승인 대기 탭으로
+    if (showConfig) {
+      setTimeout(function () {
+        switchAdminTab("config");
+      }, 150);
+    } else {
+      switchAdminTab("pending");
     }
   };
 
   window.closeAdminPanel = function () {
     const panel = document.getElementById("adminPanel");
     if (panel) panel.style.display = "none";
+    // 닫을 때 ⚙️ API 설정 탭을 숨김 초기화 (다음 "사용자 관리" 진입 시 탭 미표시 보장)
+    const configTabBtn = document.querySelector(
+      ".admin-tab-btn[data-tab='config']",
+    );
+    if (configTabBtn) configTabBtn.style.display = "none";
   };
 
   // ─── 승인 대기 중 사용자 목록 불러오기 ──────────────────────
@@ -332,6 +356,86 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
   }
+
+  // ─── 공용 API 키 관리 전용 모달 ────────────────────────────
+  /** "설정 > 공용 API 키 관리" 클릭 시 전용 모달을 엽니다. */
+  window.openGlobalApiKeyModal = async function () {
+    const userData = window.currentUserData;
+    if (!userData || userData.role !== "admin") {
+      alert("⚠️ 관리자 권한이 필요합니다.");
+      return;
+    }
+    const modal = document.getElementById("globalApiKeyModal");
+    if (!modal) return;
+
+    // 기존 키 불러오기
+    try {
+      const doc = await window.firebaseDb
+        .collection("config")
+        .doc("global_settings")
+        .get();
+      if (doc.exists) {
+        const data = doc.data();
+        const openaiEl = document.getElementById("modalOpenAIApiKey");
+        const geminiEl = document.getElementById("modalGeminiApiKey");
+        if (openaiEl) openaiEl.value = data.openai_api_key || "";
+        if (geminiEl) geminiEl.value = data.gemini_api_key || "";
+      }
+    } catch (err) {
+      console.warn("공용 API 키 불러오기 오류:", err.message);
+    }
+
+    modal.style.display = "flex";
+  };
+
+  /** 모달 닫기 */
+  window.closeGlobalApiKeyModal = function () {
+    const modal = document.getElementById("globalApiKeyModal");
+    if (modal) modal.style.display = "none";
+  };
+
+  /** 모달에서 저장하기 */
+  window.saveGlobalApiKeyModal = async function () {
+    const openaiKey = document.getElementById("modalOpenAIApiKey")?.value || "";
+    const geminiKey = document.getElementById("modalGeminiApiKey")?.value || "";
+
+    if (
+      !confirm(
+        "공용 API 키를 저장하시겠습니까?\n모든 사용자가 이 키를 공유하게 됩니다.",
+      )
+    )
+      return;
+
+    try {
+      await window.firebaseDb.collection("config").doc("global_settings").set(
+        {
+          openai_api_key: openaiKey,
+          gemini_api_key: geminiKey,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedBy: window.firebaseAuth.currentUser.uid,
+        },
+        { merge: true },
+      );
+      // 전역 설정 갱신
+      window.globalConfig = {
+        ...window.globalConfig,
+        openai_api_key: openaiKey,
+        gemini_api_key: geminiKey,
+      };
+      closeGlobalApiKeyModal();
+      // 기존 showAdminToast가 있으면 활용
+      const toast = document.getElementById("adminToast");
+      if (toast) {
+        toast.textContent = "✅ 공용 API 키가 저장되었습니다.";
+        toast.style.opacity = "1";
+        setTimeout(() => (toast.style.opacity = "0"), 3000);
+      } else {
+        alert("✅ 공용 API 키가 저장되었습니다.");
+      }
+    } catch (err) {
+      alert("❌ 저장 오류: " + err.message);
+    }
+  };
 
   console.log("✅ admin.js 로드 완료");
 })();

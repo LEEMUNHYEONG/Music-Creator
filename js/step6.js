@@ -12,17 +12,26 @@ function safeJsonParse(str, fallback = null) {
     let cleanStr = str.trim();
     // 마크다운 코드 블록 제거 (```json ... ```)
     if (cleanStr.includes("```")) {
-      const startIdx = cleanStr.indexOf("```");
-      const firstLineEnd = cleanStr.indexOf("\n", startIdx);
-      const endIdx = cleanStr.lastIndexOf("```");
-      if (endIdx > startIdx) {
-        cleanStr = cleanStr
-          .substring(firstLineEnd !== -1 ? firstLineEnd : startIdx + 3, endIdx)
-          .trim();
+      const parts = cleanStr.split("```");
+      for (const part of parts) {
+        const trimmedPart = part.trim();
+        if (
+          (trimmedPart.startsWith("{") && trimmedPart.includes("}")) ||
+          (trimmedPart.startsWith("[") && trimmedPart.includes("]"))
+        ) {
+          cleanStr = trimmedPart;
+          break;
+        } else if (trimmedPart.startsWith("json")) {
+          const jsonContent = trimmedPart.substring(4).trim();
+          if (jsonContent.startsWith("{") || jsonContent.startsWith("[")) {
+            cleanStr = jsonContent;
+            break;
+          }
+        }
       }
     }
 
-    // JSON 시작과 끝 지점 찾기
+    // JSON 시작 지점 찾기
     const firstBrace = cleanStr.indexOf("{");
     const firstBracket = cleanStr.indexOf("[");
     let start = -1;
@@ -32,24 +41,65 @@ function safeJsonParse(str, fallback = null) {
     else if (firstBracket !== -1) start = firstBracket;
 
     if (start !== -1) {
+      cleanStr = cleanStr.substring(start);
       const lastBrace = cleanStr.lastIndexOf("}");
       const lastBracket = cleanStr.lastIndexOf("]");
       const end = Math.max(lastBrace, lastBracket);
-      if (end !== -1 && end > start) {
-        cleanStr = cleanStr.substring(start, end + 1);
+
+      if (end !== -1) {
+        cleanStr = cleanStr.substring(0, end + 1);
+      } else {
+        // ⚠️ 닫는 괄호가 없는 경우 (응답 절단) 복구 시도
+        console.warn("⚠️ JSON 응답이 잘린 것으로 보임. 복구 시도 중...");
+        if (cleanStr.startsWith("[")) cleanStr += "]";
+        else if (cleanStr.startsWith("{")) cleanStr += "}";
       }
     }
 
-    return JSON.parse(cleanStr);
-  } catch (e) {
-    console.warn("⚠️ JSON 파싱 실패, 대체 시도:", e);
-    // 제어 문자 및 줄바꿈 문제 해결 시도
     try {
-      const fixedStr = str
-        .replace(/[\u0000-\u001F\u007F-\u009F]/g, "")
-        .match(/\{[\s\S]*\}|\[[\s\S]*\]/);
-      if (fixedStr) return JSON.parse(fixedStr[0]);
-    } catch (e2) {}
+      return JSON.parse(cleanStr);
+    } catch (e) {
+      // ⚠️ 응답 절단으로 인해 파싱 실패 시, 마지막 온전한 객체까지만 살리기
+      if (cleanStr.startsWith("[") && !cleanStr.endsWith("]")) {
+        const lastValidObjectEnd = cleanStr.lastIndexOf("}");
+        if (lastValidObjectEnd !== -1) {
+          console.warn(
+            "⚠️ 절단된 JSON 발견. 마지막 온전한 객체 지점까지 복구 시도.",
+          );
+          cleanStr = cleanStr.substring(0, lastValidObjectEnd + 1) + "]";
+          try {
+            return JSON.parse(cleanStr);
+          } catch (innerE) {
+            // 복구 시도 후에도 실패하면 아래 catch 블록으로 넘김
+          }
+        }
+      }
+      throw e;
+    }
+  } catch (e) {
+    console.warn("⚠️ JSON 파싱 1차 실패, 심층 복구 시도:", e);
+    try {
+      // 제어 문자 제거 및 정규식 추출
+      let fixedStr = str.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+      const match = fixedStr.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
+      if (match) {
+        let candidate = match[0];
+        // 괄호 짝 맞추기 (단순 무식하지만 효과적)
+        const openBraces = (candidate.match(/\{/g) || []).length;
+        const closeBraces = (candidate.match(/\}/g) || []).length;
+        const openBrackets = (candidate.match(/\[/g) || []).length;
+        const closeBrackets = (candidate.match(/\]/g) || []).length;
+
+        if (openBrackets > closeBrackets)
+          candidate += "]".repeat(openBrackets - closeBrackets);
+        if (openBraces > closeBraces)
+          candidate += "}".repeat(openBraces - closeBraces);
+
+        return JSON.parse(candidate);
+      }
+    } catch (e2) {
+      console.error("❌ JSON 최종 파싱 실패:", e2);
+    }
     return fallback;
   }
 }
@@ -692,11 +742,81 @@ window.generateSceneOverview = async function () {
               "AI가 가사를 분석하고 씬을 생성하는 중...";
         }
 
-        // Gemini API를 통한 가사 분석 및 씬 생성
-        const analysisPrompt = `다음 음악 가사를 분석하여 Midjourney MV 제작용 씬을 생성하세요.
+        // ═══════════════════════════════════════════════════════════════
+        // 배치 분할 처리: 토큰 한도(8192) 초과 방지를 위해 7개씩 나눠 요청
+        // ═══════════════════════════════════════════════════════════════
+        const BATCH_SIZE = 7;
+        const totalBatches = Math.ceil(imageCount / BATCH_SIZE);
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+
+        // ChatGPT API 키 확인 (배치 홀짝 교대에 사용)
+        const openaiKey = window.getOpenAIApiKey
+          ? window.getOpenAIApiKey()
+          : "";
+        const hasChatGPT = openaiKey && openaiKey.startsWith("sk-");
+        if (hasChatGPT) {
+          console.log(
+            "✅ ChatGPT API 키 확인 — 짝수 배치:Gemini / 홀수 배치:ChatGPT 교대 처리",
+          );
+        } else {
+          console.log("ℹ️ ChatGPT API 키 없음 — 전 배치 Gemini만 사용");
+        }
+
+        scenes = [];
+
+        console.log(
+          `📦 배치 처리 시작: 총 ${imageCount}개 씬, ${totalBatches}개 배치 (배치당 최대 ${BATCH_SIZE}개)`,
+        );
+
+        for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
+          const batchStart = batchIdx * BATCH_SIZE; // 이 배치의 첫 번째 씬 인덱스 (0-based)
+          const batchEnd = Math.min(batchStart + BATCH_SIZE, imageCount); // 마지막+1 (exclusive)
+          const batchCount = batchEnd - batchStart;
+
+          // 이번 배치에 사용할 1차 API 결정 (짝수:Gemini, 홀수:ChatGPT)
+          const useGeminiFirst = batchIdx % 2 === 0 || !hasChatGPT;
+          const primaryApiName = useGeminiFirst ? "Gemini" : "ChatGPT";
+          const fallbackApiName = useGeminiFirst ? "ChatGPT" : "Gemini";
+
+          // 로딩 텍스트 업데이트 (사용 중인 AI 이름 표시)
+          if (mvLoading) {
+            const loadingText = mvLoading.querySelector(".loading-text");
+            if (loadingText)
+              loadingText.textContent = `씬 생성 중... (배치 ${batchIdx + 1}/${totalBatches} · ${primaryApiName} · ${batchEnd}/${imageCount}개 완료)`;
+          }
+
+          // 이 배치에 해당하는 가사 슬라이스 추출
+          const batchLyricStart = Math.floor(
+            (batchStart / imageCount) * lyricsLines.length,
+          );
+          const batchLyricEnd = Math.ceil(
+            (batchEnd / imageCount) * lyricsLines.length,
+          );
+          const batchLyrics =
+            lyricsLines.slice(batchLyricStart, batchLyricEnd).join("\n") ||
+            cleanLyrics.substring(0, 800);
+
+          // 이 배치의 씬별 시간대 목록 생성
+          const batchTimeList = [];
+          for (let si = batchStart; si < batchEnd; si++) {
+            const st = si * interval;
+            const et = Math.min(st + interval, totalSeconds);
+            const sm = Math.floor(st / 60);
+            const ss = Math.floor(st % 60);
+            const em = Math.floor(et / 60);
+            const es = Math.floor(et % 60);
+            batchTimeList.push(
+              `씬 ${si + 1} (${sm}:${String(ss).padStart(2, "0")}-${em}:${String(es).padStart(2, "0")})`,
+            );
+          }
+
+          const analysisPrompt = `다음 음악 가사를 분석하여 Midjourney MV 제작용 씬을 생성하세요.
 
 【가사】 (가장 중요 - 반드시 각 씬의 프롬프트에 반영하세요!)
-${cleanLyrics}
+${batchLyrics}
+
+【전체 가사 맥락】 (참고용)
+${cleanLyrics.substring(0, 600)}${cleanLyrics.length > 600 ? "..." : ""}
 
 【스타일】
 ${stylePrompt || "감성적인 발라드"}
@@ -705,7 +825,7 @@ ${stylePrompt || "감성적인 발라드"}
 - 시대: ${era || "현대"}
 - 국가: ${country || "한국"}
 - 장소 유형 (사용자가 선택한 후보): ${location || "도시"}
-  **다중 선택된 경우**: 각 씬마다 해당 씬의 가사(lyrics)에 가장 잘 맞는 장소를 위 목록에서 **한 가지** 골라, 그 유형을 구체적으로 묘사하세요. 씬마다 다른 배경을 추천하고, 가사 내용과 맞는 장소를 우선하세요.
+  **다중 선택된 경우**: 각 씬마다 해당 씬의 가사(lyrics)에 가장 잘 맞는 장소를 위 목록에서 **한 가지** 골라, 그 유형을 구체적으로 묘사하세요.
 - 조명: ${lighting || "자연광"}
 - 카메라: ${cameraWork || "중간 샷"}
 - 분위기: ${mood || "감성적"}
@@ -713,780 +833,342 @@ ${stylePrompt || "감성적인 발라드"}
 ${customSettings ? `- 추가: ${customSettings}` : ""}
 
 【작업 요구사항】
-총 ${imageCount}개의 씬을 생성하세요. 각 씬은 ${interval}초 간격입니다.
+이번 배치에서 **반드시 정확히 ${batchCount}개의 씬**을 생성하세요. (전체 ${imageCount}개 중 씬 ${batchStart + 1}번~${batchEnd}번)
 
-**각 씬마다 다음 10개 필드를 반드시 작성하세요:**
+생성할 씬 번호와 시간대:
+${batchTimeList.join("\n")}
 
-1. **time**: "0:00-0:08" 형식
-2. **lyrics**: 해당 구간의 가사 (있는 경우) - **이 가사 내용을 location, characterAction, promptKo에 반드시 반영하세요**
-3. **emotion**: 감정 한 단어 (예: sad, joyful, nostalgic) - **가사에서 느껴지는 감정**
-4. **location**: **가사 내용을 바탕으로** 장소를 **구체적으로** 20단어 이상 영어로 작성
-   - 가사에서 언급되거나 암시되는 장소를 우선하세요
-   - **사용자가 선택한 장소 유형이 여러 개일 때**: 각 씬의 가사(lyrics)에 가장 잘 맞는 유형 **하나**를 골라, 그 유형으로 구체적으로 묘사하세요. 모든 씬에 같은 장소를 쓰지 말고, 씬마다 가사에 맞는 배경을 선택하세요.
-   - 예: "rain-soaked urban crosswalk at night with neon signs reflecting on wet pavement"
-5. **characterAction**: **가사 내용을 바탕으로** 인물 동작을 **구체적으로** 15단어 이상 영어로 작성
-   - 가사에서 묘사되는 인물의 행동이나 감정을 시각적으로 표현하세요
-   - **인물 상세 정보 반드시 포함** (성별, 나이, 인종, 외모/스타일) - MV 설정의 인물 정보(${characterInfoStr || "없음"})를 반영하여 모든 씬에서 일관되게 묘사
-   - 나이와 인종 정보를 반드시 포함하세요 (예: "30-year-old", "Asian", "Caucasian" 등)
-   - 예: "a 30-year-old Asian male standing alone under streetlight with hands in pockets looking down"
-6. **mood**: 분위기 영어로 (예: "melancholic and lonely") - **가사에서 느껴지는 분위기**
-7. **lighting**: 조명 영어로 (예: "dramatic streetlight with soft shadows") - **가사 분위기에 맞는 조명**
-8. **cameraWork**: 카메라 영어로 (예: "medium shot slowly zooming in") - **가사 감정을 강조하는 카메라 워크**
-9. **promptKo**: **가사 내용과 장면 설명을 중심으로** 위의 모든 정보를 종합한 **완성된 Midjourney 고화질 실사진 프롬프트** (60단어 이상, **한글로 작성**)
-   - **가사에서 묘사되는 장면, 감정, 상황을 구체적으로 포함하세요**
-   - **장면 설명(scene description)의 내용을 반드시 반영하세요** - 각 씬의 장면 설명이 프롬프트에 구체적으로 포함되어야 함
-   - **인물 상세 정보 반드시 포함** (성별, 나이, 인종, 외모/스타일) - MV 설정의 인물 정보(${characterInfoStr || "없음"})를 반영하여 모든 씬에서 일관되게 묘사
-   - 나이와 인종 정보를 반드시 포함하세요 (예: "30대", "아시아인", "백인" 등)
-   - **MV 프롬프트 상세 설정 반영**: 시대(${era || "현대"}), 국가(${country || "한국"}), 장소(${location || "도시"}), 조명(${lighting || "자연광"}), 카메라(${cameraWork || "중간 샷"}), 분위기(${mood || "감성적"})를 자연스럽게 융합
-   - **미드저니 고화질 실사진 키워드 필수 포함**: "초고화질, 8k 해상도, 사진처럼 사실적, 시네마틱 조명, 자연스러운 포즈, 상세한 손과 얼굴 특징, 전문 사진, 선명한 초점, 깊이감, 색감 보정, 영화적 구도"
-   - 예: "어두운 전당포 내부, 형광등 아래 먼지 쌓인 보석들이 줄지어 진열되어 있고, 30대 아시아인 남성(단정한 헤어스타일)이 유리 케이스 안의 반지를 슬프게 바라보며 과거의 약속을 기억하고 있다, 그의 얼굴에는 후회와 그리움이 새겨져 있다, 쓴 감정, 우울하고 후회스러운 분위기, 깊은 그림자와 함께 거친 형광등, 반지에 클로즈업한 후 남성의 얼굴로 팬업, 미국, 현대 시대, 강렬한 감정적 분위기, 시네마틱 조명, 와이드샷 구도, 초고화질, 8k 해상도, 사진처럼 사실적, 시네마틱 조명, 자연스러운 포즈, 상세한 손과 얼굴 특징, 전문 사진, 선명한 초점, 깊이감, 색감 보정"
-10. **promptEn**: promptKo를 영어로 번역한 **완성된 Midjourney 고화질 실사진 프롬프트** (60단어 이상, 영어만)
-   - **인물 상세 정보 반드시 포함** (성별, 나이, 인종, 외모/스타일) - MV 설정의 인물 정보(${characterInfoStr || "없음"})를 반영하여 모든 씬에서 인물이 일관되게 묘사되어야 함
-   - 나이와 인종 정보를 반드시 포함하세요 (예: "30-year-old", "Asian", "Caucasian" 등)
-   - **장면 설명(scene description)의 내용을 반드시 반영하세요**
-   - **MV 프롬프트 상세 설정 반영**: era, country, location, lighting, camera work, mood를 자연스럽게 융합
-   - **미드저니 고화질 실사진 키워드 필수 포함**: "ultra high quality, 8k resolution, photorealistic, cinematic lighting, natural pose, detailed hands, detailed facial features, professional photography, sharp focus, depth of field, color grading, cinematic composition"
-   - 예: "a dimly lit pawn shop interior showcasing rows of dusty jewelry under harsh fluorescent lights, a 30-year-old Asian male with neat hairstyle sadly looks at a ring in a glass case, remembering a past promise, his face etched with regret and longing, bitter emotion, somber and regretful mood, harsh fluorescent lighting with deep shadows, close-up on the ring, then pans up to the man's face, USA, modern era, intense emotional atmosphere, cinematic lighting, wide-shot composition, ultra high quality, 8k resolution, photorealistic, cinematic lighting, natural pose, detailed hands and facial features, professional photography, sharp focus, depth of field, color grading"
-11. **runwayPrompt**: **완성된 RunwayML 비디오 생성 프롬프트** (영어, 단일 문장 위주 묘사, 쉼표로 구조화)
-    - **형식**: [Subject Description], [Action/Movement], [Environment/Setting], [Lighting], [Camera Movement], [Style/Atmosphere]
-    - 시간의 흐름, 동작의 변화, 카메라 앵글을 구체적으로 명시하세요.
-    - 피사체의 미세한 감정 변화나 환경의 역동성을 강조하세요.
-    - 예: "A 30-year-old Asian male with a neat hairstyle looking sadly at a ring inside a glass case, his fingers tracing the glass, standing inside a dimly lit pawn shop with rows of dusty jewelry, harsh fluorescent lights casting deep shadows, close-up shot slowly panning up to reveal his face etched with regret, cinematic lighting, photorealistic, 8k resolution, melancholic and intense emotional atmosphere"
-12. **runwayPromptKo**: **runwayPrompt를 한글로 번역한 내용**
+**각 씬마다 다음 필드를 반드시 작성하세요:**
 
-**매우 중요 (반드시 지켜주세요):**
-- **가사 내용을 가장 우선적으로 반영하세요** - location, characterAction, promptKo 모두에 가사에서 묘사되는 내용을 포함하세요
-- location, characterAction, promptKo, promptEn은 **비워두지 마세요**
-- **promptKo와 runwayPromptKo는 한글로 작성**하고, **가사의 감정과 내용을 세밀하게 반영**하세요
-- **promptEn은 promptKo를 영어로 번역**한 것이며, **runwayPrompt는 영어로 작성**합니다
-- promptKo와 promptEn은 **가사 내용 + location + characterAction + emotion + mood + lighting + cameraWork**를 모두 포함한 완성된 프롬프트여야 합니다
-- **인물 상세 정보(성별, 나이, 인종, 외모/스타일)는 모든 씬의 characterAction, promptKo, promptEn, runwayPrompt에서 일관되게 반영되어야 합니다** - MV 설정의 인물 정보(${characterInfoStr || "없음"})를 참고하여 동일한 인물로 묘사하세요
-- **나이와 인종 정보는 반드시 포함되어야 합니다** - 예: "30-year-old Asian male", "20대 아시아인 남성" 등
-- 각 씬마다 배경을 다르게 설정하세요
-- **가사의 감정과 내용을 location과 characterAction에 반드시 반영하세요** - MV 설정보다 가사 내용이 우선입니다
-- 순수 JSON 배열만 출력하세요
+1. **time**: 위 시간대 목록에서 해당 씬의 시간 (예: "${batchTimeList[0]?.match(/\(([^)]+)\)/)?.[1] || "0:00-0:07"}")
+2. **lyrics**: 해당 구간의 가사 (없으면 빈 문자열)
+3. **emotion**: 감정 한 단어 (예: sad, joyful, nostalgic)
+4. **location**: 장소를 구체적으로 15단어 이상 영어로 작성
+5. **characterAction**: 인물 동작을 구체적으로 12단어 이상 영어로 작성
+   - **인물 상세 정보 반드시 포함**: ${characterInfoStr || "없음"}
+6. **mood**: 분위기 영어로
+7. **lighting**: 조명 영어로
+8. **cameraWork**: 카메라 영어로
+9. **promptKo**: 가사 내용 중심의 완성된 Midjourney 한글 프롬프트 (50단어 이상)
+   - 인물 정보(${characterInfoStr || "없음"}) 일관 반영
+   - 미드저니 고화질 키워드 포함: "초고화질, 8k 해상도, 사진처럼 사실적, 시네마틱 조명"
+10. **promptEn**: promptKo를 영어로 번역한 완성된 프롬프트 (50단어 이상)
+    - "ultra high quality, 8k resolution, photorealistic, cinematic lighting" 포함
+11. **runwayPrompt**: RunwayML 비디오 생성용 영어 프롬프트 (단일 문장, 쉼표 구조화)
+12. **runwayPromptKo**: runwayPrompt를 한글로 번역
+
+**중요:**
+- 반드시 ${batchCount}개 정확히 생성 (더 적게도, 더 많게도 안 됨)
+- promptKo와 runwayPromptKo는 한글로, promptEn/runwayPrompt는 영어로
+- 순수 JSON 배열만 출력
 
 **출력 형식:**
 \`\`\`json
 [
   {
-    "time": "0:00-0:08",
-    "lyrics": "별빛 아래 서있는 너와 나",
+    "time": "0:00-0:07",
+    "lyrics": "가사 내용",
     "emotion": "nostalgic",
     "location": "moonlit park bench under cherry blossom trees with petals falling",
-    "characterAction": "two people sitting close together looking at stars with gentle smiles",
+    "characterAction": "person sitting alone looking at stars with gentle smile",
     "mood": "romantic and peaceful",
     "lighting": "soft moonlight with warm ambient glow",
     "cameraWork": "wide shot slowly pushing in",
-    "promptKo": "달빛이 비치는 벚꽃 나무 아래 벤치, 떨어지는 꽃잎들, 별을 바라보며 가까이 앉아 있는 두 사람, 부드러운 미소를 띤 향수적인 감정, 로맨틱하고 평화로운 분위기, 따뜻한 주변광과 함께 부드러운 달빛, 천천히 밀어 들어가는 와이드샷, 한국, 현대 시대, 로맨틱한 분위기, 시네마틱 조명, 와이드샷, 초고화질, 8k 해상도, 사진처럼 사실적, 시네마틱 조명, 자연스러운 포즈, 상세한 손과 얼굴 특징",
-    "promptEn": "moonlit park bench under cherry blossom trees with petals falling, two people sitting close together looking at stars with gentle smiles, nostalgic emotion, romantic and peaceful, soft moonlight with warm ambient glow, wide shot slowly pushing in, Korea, modern era, romantic mood, cinematic lighting, wide-shot, ultra high quality, 8k resolution, photorealistic, cinematic lighting, natural pose, detailed hands and facial features",
-    "runwayPrompt": "Two people sitting close together on a park bench under cherry blossom trees with petals gently falling around them, looking up at the stars with gentle and nostalgic smiles, soft moonlight casting a warm ambient glow over the scene, wide shot slowly pushing in to capture their peaceful and romantic mood, 8k resolution, photorealistic, highly detailed, cinematic lighting",
-    "runwayPromptKo": "벚꽃이 부드럽게 떨어지는 나무 아래 벤치에 소중하게 앉아 별을 바라보며 부드럽고 아련한 미소를 짓고 있는 두 사람, 따뜻한 주변광을 드리우는 부드러운 달빛, 그들의 평화롭고 로맨틱한 감정을 포착하며 천천히 다가가는 와이드 샷, 8k 해상도, 사실적인 묘사, 매우 상세하고 영화적인 조명"
-  },
-  ...
+    "promptKo": "달빛이 비치는 벚꽃 나무 아래 벤치...",
+    "promptEn": "moonlit park bench under cherry blossom trees...",
+    "runwayPrompt": "Person sitting on a bench under cherry blossom trees...",
+    "runwayPromptKo": "벚꽃 나무 아래 벤치에 앉아 있는 사람..."
+  }
 ]
 \`\`\`
 
-**중요:** 
-- promptKo 및 runwayPromptKo 필드는 한글로 작성하고, 가사 내용과 MV 설정을 세밀하게 융합하여 작성하세요
-- promptEn 필드는 promptKo를 영어로 번역한 것이며, runwayPrompt는 영어로 작성합니다
+**지금 바로 JSON 배열 ${batchCount}개를 생성하세요:**`;
 
-**지금 바로 JSON 배열을 생성하세요:**`;
+          let batchScenes = [];
 
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
-
-        const response = await fetch(geminiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: analysisPrompt }] }],
-            generationConfig: {
-              temperature: 0.8,
-              topK: 40,
-              topP: 0.95,
-              maxOutputTokens: 8192,
-            },
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (window.logApiUsage) window.logApiUsage("gemini");
-          const aiResponse =
-            data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-          console.log("🤖 AI 응답 수신:", aiResponse.substring(0, 300) + "...");
-
-          // JSON 추출 - 코드 블록 제거 후 배열 찾기
-          let cleanedResponse = aiResponse.trim();
-
-          // 코드 블록 제거 (여러 패턴 시도)
-          cleanedResponse = cleanedResponse.replace(/```json\s*/gi, "");
-          cleanedResponse = cleanedResponse.replace(/```\s*/g, "");
-          cleanedResponse = cleanedResponse.replace(/^json\s*/gi, "");
-          cleanedResponse = cleanedResponse.trim();
-
-          // 앞뒤 불필요한 텍스트 제거: 첫 번째 [ 위치부터 시작
-          // JSON 파싱 (safeJsonParse 사용)
-
-          cleanedResponse = cleanedResponse.trim();
-
-          // JSON 배열 찾기
-          let aiScenes = safeJsonParse(cleanedResponse);
-
-          if (!aiScenes || !Array.isArray(aiScenes)) {
-            // 중괄호로 감싸진 배열("scenes": [...]) 찾기 시도
-            const wrappedMatch = cleanedResponse.match(
-              /\{[\s\S]*"scenes"[\s\S]*:[\s\S]*\[[\s\S]*\]/,
-            );
-            if (wrappedMatch) {
-              const wrappedJson = safeJsonParse(wrappedMatch[0]);
-              if (
-                wrappedJson &&
-                wrappedJson.scenes &&
-                Array.isArray(wrappedJson.scenes)
-              ) {
-                aiScenes = wrappedJson.scenes;
+          try {
+            // ── 1차 API 시도 ──────────────────────────────────────────────
+            let aiResponse = "";
+            try {
+              if (useGeminiFirst) {
+                aiResponse = await window.callGeminiForScenes(
+                  analysisPrompt,
+                  geminiKey,
+                );
+              } else {
+                aiResponse = await window.callChatGPTForScenes(
+                  analysisPrompt,
+                  openaiKey,
+                );
               }
-            }
-          }
-
-          if (!aiScenes && cleanedResponse.includes("[")) {
-            // 최후의 수단: 직접 배열 부분만 추출 시도
-            const startIdx = cleanedResponse.indexOf("[");
-            const endIdx = cleanedResponse.lastIndexOf("]");
-            if (startIdx !== -1 && endIdx > startIdx) {
-              aiScenes = safeJsonParse(
-                cleanedResponse.substring(startIdx, endIdx + 1),
+              console.log(
+                `🤖 배치 ${batchIdx + 1}/${totalBatches} [${primaryApiName}] 응답 수신`,
               );
-            }
-          }
-
-          if (!aiScenes || (Array.isArray(aiScenes) && aiScenes.length === 0)) {
-            console.error("❌ JSON 배열을 찾을 수 없습니다.");
-            console.error(
-              "cleanedResponse:",
-              cleanedResponse.substring(0, 500),
-            );
-            console.error("AI 응답 전체:", aiResponse);
-            throw new Error("JSON 배열을 찾을 수 없습니다");
-          }
-
-          if (!Array.isArray(aiScenes)) {
-            aiScenes = [aiScenes];
-          }
-
-          if (Array.isArray(aiScenes) && aiScenes.length > 0) {
-            // ========== AI 응답에서 프롬프트 생성 ==========
-            // 각 씬에 대해 한글 프롬프트 생성 및 영어 번역을 순차적으로 처리
-            scenes = [];
-
-            console.log(`🔄 ${aiScenes.length}개 씬 처리 시작...`);
-
-            for (let index = 0; index < aiScenes.length; index++) {
-              try {
-                const aiScene = aiScenes[index];
-                const startTime = index * interval;
-                const endTime = Math.min(startTime + interval, totalSeconds);
-                const startMin = Math.floor(startTime / 60);
-                const startSec = Math.floor(startTime % 60);
-                const endMin = Math.floor(endTime / 60);
-                const endSec = Math.floor(endTime % 60);
-                const timeStr = `${startMin}:${String(startSec).padStart(2, "0")}-${endMin}:${String(endSec).padStart(2, "0")}`;
-
-                // AI가 promptKo와 promptEn을 생성한 경우 (새 방식)
-                let promptKo = aiScene.promptKo || "";
-                let prompt = aiScene.promptEn || "";
-
-                // promptKo와 promptEn이 모두 있으면 그대로 사용
-                if (
-                  promptKo &&
-                  promptKo.length >= 50 &&
-                  prompt &&
-                  prompt.length >= 50
-                ) {
-                  if (index === 0) {
-                    console.log(
-                      `✅ 씬 ${index + 1} AI가 promptKo와 promptEn을 모두 생성함`,
-                    );
-                  }
-                  // 그대로 사용
-                } else if (promptKo && promptKo.length >= 50) {
-                  // promptKo만 있으면 영어로 번역
-                  try {
-                    if (index === 0)
-                      console.log(
-                        `🔄 씬 ${index + 1} 한글 프롬프트 번역 중...`,
-                      );
-                    const translated = await translateKoreanToEnglishForScene(
-                      "prompt",
-                      promptKo,
-                    );
-                    if (translated && translated.length >= 50) {
-                      prompt = translated.replace(/[가-힣]+/g, "").trim();
-                      if (index === 0)
-                        console.log(`✅ 씬 ${index + 1} 번역 완료`);
-                    } else {
-                      console.warn(`⚠️ 씬 ${index + 1} 번역 결과가 너무 짧음`);
-                    }
-                  } catch (transError) {
-                    console.warn(
-                      `⚠️ 씬 ${index + 1} 번역 실패, promptEn 사용:`,
-                      transError,
-                    );
-                    // 번역 실패 시 promptEn 사용
-                    if (aiScene.promptEn && aiScene.promptEn.length >= 50) {
-                      prompt = aiScene.promptEn;
-                    }
-                  }
-                } else if (prompt && prompt.length >= 50) {
-                  // promptEn만 있으면 한글로 번역
-                  try {
-                    if (index === 0)
-                      console.log(
-                        `🔄 씬 ${index + 1} 영어 프롬프트 한글 번역 중...`,
-                      );
-                    const translated = await translateEnglishToKoreanForScene(
-                      "prompt",
-                      prompt,
-                    );
-                    if (translated && translated.length >= 50) {
-                      promptKo = translated;
-                      if (index === 0)
-                        console.log(`✅ 씬 ${index + 1} 한글 번역 완료`);
-                    }
-                  } catch (transError) {
-                    console.warn(
-                      `⚠️ 씬 ${index + 1} 한글 번역 실패:`,
-                      transError,
-                    );
-                  }
-                } else if (index === 0) {
-                  console.log(
-                    `⚠️ 씬 ${index + 1} promptKo와 promptEn 모두 없음 (promptKo 길이: ${promptKo.length}, promptEn 길이: ${prompt ? prompt.length : 0})`,
+            } catch (primaryError) {
+              // ── 폴백: 반대 API로 재시도 ────────────────────────────────
+              const canFallback = useGeminiFirst ? hasChatGPT : true;
+              if (canFallback) {
+                console.warn(
+                  `⚠️ 배치 ${batchIdx + 1} [${primaryApiName}] 실패 → [${fallbackApiName}] 폴백:`,
+                  primaryError.message,
+                );
+                if (mvLoading) {
+                  const loadingText = mvLoading.querySelector(".loading-text");
+                  if (loadingText)
+                    loadingText.textContent = `씬 생성 중... (배치 ${batchIdx + 1}/${totalBatches} · ${fallbackApiName} 폴백 · ${batchEnd}/${imageCount}개 완료)`;
+                }
+                if (useGeminiFirst) {
+                  aiResponse = await window.callChatGPTForScenes(
+                    analysisPrompt,
+                    openaiKey,
+                  );
+                } else {
+                  aiResponse = await window.callGeminiForScenes(
+                    analysisPrompt,
+                    geminiKey,
                   );
                 }
-
-                // promptEn이 없거나 promptKo도 없으면 개별 필드로 조합 (기존 방식)
-                if (!prompt || prompt.length < 50) {
-                  // 첫 번째 씬에서만 경고 출력 (콘솔 스팸 방지)
-                  if (index === 0) {
-                    console.log(
-                      `⚠️ AI가 promptEn을 생성하지 않아 개별 필드로 조합합니다. (${aiScenes.length}개 씬 모두 동일 처리)`,
-                    );
-                  }
-
-                  let promptParts = []; // const가 아닌 let 사용!
-
-                  // 유효한 값만 추가
-                  const addIfValid = (value) => {
-                    if (value && typeof value === "string") {
-                      const t = value.trim();
-                      if (t && t.length >= 2 && !/^[,.\s]+$/.test(t)) {
-                        promptParts.push(t);
-                        return true;
-                      }
-                    }
-                    return false;
-                  };
-
-                  // AI 데이터에서 추출 (가사 맥락 우선 - 가사 내용이 반영된 location과 characterAction을 먼저)
-                  // location과 characterAction은 가사 내용을 바탕으로 생성되었으므로 우선 추가
-                  if (aiScene.location && aiScene.location.trim()) {
-                    addIfValid(aiScene.location.trim());
-                  }
-                  if (
-                    aiScene.characterAction &&
-                    aiScene.characterAction.trim()
-                  ) {
-                    addIfValid(aiScene.characterAction.trim());
-                  }
-                  // 가사에서 느껴지는 감정과 분위기
-                  if (aiScene.emotion) addIfValid(aiScene.emotion + " emotion");
-                  if (aiScene.mood) addIfValid(aiScene.mood);
-                  if (aiScene.lighting) addIfValid(aiScene.lighting);
-                  if (aiScene.cameraWork) addIfValid(aiScene.cameraWork);
-
-                  // 가사 내용도 포함 (가능한 경우)
-                  if (
-                    aiScene.lyrics &&
-                    aiScene.lyrics.trim() &&
-                    aiScene.lyrics.length > 5
-                  ) {
-                    // 가사 내용을 간단히 영어로 변환하여 포함
-                    const lyricsEn = aiScene.lyrics
-                      .replace(/[가-힣]/g, "")
-                      .trim();
-                    if (lyricsEn && lyricsEn.length > 5) {
-                      // 가사 내용을 묘사로 변환
-                      addIfValid(
-                        `scene depicting: ${lyricsEn.substring(0, 50)}`,
-                      );
-                    }
-                  }
-
-                  // 인물 정보
-                  if (characters.length > 0) {
-                    promptParts.push(
-                      characters.length === 1
-                        ? "one person"
-                        : characters.length === 2
-                          ? "two people"
-                          : "multiple people",
-                    );
-                    characters.forEach((char) => {
-                      addIfValid(char.gender);
-                      addIfValid(char.appearance);
-                    });
-                  }
-
-                  // 사용자 설정 (한글을 영어로 변환)
-                  const countryMap = {
-                    한국: "Korea",
-                    korea: "Korea",
-                    Korea: "Korea",
-                    일본: "Japan",
-                    japan: "Japan",
-                    Japan: "Japan",
-                    미국: "USA",
-                    usa: "USA",
-                    USA: "USA",
-                    영국: "UK",
-                    uk: "UK",
-                    UK: "UK",
-                  };
-                  const eraMap = {
-                    현대: "modern",
-                    modern: "modern",
-                    Modern: "modern",
-                    과거: "historical",
-                    historical: "historical",
-                    Historical: "historical",
-                    미래: "futuristic",
-                    futuristic: "futuristic",
-                    Futuristic: "futuristic",
-                    복고: "retro",
-                    retro: "retro",
-                    Retro: "retro",
-                  };
-                  const moodMap = {
-                    로맨틱: "romantic mood",
-                    romantic: "romantic mood",
-                    우울한: "melancholic mood",
-                    melancholic: "melancholic mood",
-                    에너지틱: "energetic mood",
-                    energetic: "energetic mood",
-                    평화로운: "peaceful mood",
-                    peaceful: "peaceful mood",
-                    신비로운: "mysterious mood",
-                    mysterious: "mysterious mood",
-                    향수적인: "nostalgic mood",
-                    nostalgic: "nostalgic mood",
-                    드라마틱: "dramatic mood",
-                    dramatic: "dramatic mood",
-                    몽환적인: "dreamy mood",
-                    dreamy: "dreamy mood",
-                    강렬한: "intense mood",
-                    intense: "intense mood",
-                    부드러운: "gentle mood",
-                    gentle: "gentle mood",
-                    감성적: "emotional mood",
-                    emotional: "emotional mood",
-                  };
-                  const lightingMap = {
-                    자연광: "natural lighting",
-                    natural: "natural lighting",
-                    부드러운: "soft lighting",
-                    soft: "soft lighting",
-                    드라마틱: "dramatic lighting",
-                    dramatic: "dramatic lighting",
-                    따뜻한: "warm lighting",
-                    warm: "warm lighting",
-                    차가운: "cool lighting",
-                    cool: "cool lighting",
-                    네온: "neon lighting",
-                    neon: "neon lighting",
-                    골든아워: "golden hour lighting",
-                    "golden-hour": "golden hour lighting",
-                    블루아워: "blue hour lighting",
-                    "blue-hour": "blue hour lighting",
-                    스튜디오: "studio lighting",
-                    studio: "studio lighting",
-                    시네마틱: "cinematic lighting",
-                    cinematic: "cinematic lighting",
-                  };
-                  const cameraMap = {
-                    클로즈업: "close-up shot",
-                    "close-up": "close-up shot",
-                    와이드샷: "wide shot",
-                    "wide-shot": "wide shot",
-                    미디엄샷: "medium shot",
-                    "medium-shot": "medium shot",
-                    돌리: "dolly shot",
-                    dolly: "dolly shot",
-                    트래킹: "tracking shot",
-                    tracking: "tracking shot",
-                    팬: "pan shot",
-                    pan: "pan shot",
-                    틸트: "tilt shot",
-                    tilt: "tilt shot",
-                    핸드헬드: "handheld camera",
-                    handheld: "handheld camera",
-                    스테디캠: "steady cam",
-                    "steady-cam": "steady cam",
-                    드론: "drone shot",
-                    drone: "drone shot",
-                  };
-
-                  if (country) {
-                    const countryEn = countryMap[country] || country;
-                    if (countryEn && !/[가-힣]/.test(countryEn)) {
-                      promptParts.push(countryEn);
-                    }
-                  }
-                  if (era) {
-                    const eraEn = eraMap[era] || era;
-                    if (eraEn && !/[가-힣]/.test(eraEn)) {
-                      promptParts.push(eraEn + " era");
-                    }
-                  }
-                  if (!promptParts.some((p) => p.includes("mood")) && mood) {
-                    const moodEn = moodMap[mood] || mood + " mood";
-                    if (moodEn && !/[가-힣]/.test(moodEn)) {
-                      promptParts.push(moodEn);
-                    }
-                  }
-                  if (
-                    !promptParts.some((p) => p.includes("lighting")) &&
-                    lighting
-                  ) {
-                    const lightingEn = lightingMap[lighting] || lighting;
-                    if (lightingEn && !/[가-힣]/.test(lightingEn)) {
-                      promptParts.push(lightingEn);
-                    }
-                  }
-                  if (
-                    !promptParts.some((p) => p.includes("shot")) &&
-                    cameraWork
-                  ) {
-                    const cameraEn = cameraMap[cameraWork] || cameraWork;
-                    if (cameraEn && !/[가-힣]/.test(cameraEn)) {
-                      promptParts.push(cameraEn);
-                    }
-                  }
-                  if (customSettings) {
-                    // 커스텀 설정에서 한글 제거
-                    const customEn = customSettings
-                      .replace(/[가-힣]+/g, "")
-                      .trim();
-                    if (customEn) addIfValid(customEn);
-                  }
-
-                  // 고품질 키워드
-                  [
-                    "ultra high quality",
-                    "8k resolution",
-                    "photorealistic",
-                    "cinematic lighting",
-                    "natural pose",
-                    "detailed hands",
-                  ].forEach((k) => promptParts.push(k));
-
-                  // 조합 (재할당 가능하도록)
-                  const filteredParts = promptParts.filter((p) => {
-                    if (!p || !p.trim() || p.trim().length < 2) return false;
-                    // 한글이 포함된 항목 제거
-                    if (/[가-힣]/.test(p)) return false;
-                    return true;
-                  });
-                  prompt = filteredParts.join(", ").trim();
-
-                  // 한글 완전 제거 (혹시 남아있는 경우)
-                  prompt = prompt.replace(/[가-힣]+/g, "").trim();
-
-                  // 불필요한 구두점 정리
-                  prompt = prompt.replace(/,\s*,+/g, ", "); // 연속 쉼표
-                  prompt = prompt.replace(/\s+/g, " "); // 연속 공백
-                  prompt = prompt.trim();
-
-                  if (!prompt.endsWith(".")) prompt += ".";
-                }
-
-                // promptEn 필드가 있으면 그대로 사용 (AI가 완성된 프롬프트 반환)
-                if (
-                  aiScene.promptEn &&
-                  aiScene.promptEn.length >= 50 &&
-                  !prompt
-                ) {
-                  prompt = aiScene.promptEn;
-                  // 첫 번째 씬에서만 로그 출력
-                  if (index === 0) {
-                    console.log(
-                      `✅ AI promptEn 사용 중 (${aiScenes.length}개 씬 모두 동일 처리)`,
-                    );
-                  }
-                }
-
-                // promptKo가 없으면 AI를 통해 한글 프롬프트 생성
-                if (!promptKo || promptKo.length < 50) {
-                  // Gemini API를 사용하여 한글 프롬프트 생성
-                  try {
-                    const geminiKey = window.getGeminiApiKey();
-                    if (geminiKey && geminiKey.startsWith("AIza")) {
-                      const sceneLyrics = aiScene.lyrics || "";
-
-                      // 해당 씬의 가사 추출 (시간 기반)
-                      let sceneLyricsFull = sceneLyrics;
-                      if (!sceneLyricsFull && cleanLyrics) {
-                        const timeMatch = timeStr.match(
-                          /(\d+):(\d+)-(\d+):(\d+)/,
-                        );
-                        if (timeMatch) {
-                          const startMin = parseInt(timeMatch[1]);
-                          const startSec = parseInt(timeMatch[2]);
-                          const startTotal = startMin * 60 + startSec;
-                          const endMin = parseInt(timeMatch[3]);
-                          const endSec = parseInt(timeMatch[4]);
-                          const endTotal = endMin * 60 + endSec;
-
-                          const lyricsLines = cleanLyrics
-                            .split("\n")
-                            .filter((l) => l.trim());
-                          const estimatedLinesPerMinute =
-                            lyricsLines.length / (totalSeconds / 60);
-                          const startLine = Math.floor(
-                            (startTotal / 60) * estimatedLinesPerMinute,
-                          );
-                          const endLine = Math.ceil(
-                            (endTotal / 60) * estimatedLinesPerMinute,
-                          );
-                          sceneLyricsFull = lyricsLines
-                            .slice(startLine, endLine + 1)
-                            .join(" ")
-                            .trim();
-                        }
-                      }
-
-                      const koPrompt = `다음 정보를 기반으로 Midjourney용 상세한 한글 MV 씬 프롬프트를 생성해주세요.
-
-【가사 내용】 (가장 중요 - 반드시 프롬프트에 구체적으로 반영하세요!)
-"${sceneLyricsFull || sceneLyrics || "없음"}"
-
-【전체 가사 맥락】 (참고용)
-${cleanLyrics.substring(0, 300)}${cleanLyrics.length > 300 ? "..." : ""}
-
-씬 정보:
-- 시간: ${timeStr}
-- 감정: ${aiScene.emotion || "없음"} (가사에서 느껴지는 감정)
-- 장소: ${aiScene.location || "없음"} (가사 내용을 바탕으로)
-- 인물 동작: ${aiScene.characterAction || "없음"} (가사 내용을 바탕으로)
-- 분위기: ${aiScene.mood || "없음"} (가사에서 느껴지는 분위기)
-- 조명: ${aiScene.lighting || "없음"} (가사 분위기에 맞는 조명)
-- 카메라: ${aiScene.cameraWork || "없음"} (가사 감정을 강조하는 카메라)
-
-MV 설정 (보조 참고용):
-${era ? `- 시대: ${era}` : ""}
-${country ? `- 국가: ${country}` : ""}
-${location ? `- 기본 장소: ${location}` : ""}
-${lighting ? `- 조명: ${lighting}` : ""}
-${cameraWork ? `- 카메라 워크: ${cameraWork}` : ""}
-${mood ? `- 분위기: ${mood}` : ""}
-
-요구사항:
-1. **가사 내용을 중심으로** Midjourney 이미지 생성용 한글 프롬프트 작성 (50단어 이상)
-2. 가사에서 묘사되는 장면, 감정, 상황을 구체적으로 포함하세요
-3. 가사 내용이 프롬프트의 핵심이 되어야 합니다
-4. MV 설정은 가사 내용과 자연스럽게 융합하세요
-5. 매우 상세하고 구체적인 묘사 포함
-6. 자연스러운 한글 문장으로 작성
-7. 프롬프트만 출력 (설명 없이)
-
-**예시:**
-가사가 "그날의 반지에 새겨진 맹세"라면:
-"어두운 전당포 내부, 형광등 아래 먼지 쌓인 보석들이 줄지어 진열되어 있고, 30대 남성이 유리 케이스 안의 반지를 슬프게 바라보며 과거의 약속을 기억하고 있다, 그의 얼굴에는 후회와 그리움이 새겨져 있다, 쓴 감정, 우울하고 후회스러운 분위기, 깊은 그림자와 함께 거친 형광등, 반지에 클로즈업한 후 남성의 얼굴로 팬업, 미국, 현대 시대, 강렬한 감정적 분위기, 시네마틱 조명, 와이드샷 구도, 초고화질, 8k 해상도, 사진처럼 사실적, 시네마틱 조명, 자연스러운 포즈, 상세한 손과 얼굴 특징"`;
-
-                      const koResponse = await fetch(
-                        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
-                        {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            contents: [{ parts: [{ text: koPrompt }] }],
-                            generationConfig: {
-                              temperature: 0.8,
-                              topK: 40,
-                              topP: 0.95,
-                              maxOutputTokens: 500,
-                            },
-                          }),
-                        },
-                      );
-
-                      if (koResponse.ok) {
-                        const koData = await koResponse.json();
-                        const koText =
-                          koData.candidates?.[0]?.content?.parts?.[0]?.text ||
-                          "";
-                        promptKo = koText
-                          .trim()
-                          .replace(/```json\s*/gi, "")
-                          .replace(/```\s*/g, "")
-                          .replace(/^["']|["']$/g, "")
-                          .trim();
-                        if (promptKo && promptKo.length >= 50) {
-                          if (index === 0)
-                            console.log(
-                              `✅ 씬 ${index + 1} 한글 프롬프트 생성 완료`,
-                            );
-                        }
-                      }
-                    }
-                  } catch (koError) {
-                    console.warn(
-                      `⚠️ 씬 ${index + 1} 한글 프롬프트 생성 실패:`,
-                      koError,
-                    );
-                  }
-
-                  // AI 생성 실패 시 개별 필드로 한글 프롬프트 조합
-                  if (!promptKo || promptKo.length < 50) {
-                    let promptKoParts = [];
-
-                    const addIfValidKo = (value) => {
-                      if (value && typeof value === "string") {
-                        const t = value.trim();
-                        if (t && t.length >= 2 && !/^[,.\s]+$/.test(t)) {
-                          promptKoParts.push(t);
-                          return true;
-                        }
-                      }
-                      return false;
-                    };
-
-                    // 가사 내용을 먼저 포함 (가능한 경우)
-                    const sceneLyrics = aiScene.lyrics || "";
-                    if (
-                      sceneLyrics &&
-                      sceneLyrics.trim() &&
-                      sceneLyrics.length > 3
-                    ) {
-                      // 가사 내용을 묘사로 변환
-                      promptKoParts.push(`가사 내용: "${sceneLyrics.trim()}"`);
-                    }
-
-                    // AI 데이터에서 추출 (가사 내용이 반영된 location과 characterAction을 우선)
-                    if (aiScene.location) addIfValidKo(aiScene.location);
-                    if (aiScene.characterAction)
-                      addIfValidKo(aiScene.characterAction);
-                    if (aiScene.emotion)
-                      addIfValidKo(aiScene.emotion + " 감정");
-                    if (aiScene.mood) addIfValidKo(aiScene.mood);
-                    if (aiScene.lighting) addIfValidKo(aiScene.lighting);
-                    if (aiScene.cameraWork) addIfValidKo(aiScene.cameraWork);
-
-                    // 사용자 설정 한글 변환 (보조)
-                    if (country) {
-                      const countryKoMap = {
-                        korea: "한국",
-                        Korea: "한국",
-                        한국: "한국",
-                        usa: "미국",
-                        USA: "미국",
-                        미국: "미국",
-                      };
-                      const countryKo = countryKoMap[country] || country;
-                      if (countryKo) promptKoParts.push(countryKo);
-                    }
-                    if (era) {
-                      const eraKoMap = {
-                        modern: "현대",
-                        현대: "현대",
-                        historical: "과거",
-                        과거: "과거",
-                      };
-                      const eraKo = eraKoMap[era] || era;
-                      if (eraKo) promptKoParts.push(eraKo + " 시대");
-                    }
-
-                    promptKo = promptKoParts.join(", ").trim();
-                    if (!promptKo.endsWith(".")) promptKo += ".";
-                  }
-                }
-
-                // 한글 완전 제거 및 정리
-                prompt = prompt.replace(/[가-힣]+/g, ""); // 한글 제거
-                prompt = prompt.replace(/,\s*,+/g, ", "); // 연속 쉼표
-                prompt = prompt.replace(/,\s*\./g, "."); // 쉼표+마침표
-                prompt = prompt.replace(/\.+/g, "."); // 연속 마침표
-                prompt = prompt.replace(/\s+/g, " "); // 공백
-                prompt = prompt.trim();
-
-                if (!prompt.endsWith(".")) prompt += ".";
-
-                // 첫 번째 씬의 최종 프롬프트만 로그 출력 (디버깅용)
-                if (index === 0) {
-                  console.log(
-                    `✅ 씬 1 한글 프롬프트 (${promptKo.length}자):`,
-                    promptKo.substring(0, 100) + "...",
-                  );
-                  console.log(
-                    `✅ 씬 1 영어 프롬프트 (${prompt.length}자):`,
-                    prompt.substring(0, 150) + "...",
-                  );
-                }
-
-                // 씬 번호 주석 추가 (Midjourney 복사용)
-                const promptWithNumber = `/* Scene ${index + 1} */ ${prompt}`;
-
-                scenes.push({
-                  time: timeStr,
-                  scene: aiScene.lyrics || `씬 ${index + 1}`, // 가사만 표시
-                  prompt: promptWithNumber, // 씬 번호 주석 포함
-                  promptKo: promptKo, // 한글 프롬프트 저장
-                  runwayPrompt: aiScene.runwayPrompt || "",
-                  runwayPromptKo: aiScene.runwayPromptKo || "",
-                  location: aiScene.location,
-                  emotion: aiScene.emotion,
-                  mood: aiScene.mood,
-                  lighting: aiScene.lighting,
-                  characterAction: aiScene.characterAction,
-                  cameraWork: aiScene.cameraWork,
-                });
-              } catch (sceneError) {
-                console.error(`❌ 씬 ${index + 1} 처리 중 오류:`, sceneError);
-                // 에러가 발생해도 기본 씬 추가
-                const startTime = index * interval;
-                const endTime = Math.min(startTime + interval, totalSeconds);
-                const startMin = Math.floor(startTime / 60);
-                const startSec = Math.floor(startTime % 60);
-                const endMin = Math.floor(endTime / 60);
-                const endSec = Math.floor(endTime % 60);
-                const timeStr = `${startMin}:${String(startSec).padStart(2, "0")}-${endMin}:${String(endSec).padStart(2, "0")}`;
-
-                scenes.push({
-                  time: timeStr,
-                  scene: `씬 ${index + 1}`,
-                  prompt: `/* Scene ${index + 1} */ 기본 프롬프트`,
-                  promptKo: `씬 ${index + 1} 기본 한글 프롬프트`,
-                });
+                console.log(
+                  `🔄 배치 ${batchIdx + 1}/${totalBatches} [${fallbackApiName}] 폴백 응답 수신`,
+                );
+              } else {
+                throw primaryError; // 폴백 불가 → 자동보충으로 처리
               }
             }
 
-            console.log("✅ AI 기반 씬 생성 완료:", scenes.length, "개");
-            if (scenes.length === 0) {
-              throw new Error("생성된 씬이 없습니다");
+            console.log(`✅ 배치 ${batchIdx + 1}/${totalBatches} AI 응답 완료`);
+
+            // JSON 추출
+            let cleanedResponse = aiResponse.trim();
+            cleanedResponse = cleanedResponse.replace(/```json\s*/gi, "");
+            cleanedResponse = cleanedResponse.replace(/```\s*/g, "");
+            cleanedResponse = cleanedResponse.replace(/^json\s*/gi, "").trim();
+
+            let aiScenes = safeJsonParse(cleanedResponse);
+
+            if (!aiScenes || !Array.isArray(aiScenes)) {
+              const wrappedMatch = cleanedResponse.match(
+                /\{[\s\S]*"scenes"[\s\S]*:[\s\S]*\[[\s\S]*\]/,
+              );
+              if (wrappedMatch) {
+                const wrappedJson = safeJsonParse(wrappedMatch[0]);
+                if (wrappedJson?.scenes && Array.isArray(wrappedJson.scenes)) {
+                  aiScenes = wrappedJson.scenes;
+                }
+              }
             }
-          } else {
-            console.error("❌ JSON 배열이 비어있거나 유효하지 않습니다");
-            throw new Error("JSON 배열이 비어있거나 유효하지 않습니다");
+
+            if (!aiScenes && cleanedResponse.includes("[")) {
+              const startIdx = cleanedResponse.indexOf("[");
+              const endIdx = cleanedResponse.lastIndexOf("]");
+              if (startIdx !== -1 && endIdx > startIdx) {
+                aiScenes = safeJsonParse(
+                  cleanedResponse.substring(startIdx, endIdx + 1),
+                );
+              }
+            }
+
+            if (
+              !aiScenes ||
+              !Array.isArray(aiScenes) ||
+              aiScenes.length === 0
+            ) {
+              console.warn(
+                `⚠️ 배치 ${batchIdx + 1} JSON 파싱 실패 - 빈 씬으로 대체`,
+              );
+              aiScenes = [];
+            }
+
+            // 과다 반환 시 trim
+            if (aiScenes.length > batchCount) {
+              aiScenes = aiScenes.slice(0, batchCount);
+            }
+
+            // 각 AI 씬을 scenes 객체로 변환
+            for (let localIdx = 0; localIdx < aiScenes.length; localIdx++) {
+              const globalIdx = batchStart + localIdx;
+              const aiScene = aiScenes[localIdx];
+              const startTime = globalIdx * interval;
+              const endTime = Math.min(startTime + interval, totalSeconds);
+              const startMin = Math.floor(startTime / 60);
+              const startSec = Math.floor(startTime % 60);
+              const endMin = Math.floor(endTime / 60);
+              const endSec = Math.floor(endTime % 60);
+              const timeStr = `${startMin}:${String(startSec).padStart(2, "0")}-${endMin}:${String(endSec).padStart(2, "0")}`;
+
+              let promptKo = aiScene.promptKo || "";
+              let prompt = aiScene.promptEn || "";
+
+              // promptKo/En이 짧은 경우 개별 필드 조합
+              if (!prompt || prompt.length < 50) {
+                const parts = [
+                  aiScene.location,
+                  aiScene.characterAction,
+                  aiScene.emotion ? aiScene.emotion + " emotion" : "",
+                  aiScene.mood,
+                  aiScene.lighting,
+                  aiScene.cameraWork,
+                  country || "",
+                  era ? era + " era" : "",
+                  "ultra high quality",
+                  "8k resolution",
+                  "photorealistic",
+                  "cinematic lighting",
+                ].filter((p) => p && p.trim() && !/[가-힣]/.test(p));
+                prompt = parts.join(", ").trim();
+                if (!prompt.endsWith(".")) prompt += ".";
+              }
+              if (!promptKo || promptKo.length < 20) {
+                promptKo =
+                  aiScene.promptKo || aiScene.location || `씬 ${globalIdx + 1}`;
+              }
+
+              // 한글 제거 및 정리
+              prompt = prompt
+                .replace(/[가-힣]+/g, "")
+                .replace(/,\s*,+/g, ", ")
+                .replace(/\s+/g, " ")
+                .trim();
+              if (!prompt.endsWith(".")) prompt += ".";
+
+              batchScenes.push({
+                time: timeStr,
+                scene: aiScene.lyrics || `씬 ${globalIdx + 1}`,
+                prompt: `/* Scene ${globalIdx + 1} */ ${prompt}`,
+                promptKo: promptKo,
+                runwayPrompt: aiScene.runwayPrompt || "",
+                runwayPromptKo: aiScene.runwayPromptKo || "",
+                location: aiScene.location || "",
+                emotion: aiScene.emotion || "",
+                mood: aiScene.mood || "",
+                lighting: aiScene.lighting || "",
+                characterAction: aiScene.characterAction || "",
+                cameraWork: aiScene.cameraWork || "",
+              });
+            }
+
+            console.log(
+              `✅ 배치 ${batchIdx + 1}/${totalBatches} 완료: ${batchScenes.length}개 씬 생성`,
+            );
+          } catch (batchError) {
+            console.error(`❌ 배치 ${batchIdx + 1} 처리 실패:`, batchError);
+            // 실패한 배치 → 빈 씬 placeholder로 채움 (후속 자동 보충에서 처리)
+            batchScenes = [];
           }
+
+          // 배치 씬이 batchCount보다 적으면 자동 보충
+          if (batchScenes.length < batchCount) {
+            const baseFillPrompt =
+              batchScenes.length > 0
+                ? (batchScenes[batchScenes.length - 1].prompt || "")
+                    .replace(/\/\*\s*Scene\s+\d+\s*\*\//gi, "")
+                    .trim()
+                : "cinematic scene, ultra high quality, 8k resolution, photorealistic.";
+            const baseFillKo =
+              batchScenes.length > 0
+                ? batchScenes[batchScenes.length - 1].promptKo || ""
+                : "";
+
+            for (
+              let fillIdx = batchScenes.length;
+              fillIdx < batchCount;
+              fillIdx++
+            ) {
+              const globalIdx = batchStart + fillIdx;
+              const startTime = globalIdx * interval;
+              const endTime = Math.min(startTime + interval, totalSeconds);
+              const sMin = Math.floor(startTime / 60);
+              const sSec = Math.floor(startTime % 60);
+              const eMin = Math.floor(endTime / 60);
+              const eSec = Math.floor(endTime % 60);
+              const fillTimeStr = `${sMin}:${String(sSec).padStart(2, "0")}-${eMin}:${String(eSec).padStart(2, "0")}`;
+
+              batchScenes.push({
+                time: fillTimeStr,
+                scene: `씬 ${globalIdx + 1}`,
+                prompt: `/* Scene ${globalIdx + 1} */ ${baseFillPrompt}`,
+                promptKo: baseFillKo,
+                runwayPrompt: "",
+                runwayPromptKo: "",
+                location: "",
+                emotion: "",
+                mood: "",
+                lighting: "",
+                characterAction: "",
+                cameraWork: "",
+                _isFilled: true,
+              });
+            }
+          }
+
+          // 배치 결과를 scenes에 병합
+          scenes.push(...batchScenes);
+
+          // 배치 간 짧은 딜레이 (API rate limit 회피)
+          if (batchIdx < totalBatches - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 300));
+          }
+        } // end for batchIdx
+
+        // ═══════════════════════════════════════════════════════════════
+        // 자동 검증: scenes.length === imageCount 확인
+        // ═══════════════════════════════════════════════════════════════
+        console.log(
+          `🔍 자동 검증: 생성된 씬(${scenes.length}) vs 예상 씬(${imageCount})`,
+        );
+
+        if (scenes.length > imageCount) {
+          console.warn(`✂️ 초과 씬 제거: ${scenes.length}개 → ${imageCount}개`);
+          scenes = scenes.slice(0, imageCount);
+        }
+
+        if (scenes.length < imageCount) {
+          console.warn(`⚠️ 씬 부족 보충: ${scenes.length}개 → ${imageCount}개`);
+          const lastScene =
+            scenes.length > 0 ? scenes[scenes.length - 1] : null;
+          for (let fillIdx = scenes.length; fillIdx < imageCount; fillIdx++) {
+            const startTime = fillIdx * interval;
+            const endTime = Math.min(startTime + interval, totalSeconds);
+            const sMin = Math.floor(startTime / 60);
+            const sSec = Math.floor(startTime % 60);
+            const eMin = Math.floor(endTime / 60);
+            const eSec = Math.floor(endTime % 60);
+            const fillTimeStr = `${sMin}:${String(sSec).padStart(2, "0")}-${eMin}:${String(eSec).padStart(2, "0")}`;
+            const baseEn = lastScene
+              ? (lastScene.prompt || "")
+                  .replace(/\/\*\s*Scene\s+\d+\s*\*\//gi, "")
+                  .trim()
+              : "cinematic scene, photorealistic.";
+            scenes.push({
+              time: fillTimeStr,
+              scene: `씬 ${fillIdx + 1}`,
+              prompt: `/* Scene ${fillIdx + 1} */ ${baseEn}`,
+              promptKo: lastScene?.promptKo || "",
+              runwayPrompt: lastScene?.runwayPrompt || "",
+              runwayPromptKo: lastScene?.runwayPromptKo || "",
+              location: lastScene?.location || "",
+              emotion: lastScene?.emotion || "",
+              mood: lastScene?.mood || "",
+              lighting: lastScene?.lighting || "",
+              characterAction: lastScene?.characterAction || "",
+              cameraWork: lastScene?.cameraWork || "",
+              _isFilled: true,
+            });
+          }
+        }
+
+        if (scenes.length === imageCount) {
+          console.log(
+            `✅ 최종 씬 수 검증 통과: ${scenes.length}개 / 예상 ${imageCount}개`,
+          );
         } else {
           console.error(
-            "❌ API 응답 실패:",
-            response.status,
-            response.statusText,
+            `❌ 씬 수 불일치: ${scenes.length}개 / 예상 ${imageCount}개`,
           );
-          throw new Error(`API 응답 실패: ${response.status}`);
+        }
+
+        if (scenes.length === 0) {
+          throw new Error("생성된 씬이 없습니다");
         }
       } catch (aiError) {
         console.error("❌ AI 씬 생성 실패, 기본 방식으로 전환:", aiError);
@@ -1928,6 +1610,7 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <h4 style="margin: 0; color: var(--text-primary);">씬 ${index + 1}</h4>
                                 <span style="color: var(--accent); font-weight: 600;">${scene.time}</span>
+                                ${scene._isFilled ? `<span style="background: #e67e22; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; font-weight: 700;">⚠ 자동보충 (재생성 권장)</span>` : ""}
                             </div>
                             <div style="display: flex; gap: 8px;">
                                 <button class="btn btn-small btn-primary" onclick="regenerateSceneOverviewPrompt(${index})" title="이 씬의 프롬프트 재생성" style="padding: 6px 12px; font-size: 0.8rem;">
@@ -3315,28 +2998,23 @@ window.saveAndConfirmMVPrompts = async function () {
       }
     }
 
+    if (typeof window.showCopyIndicator === "function") {
+      window.showCopyIndicator("✅ 현재 편집 내용이 저장되었습니다.");
+    } else {
+      alert("현재 편집 내용이 저장되었습니다.");
+    }
+
+    // 저장 후 편집 화면(mvSceneOverviewSection)은 그대로 유지하고,
+    // 결과 섹션(mvResultsSection)은 명시적으로 숨겨서 화면 전환 방지
+    const mvResultsSection = document.getElementById("mvResultsSection");
     const mvSceneOverviewSection = document.getElementById(
       "mvSceneOverviewSection",
     );
-    const mvResultsSection = document.getElementById("mvResultsSection");
-    if (mvSceneOverviewSection) mvSceneOverviewSection.style.display = "none";
-    if (mvResultsSection) {
-      mvResultsSection.style.display = "block";
-      // Populate the results section (Placeholder for actual render logic if needed)
-      if (typeof renderMVPrompts === "function") {
-        renderMVPrompts(window.currentScenes, mvSettings);
-      }
-    }
 
-    if (typeof window.showCopyIndicator === "function") {
-      window.showCopyIndicator("✅ 씬 및 프롬프트가 확정되었습니다.");
-    } else {
-      alert("씬 개요 및 프롬프트가 저장되었습니다.");
-    }
+    if (mvResultsSection) mvResultsSection.style.display = "none";
+    if (mvSceneOverviewSection) mvSceneOverviewSection.style.display = "block";
 
-    document
-      .getElementById("mvResultsSection")
-      ?.scrollIntoView({ behavior: "smooth" });
+    // [중요] 화면이 튀지 않도록 어떠한 스크롤(scrollIntoView 등) 로직도 실행하지 않음
   } catch (error) {
     console.error("저장 오류:", error);
     alert("저장 중 오류가 발생했습니다.");

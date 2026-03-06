@@ -302,6 +302,7 @@
       // 승인된 사용자 → 앱 진입
       hideAuthOverlay();
       updateHeaderUserInfo(currentUserData);
+      buildHeaderMenu(currentUserData); // 설정 메뉴 항목 동적 생성
 
       // ─── 로그인 성공 시 수정 모드로 전환 ───
       window.editMode = true;
@@ -313,27 +314,24 @@
       fetchGlobalSettings();
 
       // 관리자 패널 및 설정 메뉴 표시 여부
+      // 도움말 버튼: 관리자/일반 사용자 모두 표시
+      const helpModalBtn = document.getElementById("helpModalBtn");
+      if (helpModalBtn) helpModalBtn.style.display = "inline-flex";
+
       if (currentUserData.role === "admin") {
-        const adminBtn = document.getElementById("adminPanelBtn");
-        if (adminBtn) adminBtn.style.display = "inline-flex";
+        // 헤더 "회원관리" 버튼은 설정 메뉴 "사용자 관리"로 대체됨 — 표시 안 함
 
         const adminMenuDropdown = document.getElementById("adminMenuDropdown");
         if (adminMenuDropdown) adminMenuDropdown.style.display = "block";
 
         const apiKeyMenuBtn = document.getElementById("apiKeyMenuBtn");
         if (apiKeyMenuBtn) apiKeyMenuBtn.style.display = "flex";
-
-        const helpModalBtn = document.getElementById("helpModalBtn");
-        if (helpModalBtn) helpModalBtn.style.display = "none";
       } else {
         const adminMenuDropdown = document.getElementById("adminMenuDropdown");
         if (adminMenuDropdown) adminMenuDropdown.style.display = "block"; // 🌟 일반 사용자도 지침서/초기화 메뉴 접근 가능
 
         const apiKeyMenuBtn = document.getElementById("apiKeyMenuBtn");
         if (apiKeyMenuBtn) apiKeyMenuBtn.style.display = "none";
-
-        const helpModalBtn = document.getElementById("helpModalBtn");
-        if (helpModalBtn) helpModalBtn.style.display = "inline-flex";
       }
 
       console.log(
@@ -370,43 +368,119 @@
 
   // ─── API 사용량 로깅 ────────────────────────────────────────
   window.logApiUsage = async function (provider) {
-    if (!currentUser) return;
-    const field = provider === "openai" ? "usage_openai" : "usage_gemini";
+    const user = window.firebaseAuth.currentUser;
+    if (!user) return;
 
     try {
-      await window.firebaseDb
-        .collection(COLLECTION_USERS)
-        .doc(currentUser.uid)
-        .update({
-          [field]: firebase.firestore.FieldValue.increment(1),
-          lastApiCall: firebase.firestore.FieldValue.serverTimestamp(),
-        });
-      console.log(`📊 API 사용 기록됨: ${provider}`);
+      await window.firebaseDb.collection("api_usage").add({
+        uid: user.uid,
+        provider: provider,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      });
     } catch (err) {
-      console.error("API 사용량 로깅 실패:", err);
+      // ⚠️ 권한 부족 등 비정상 상황이더라도 앱 동작에는 지장이 없으므로 trace 정보만 남김
+      if (err.code === "permission-denied") {
+        console.debug("📊 API 사용량 로깅 권한 없음 (무시됨)");
+      } else {
+        console.warn("📊 API 사용량 로깅 실패:", err.message);
+      }
     }
   };
 
+  // ─── 헤더 설정 메뉴 항목 동적 생성 ──────────────────────────
+  function buildHeaderMenu(userData) {
+    const menuContent = document.getElementById("headerMenuContent");
+    if (!menuContent) return;
+    menuContent.innerHTML = "";
+
+    const isAdmin = userData && userData.role === "admin";
+
+    // 메뉴 항목 목록 정의
+    const menuItems = [];
+
+    if (isAdmin) {
+      menuItems.push(
+        {
+          icon: "fas fa-users-cog",
+          label: "사용자 관리",
+          action: "openAdminPanel()",
+        },
+        {
+          icon: "fas fa-server",
+          label: "공용 API 키 관리",
+          action: "openGlobalApiKeyModal()",
+        },
+        {
+          icon: "fas fa-key",
+          label: "API 관리",
+          action: "openAPISettings()",
+          dividerAfter: true,
+        },
+      );
+    }
+
+    menuItems.push(
+      {
+        icon: "fas fa-book-open",
+        label: "제작 지침서",
+        action: "openGuidelinesModal()",
+      },
+      {
+        icon: "fas fa-undo-alt",
+        label: "현재단계 초기화",
+        action: "resetCurrentStep()",
+        danger: true,
+      },
+      {
+        icon: "fas fa-trash-alt",
+        label: "전체 초기화",
+        action: "resetAllSteps()",
+        danger: true,
+      },
+    );
+
+    menuItems.forEach(({ icon, label, action, danger, dividerAfter }) => {
+      const btn = document.createElement("button");
+      btn.className = "admin-menu-item" + (danger ? " danger" : "");
+      btn.setAttribute(
+        "onclick",
+        action + "; window.closeAdminMenu && window.closeAdminMenu();",
+      );
+      btn.innerHTML = `<i class="${icon}"></i><span>${label}</span>`;
+      menuContent.appendChild(btn);
+
+      if (dividerAfter) {
+        const hr = document.createElement("div");
+        hr.className = "admin-menu-divider";
+        menuContent.appendChild(hr);
+      }
+    });
+  }
+
   // ─── 헤더 사용자 정보 업데이트 ──────────────────────────────
   function updateHeaderUserInfo(userData) {
+    const userInfoDiv = document.getElementById("headerUserInfo");
     const userNameEl = document.getElementById("headerUserName");
     const userRoleEl = document.getElementById("headerUserRole");
     const logoutBtn = document.getElementById("headerLogoutBtn");
+    const loginBtn = document.getElementById("headerLoginBtn");
 
     if (!userData) {
+      // 로그아웃 상태: 로그인 버튼 보이기, 유저정보 숨기기
+      if (loginBtn) loginBtn.style.display = "inline-flex";
+      if (userInfoDiv) userInfoDiv.style.display = "none";
       if (userNameEl) userNameEl.textContent = "";
       if (userRoleEl) userRoleEl.textContent = "";
       if (logoutBtn) logoutBtn.style.display = "none";
-      const loginBtn = document.getElementById("headerLoginBtn");
-      if (loginBtn) loginBtn.style.display = "inline-flex";
       return;
     }
-    const loginBtn = document.getElementById("headerLoginBtn");
+
+    // 로그인 상태: 로그인 버튼 숨기기, 유저정보 보이기
     if (loginBtn) loginBtn.style.display = "none";
+    if (userInfoDiv) userInfoDiv.style.display = "flex";
     if (userNameEl) userNameEl.textContent = userData.name || userData.email;
     if (userRoleEl)
-      userRoleEl.textContent =
-        userData.role === "admin" ? "👑 관리자" : "일반 회원";
+      userRoleEl.textContent = userData.role === "admin" ? "👑 관리자" : "";
     if (logoutBtn) logoutBtn.style.display = "inline-flex";
   }
 
