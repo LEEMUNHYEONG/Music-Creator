@@ -370,6 +370,10 @@ function getMVSceneQualityStats(scenesArg) {
   };
 
   scenes.forEach((scene, index) => {
+    const getElementById =
+      typeof document.getElementById === "function"
+        ? document.getElementById.bind(document)
+        : () => null;
     const timing = getMVSceneTimingParts(scene);
     const hasValidTime =
       timing.startSeconds !== null &&
@@ -382,8 +386,8 @@ function getMVSceneQualityStats(scenesArg) {
       scene?.lighting,
       scene?.cameraWork,
     ].filter((value) => String(value || "").trim()).length;
-    const enEl = document.getElementById(`scene_overview_${index}_en`);
-    const koEl = document.getElementById(`scene_overview_${index}_ko`);
+    const enEl = getElementById(`scene_overview_${index}_en`);
+    const koEl = getElementById(`scene_overview_${index}_ko`);
     const hasLyrics = Boolean(String(scene?.lyrics || "").trim());
     const hasEnPrompt = Boolean(String(enEl?.value || scene?.prompt || "").trim());
     const hasKoPrompt = Boolean(String(koEl?.value || scene?.promptKo || "").trim());
@@ -409,6 +413,40 @@ function getMVSceneQualityStats(scenesArg) {
   return stats;
 }
 
+function getMVSceneReviewIndexes(scenesArg) {
+  const scenes = Array.isArray(scenesArg) ? scenesArg : [];
+  const getElementById =
+    typeof document.getElementById === "function"
+      ? document.getElementById.bind(document)
+      : () => null;
+
+  return scenes
+    .map((scene, index) => {
+      const timing = getMVSceneTimingParts(scene);
+      const hasValidTime =
+        timing.startSeconds !== null &&
+        timing.endSeconds !== null &&
+        timing.endSeconds >= timing.startSeconds;
+      const hasMetadata = [
+        scene?.location,
+        scene?.emotion,
+        scene?.mood,
+        scene?.lighting,
+        scene?.cameraWork,
+      ].some((value) => String(value || "").trim());
+      const enEl = getElementById(`scene_overview_${index}_en`);
+      const koEl = getElementById(`scene_overview_${index}_ko`);
+      const hasLyrics = Boolean(String(scene?.lyrics || "").trim());
+      const hasEnPrompt = Boolean(String(enEl?.value || scene?.prompt || "").trim());
+      const hasKoPrompt = Boolean(String(koEl?.value || scene?.promptKo || "").trim());
+
+      return hasValidTime && hasMetadata && hasLyrics && hasEnPrompt && hasKoPrompt
+        ? null
+        : index;
+    })
+    .filter((index) => index !== null);
+}
+
 function getMVSceneQualitySummaryText(scenesArg) {
   const stats = getMVSceneQualityStats(scenesArg);
   return [
@@ -424,9 +462,13 @@ function getMVSceneQualitySummaryText(scenesArg) {
 }
 
 function renderMVSceneQualitySummary(scenesArg) {
+  const stats = getMVSceneQualityStats(scenesArg);
   return `
-    <div id="mv_scene_quality_summary" class="mv-scene-quality-summary" role="status" aria-live="polite" style="margin: 10px 0 18px 0; padding: 12px 14px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.24); border-radius: 8px; color: var(--text-secondary); font-size: 0.84rem; line-height: 1.5;">
-      ${getMVSceneQualitySummaryText(scenesArg)}
+    <div id="mv_scene_quality_summary" class="mv-scene-quality-summary" role="status" aria-live="polite" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 10px 0 18px 0; padding: 12px 14px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.24); border-radius: 8px; color: var(--text-secondary); font-size: 0.84rem; line-height: 1.5;">
+      <span id="mv_scene_quality_summary_text">${getMVSceneQualitySummaryText(scenesArg)}</span>
+      <button id="mv_scene_quality_focus_btn" type="button" class="btn btn-small btn-secondary" onclick="window.focusMVFirstReviewScene()" ${stats.needsReview ? "" : "disabled"} style="padding: 6px 10px; font-size: 0.78rem;">
+        확인 필요 씬으로 이동
+      </button>
     </div>
   `;
 }
@@ -434,8 +476,30 @@ function renderMVSceneQualitySummary(scenesArg) {
 function updateMVSceneQualitySummary() {
   const summaryEl = document.getElementById("mv_scene_quality_summary");
   if (!summaryEl || !Array.isArray(window.currentScenes)) return;
-  summaryEl.textContent = getMVSceneQualitySummaryText(window.currentScenes);
+  const textEl = document.getElementById("mv_scene_quality_summary_text");
+  const focusBtn = document.getElementById("mv_scene_quality_focus_btn");
+  const summaryText = getMVSceneQualitySummaryText(window.currentScenes);
+  const stats = getMVSceneQualityStats(window.currentScenes);
+  if (textEl) {
+    textEl.textContent = summaryText;
+  } else {
+    summaryEl.textContent = summaryText;
+  }
+  if (focusBtn) {
+    focusBtn.disabled = stats.needsReview === 0;
+  }
 }
+
+window.focusMVFirstReviewScene = function () {
+  if (!Array.isArray(window.currentScenes)) return false;
+  const reviewIndexes = getMVSceneReviewIndexes(window.currentScenes);
+  if (!reviewIndexes.length) return false;
+  if (typeof window.focusMVSceneCard === "function") {
+    window.focusMVSceneCard(reviewIndexes[0]);
+    return true;
+  }
+  return false;
+};
 
 function renderMVSceneEditorSummary(scene, index) {
   return `
