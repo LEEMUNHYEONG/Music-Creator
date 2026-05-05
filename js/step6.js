@@ -230,6 +230,81 @@ window.focusMVSceneCard = function (sceneIndex) {
   }
 };
 
+function parseMVTimelineSeconds(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const text = String(value || "").trim();
+  if (!text) return null;
+  if (/^\d+(\.\d+)?$/.test(text)) return Number(text);
+
+  const parts = text.split(":").map((part) => part.trim());
+  if (parts.length < 2 || parts.length > 3) return null;
+  const numbers = parts.map(Number);
+  if (numbers.some((part) => Number.isNaN(part) || part < 0)) return null;
+
+  if (numbers.length === 2) {
+    return numbers[0] * 60 + numbers[1];
+  }
+  return numbers[0] * 3600 + numbers[1] * 60 + numbers[2];
+}
+
+function formatMVTimelineSeconds(seconds) {
+  const safeSeconds = Math.max(0, Math.round(Number(seconds) || 0));
+  const minutes = Math.floor(safeSeconds / 60);
+  const secs = safeSeconds % 60;
+  return `${minutes}:${String(secs).padStart(2, "0")}`;
+}
+
+function getMVSceneTimingParts(scene) {
+  const timeText = String(scene?.time || "");
+  const [startText = "", endText = ""] = timeText.split("-");
+  const startSeconds =
+    typeof scene?.startSeconds === "number"
+      ? scene.startSeconds
+      : parseMVTimelineSeconds(startText);
+  const endSeconds =
+    typeof scene?.endSeconds === "number"
+      ? scene.endSeconds
+      : parseMVTimelineSeconds(endText);
+
+  return {
+    startText:
+      startSeconds !== null
+        ? formatMVTimelineSeconds(startSeconds)
+        : startText.trim(),
+    endText:
+      endSeconds !== null ? formatMVTimelineSeconds(endSeconds) : endText.trim(),
+    startSeconds,
+    endSeconds,
+  };
+}
+
+window.updateMVSceneTimelineFromEditor = function (scene, index) {
+  if (!scene) return scene;
+
+  const startEl = document.getElementById(`scene_time_start_${index}`);
+  const endEl = document.getElementById(`scene_time_end_${index}`);
+  const lyricsEl = document.getElementById(`scene_lyrics_${index}`);
+  const startSeconds = parseMVTimelineSeconds(startEl?.value);
+  const endSeconds = parseMVTimelineSeconds(endEl?.value);
+
+  if (
+    startSeconds !== null &&
+    endSeconds !== null &&
+    endSeconds >= startSeconds
+  ) {
+    scene.startSeconds = startSeconds;
+    scene.endSeconds = endSeconds;
+    scene.durationSeconds = endSeconds - startSeconds;
+    scene.time = `${formatMVTimelineSeconds(startSeconds)}-${formatMVTimelineSeconds(endSeconds)}`;
+  }
+
+  if (lyricsEl) {
+    scene.lyrics = lyricsEl.value;
+  }
+
+  return scene;
+};
+
 // --- UI 렌더링 함수: MV 썸네일/배경/인물 프롬프트 표시 ---
 window.renderMvThumbnailPromptsUI = function (prompts) {
   if (!prompts) return;
@@ -395,6 +470,7 @@ window.renderSceneOverview = function (scenesArg) {
       existingPrompt = `/* Scene ${index + 1} */ ${existingPrompt}`;
     }
     const existingPromptKo = scene.promptKo || "";
+    const timing = getMVSceneTimingParts(scene);
 
     html += `
                 <div class="mv-scene-overview-card" style="margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);" data-scene-index="${index}">
@@ -419,6 +495,20 @@ window.renderSceneOverview = function (scenesArg) {
                     <div style="margin-bottom: 15px;">
                         <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">📝 장면 설명:</label>
                         <textarea class="scene-description" data-index="${index}" style="width: 100%; min-height: 80px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; resize: vertical;">${scene.scene || ""}</textarea>
+                    </div>
+                    <div style="display: grid; grid-template-columns: minmax(120px, 160px) minmax(120px, 160px) 1fr; gap: 12px; margin-bottom: 15px; align-items: end;">
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">시작 시간</label>
+                            <input id="scene_time_start_${index}" class="scene-time-start" data-index="${index}" value="${timing.startText}" placeholder="0:00" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">종료 시간</label>
+                            <input id="scene_time_end_${index}" class="scene-time-end" data-index="${index}" value="${timing.endText}" placeholder="0:08" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">가사 구간</label>
+                            <textarea id="scene_lyrics_${index}" class="scene-lyrics" data-index="${index}" style="width: 100%; min-height: 52px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; resize: vertical;">${scene.lyrics || ""}</textarea>
+                        </div>
                     </div>
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
@@ -4811,6 +4901,9 @@ window.saveSceneOverview = function () {
 
   // 영어 프롬프트와 한글 프롬프트 각각 저장
   window.currentScenes.forEach((scene, index) => {
+    if (typeof window.updateMVSceneTimelineFromEditor === "function") {
+      window.updateMVSceneTimelineFromEditor(scene, index);
+    }
     const enEl = document.getElementById(`scene_overview_${index}_en`);
     const koEl = document.getElementById(`scene_overview_${index}_ko`);
 
@@ -5000,6 +5093,9 @@ window.saveAndConfirmMVPrompts = async function () {
     });
 
     window.currentScenes.forEach((scene, index) => {
+      if (typeof window.updateMVSceneTimelineFromEditor === "function") {
+        window.updateMVSceneTimelineFromEditor(scene, index);
+      }
       const enEl = document.getElementById(`scene_overview_${index}_en`);
       const koEl = document.getElementById(`scene_overview_${index}_ko`);
       if (enEl) window.currentScenes[index].prompt = enEl.value;

@@ -2036,3 +2036,37 @@ MV smoke test suite: PASS (65 checks)
 ### 참고
 
 인앱 브라우저 자동화는 초기화 단계에서 시간 초과되어 직접 탭 스크린샷 확인은 완료하지 못했습니다. 대신 동일 페이지를 Chrome headless로 열어 실제 CSS 미디어쿼리 계산 결과를 검증했습니다.
+
+## 2026-05-06: 씬별 타임라인/가사 구간 편집 UI 추가
+
+### 작업 목적
+
+생성된 MV 씬을 사용자가 실제 영상 흐름에 맞게 다듬을 수 있도록, 씬 개요 편집 카드에서 시작 시간, 종료 시간, 가사 구간을 직접 수정하고 저장할 수 있게 했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - 씬 개요 카드에 시작 시간, 종료 시간, 가사 구간 입력 영역 추가
+   - `parseMVTimelineSeconds()`, `formatMVTimelineSeconds()`, `getMVSceneTimingParts()` 추가
+   - `updateMVSceneTimelineFromEditor(scene, index)` 추가
+   - 저장 시 `time`, `startSeconds`, `endSeconds`, `durationSeconds`, `lyrics`를 함께 갱신
+   - 종료 시간이 시작 시간보다 앞서는 잘못된 입력은 기존 시간 데이터를 보존
+
+2. `tests/mv_scene_timing_editor_smoke.js`
+   - `0:08`, `0:17` 같은 분:초 입력이 초 단위 필드와 `time` 문자열로 저장되는지 확인
+   - 잘못된 역전 시간 입력은 기존 타임라인을 덮어쓰지 않는지 확인
+   - 가사 구간은 시간 입력 유효성과 별개로 저장되는지 확인
+
+3. `tests/mv_confirm_scene_overview_smoke.js`
+   - 씬 개요 저장/확정 흐름에서 시간과 가사 구간이 실제 `currentScenes`에 반영되는지 추가 확인
+
+4. `MV_테스트_실행_가이드.md`
+   - 현재 정상 기준을 `PASS (67 checks)`로 갱신
+   - 보호 범위에 씬별 시작/종료 시간과 가사 구간 편집 저장 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (67 checks)
+```

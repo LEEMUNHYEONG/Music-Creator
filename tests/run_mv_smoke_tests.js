@@ -26,6 +26,7 @@ const tests = [
   "tests/mv_sync_scene_prompt_translation_smoke.js",
   "tests/mv_lyrics_scene_allocation_smoke.js",
   "tests/mv_scene_timeline_preview_smoke.js",
+  "tests/mv_scene_timing_editor_smoke.js",
   "tests/mv_emotion_visual_tone_smoke.js",
   "tests/mv_settings_smoke.js",
   "tests/mv_location_helpers_smoke.js",

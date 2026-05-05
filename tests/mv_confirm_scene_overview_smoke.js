@@ -161,6 +161,12 @@ addElement("scene_overview_0_en", "overview scene one en");
 addElement("scene_overview_0_ko", "개요 씬 1 한글");
 addElement("scene_overview_1_en", "overview scene two en");
 addElement("scene_overview_1_ko", "개요 씬 2 한글");
+addElement("scene_time_start_0", "0:02");
+addElement("scene_time_end_0", "0:12");
+addElement("scene_lyrics_0", "수정된 첫 번째 가사 구간");
+addElement("scene_time_start_1", "0:12");
+addElement("scene_time_end_1", "0:22");
+addElement("scene_lyrics_1", "수정된 두 번째 가사 구간");
 
 (async () => {
   window.saveSceneOverview();
@@ -169,8 +175,15 @@ addElement("scene_overview_1_ko", "개요 씬 2 한글");
   assert.strictEqual(window.currentScenes[1].scene, "수정된 두 번째 장면");
   assert.strictEqual(window.currentScenes[0].prompt, "overview scene one en");
   assert.strictEqual(window.currentScenes[0].promptKo, "개요 씬 1 한글");
+  assert.strictEqual(window.currentScenes[0].time, "0:02-0:12");
+  assert.strictEqual(window.currentScenes[0].startSeconds, 2);
+  assert.strictEqual(window.currentScenes[0].endSeconds, 12);
+  assert.strictEqual(window.currentScenes[0].durationSeconds, 10);
+  assert.strictEqual(window.currentScenes[0].lyrics, "수정된 첫 번째 가사 구간");
   assert.strictEqual(window.currentScenes[1].prompt, "overview scene two en");
   assert.strictEqual(window.currentScenes[1].promptKo, "개요 씬 2 한글");
+  assert.strictEqual(window.currentScenes[1].time, "0:12-0:22");
+  assert.strictEqual(window.currentScenes[1].lyrics, "수정된 두 번째 가사 구간");
   assert.ok(alerts.some((message) => message.includes("씬 개요가 저장")));
 
   await window.confirmSceneOverviewAndGenerate(true);
