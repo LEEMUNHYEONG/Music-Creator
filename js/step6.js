@@ -286,6 +286,18 @@ function escapeMVAttribute(value) {
     .replace(/>/g, "&gt;");
 }
 
+function updateMVSceneEditorNotice(index, messages) {
+  const noticeEl = document.getElementById(`scene_editor_notice_${index}`);
+  if (!noticeEl) return;
+  const cleanMessages = Array.isArray(messages)
+    ? messages.filter(Boolean)
+    : [];
+  noticeEl.textContent = cleanMessages.join(" ");
+  if (noticeEl.style) {
+    noticeEl.style.display = cleanMessages.length ? "block" : "none";
+  }
+}
+
 window.updateMVSceneTimelineFromEditor = function (scene, index) {
   if (!scene) return scene;
 
@@ -299,6 +311,7 @@ window.updateMVSceneTimelineFromEditor = function (scene, index) {
   const cameraWorkEl = document.getElementById(`scene_camera_work_${index}`);
   const startSeconds = parseMVTimelineSeconds(startEl?.value);
   const endSeconds = parseMVTimelineSeconds(endEl?.value);
+  const notices = [];
 
   if (
     startSeconds !== null &&
@@ -309,6 +322,8 @@ window.updateMVSceneTimelineFromEditor = function (scene, index) {
     scene.endSeconds = endSeconds;
     scene.durationSeconds = endSeconds - startSeconds;
     scene.time = `${formatMVTimelineSeconds(startSeconds)}-${formatMVTimelineSeconds(endSeconds)}`;
+  } else if (startEl?.value || endEl?.value) {
+    notices.push("종료 시간이 시작 시간보다 빠르거나 시간 형식이 올바르지 않아 기존 타임라인을 유지했습니다.");
   }
 
   if (lyricsEl) {
@@ -329,6 +344,18 @@ window.updateMVSceneTimelineFromEditor = function (scene, index) {
   if (cameraWorkEl) {
     scene.cameraWork = cameraWorkEl.value;
   }
+
+  const metadataValues = [
+    scene.location,
+    scene.emotion,
+    scene.mood,
+    scene.lighting,
+    scene.cameraWork,
+  ].map((value) => String(value || "").trim());
+  if (metadataValues.every((value) => !value)) {
+    notices.push("장소/감정/무드/조명/카메라 메타데이터가 비어 있습니다. 재생성 품질을 높이려면 최소 한 가지를 입력하세요.");
+  }
+  updateMVSceneEditorNotice(index, notices);
 
   return scene;
 };
@@ -593,6 +620,7 @@ window.renderSceneOverview = function (scenesArg) {
                             <input id="scene_camera_work_${index}" class="scene-camera-work" data-index="${index}" value="${escapeMVAttribute(scene.cameraWork)}" placeholder="slow dolly-in" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
                         </div>
                     </div>
+                    <div id="scene_editor_notice_${index}" class="mv-scene-editor-notice" style="display: none; margin: -4px 0 15px 0; padding: 10px 12px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 6px; color: var(--text-primary); font-size: 0.82rem; line-height: 1.5;"></div>
 
                     <div class="mv-scene-prompt-editor-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                         <div>

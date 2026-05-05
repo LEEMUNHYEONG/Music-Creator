@@ -30,6 +30,7 @@ elements.set("scene_emotion_0", { value: "hopeful" });
 elements.set("scene_mood_0", { value: "warm open horizon" });
 elements.set("scene_lighting_0", { value: "golden sunrise backlight" });
 elements.set("scene_camera_work_0", { value: "slow crane-up" });
+elements.set("scene_editor_notice_0", { textContent: "", style: {} });
 
 const scene = {
   time: "0:00-0:08",
@@ -53,12 +54,15 @@ assert.strictEqual(scene.emotion, "hopeful");
 assert.strictEqual(scene.mood, "warm open horizon");
 assert.strictEqual(scene.lighting, "golden sunrise backlight");
 assert.strictEqual(scene.cameraWork, "slow crane-up");
+assert.strictEqual(elements.get("scene_editor_notice_0").textContent, "");
+assert.strictEqual(elements.get("scene_editor_notice_0").style.display, "none");
 
 elements.set("scene_time_start_1", { value: "0:30" });
 elements.set("scene_time_end_1", { value: "0:20" });
 elements.set("scene_lyrics_1", { value: "역전된 시간은 반영하지 않는다" });
 elements.set("scene_location_1", { value: "rainy street" });
 elements.set("scene_emotion_1", { value: "lonely" });
+elements.set("scene_editor_notice_1", { textContent: "", style: {} });
 
 const invalidScene = {
   time: "0:10-0:18",
@@ -76,5 +80,30 @@ assert.strictEqual(invalidScene.durationSeconds, 8);
 assert.strictEqual(invalidScene.lyrics, "역전된 시간은 반영하지 않는다");
 assert.strictEqual(invalidScene.location, "rainy street");
 assert.strictEqual(invalidScene.emotion, "lonely");
+assert.ok(elements.get("scene_editor_notice_1").textContent.includes("기존 타임라인"));
+assert.strictEqual(elements.get("scene_editor_notice_1").style.display, "block");
+
+elements.set("scene_time_start_2", { value: "0:20" });
+elements.set("scene_time_end_2", { value: "0:28" });
+elements.set("scene_lyrics_2", { value: "빈 메타데이터 안내 확인" });
+elements.set("scene_location_2", { value: "" });
+elements.set("scene_emotion_2", { value: "" });
+elements.set("scene_mood_2", { value: "" });
+elements.set("scene_lighting_2", { value: "" });
+elements.set("scene_camera_work_2", { value: "" });
+elements.set("scene_editor_notice_2", { textContent: "", style: {} });
+
+const emptyMetadataScene = {
+  time: "0:20-0:28",
+  startSeconds: 20,
+  endSeconds: 28,
+  durationSeconds: 8,
+};
+
+window.updateMVSceneTimelineFromEditor(emptyMetadataScene, 2);
+
+assert.strictEqual(emptyMetadataScene.time, "0:20-0:28");
+assert.ok(elements.get("scene_editor_notice_2").textContent.includes("메타데이터가 비어"));
+assert.strictEqual(elements.get("scene_editor_notice_2").style.display, "block");
 
 console.log("MV scene timing editor smoke test: PASS");
