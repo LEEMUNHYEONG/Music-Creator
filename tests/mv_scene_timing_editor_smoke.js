@@ -44,6 +44,18 @@ elements.set("scene_editor_summary_0", { textContent: "" });
 elements.set("mv_scene_quality_summary", { textContent: "" });
 elements.set("mv_scene_quality_summary_text", { textContent: "" });
 elements.set("mv_scene_quality_focus_btn", { disabled: false });
+[
+  "invalidTime",
+  "missingMetadata",
+  "missingLyrics",
+  "missingEnPrompt",
+  "missingKoPrompt",
+].forEach((key) => {
+  elements.set(`mv_scene_quality_filter_${key}`, {
+    disabled: false,
+    textContent: "",
+  });
+});
 
 const scene = {
   time: "0:00-0:08",
@@ -80,6 +92,11 @@ assert.ok(elements.get("mv_scene_quality_summary_text").textContent.includes("�
 assert.ok(elements.get("mv_scene_quality_summary_text").textContent.includes("준비 완료 1개"));
 assert.ok(elements.get("mv_scene_quality_summary_text").textContent.includes("확인 필요 0개"));
 assert.strictEqual(elements.get("mv_scene_quality_focus_btn").disabled, true);
+assert.strictEqual(elements.get("mv_scene_quality_filter_invalidTime").disabled, true);
+assert.strictEqual(elements.get("mv_scene_quality_filter_missingMetadata").disabled, true);
+assert.strictEqual(elements.get("mv_scene_quality_filter_missingLyrics").disabled, true);
+assert.strictEqual(elements.get("mv_scene_quality_filter_missingEnPrompt").disabled, true);
+assert.strictEqual(elements.get("mv_scene_quality_filter_missingKoPrompt").disabled, true);
 
 elements.set("scene_time_start_1", { value: "0:30" });
 elements.set("scene_time_end_1", { value: "0:20" });
@@ -159,6 +176,7 @@ assert.ok(renderOverviewSource.includes("renderMVSceneEditorSummary(scene, index
 assert.ok(renderOverviewSource.includes("renderMVSceneQualitySummary(scenes)"));
 assert.ok(renderOverviewSource.includes(".scene-overview-en,.scene-overview-ko"));
 assert.ok(source.slice(start, end).includes("focusMVFirstReviewScene"));
+assert.ok(source.slice(start, end).includes("focusMVSceneIssue"));
 
 const mixedQualityText = getMVSceneQualitySummaryText([
   scene,
@@ -191,8 +209,7 @@ assert.deepStrictEqual(
   ]),
   [1],
 );
-let focusedReviewIndex = null;
-window.currentScenes = [
+const issueScenes = [
   scene,
   {
     time: "0:30-0:20",
@@ -202,10 +219,20 @@ window.currentScenes = [
     location: "",
   },
 ];
+assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "invalidTime"), [1]);
+assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "missingMetadata"), [1]);
+assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "missingLyrics"), [1]);
+assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "missingEnPrompt"), [1]);
+assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "missingKoPrompt"), [1]);
+let focusedReviewIndex = null;
+window.currentScenes = issueScenes;
 window.focusMVSceneCard = function (index) {
   focusedReviewIndex = index;
 };
 assert.strictEqual(window.focusMVFirstReviewScene(), true);
+assert.strictEqual(focusedReviewIndex, 1);
+focusedReviewIndex = null;
+assert.strictEqual(window.focusMVSceneIssue("missingMetadata"), true);
 assert.strictEqual(focusedReviewIndex, 1);
 
 console.log("MV scene timing editor smoke test: PASS");

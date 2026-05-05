@@ -447,6 +447,45 @@ function getMVSceneReviewIndexes(scenesArg) {
     .filter((index) => index !== null);
 }
 
+function getMVSceneIssueIndexes(scenesArg, issueType) {
+  const scenes = Array.isArray(scenesArg) ? scenesArg : [];
+  const getElementById =
+    typeof document.getElementById === "function"
+      ? document.getElementById.bind(document)
+      : () => null;
+
+  return scenes
+    .map((scene, index) => {
+      const timing = getMVSceneTimingParts(scene);
+      const hasValidTime =
+        timing.startSeconds !== null &&
+        timing.endSeconds !== null &&
+        timing.endSeconds >= timing.startSeconds;
+      const hasMetadata = [
+        scene?.location,
+        scene?.emotion,
+        scene?.mood,
+        scene?.lighting,
+        scene?.cameraWork,
+      ].some((value) => String(value || "").trim());
+      const enEl = getElementById(`scene_overview_${index}_en`);
+      const koEl = getElementById(`scene_overview_${index}_ko`);
+      const hasLyrics = Boolean(String(scene?.lyrics || "").trim());
+      const hasEnPrompt = Boolean(String(enEl?.value || scene?.prompt || "").trim());
+      const hasKoPrompt = Boolean(String(koEl?.value || scene?.promptKo || "").trim());
+
+      const issueMap = {
+        invalidTime: !hasValidTime,
+        missingMetadata: !hasMetadata,
+        missingLyrics: !hasLyrics,
+        missingEnPrompt: !hasEnPrompt,
+        missingKoPrompt: !hasKoPrompt,
+      };
+      return issueMap[issueType] ? index : null;
+    })
+    .filter((index) => index !== null);
+}
+
 function getMVSceneQualitySummaryText(scenesArg) {
   const stats = getMVSceneQualityStats(scenesArg);
   return [
@@ -463,12 +502,30 @@ function getMVSceneQualitySummaryText(scenesArg) {
 
 function renderMVSceneQualitySummary(scenesArg) {
   const stats = getMVSceneQualityStats(scenesArg);
+  const filters = [
+    ["invalidTime", "시간", stats.invalidTime],
+    ["missingMetadata", "메타", stats.missingMetadata],
+    ["missingLyrics", "가사", stats.missingLyrics],
+    ["missingEnPrompt", "EN", stats.missingEnPrompt],
+    ["missingKoPrompt", "KO", stats.missingKoPrompt],
+  ];
   return `
     <div id="mv_scene_quality_summary" class="mv-scene-quality-summary" role="status" aria-live="polite" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 10px 0 18px 0; padding: 12px 14px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.24); border-radius: 8px; color: var(--text-secondary); font-size: 0.84rem; line-height: 1.5;">
       <span id="mv_scene_quality_summary_text">${getMVSceneQualitySummaryText(scenesArg)}</span>
-      <button id="mv_scene_quality_focus_btn" type="button" class="btn btn-small btn-secondary" onclick="window.focusMVFirstReviewScene()" ${stats.needsReview ? "" : "disabled"} style="padding: 6px 10px; font-size: 0.78rem;">
-        확인 필요 씬으로 이동
-      </button>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        ${filters
+          .map(
+            ([key, label, count]) => `
+              <button id="mv_scene_quality_filter_${key}" type="button" class="btn btn-small btn-secondary" onclick="window.focusMVSceneIssue('${key}')" ${count ? "" : "disabled"} style="padding: 6px 9px; font-size: 0.76rem;">
+                ${label} ${count}
+              </button>
+            `,
+          )
+          .join("")}
+        <button id="mv_scene_quality_focus_btn" type="button" class="btn btn-small btn-secondary" onclick="window.focusMVFirstReviewScene()" ${stats.needsReview ? "" : "disabled"} style="padding: 6px 10px; font-size: 0.78rem;">
+          확인 필요 씬으로 이동
+        </button>
+      </div>
     </div>
   `;
 }
@@ -488,14 +545,72 @@ function updateMVSceneQualitySummary() {
   if (focusBtn) {
     focusBtn.disabled = stats.needsReview === 0;
   }
+  [
+    ["invalidTime", stats.invalidTime],
+    ["missingMetadata", stats.missingMetadata],
+    ["missingLyrics", stats.missingLyrics],
+    ["missingEnPrompt", stats.missingEnPrompt],
+    ["missingKoPrompt", stats.missingKoPrompt],
+  ].forEach(([key, count]) => {
+    const btn = document.getElementById(`mv_scene_quality_filter_${key}`);
+    if (btn) {
+      btn.disabled = count === 0;
+      btn.textContent =
+        {
+          invalidTime: "시간",
+          missingMetadata: "메타",
+          missingLyrics: "가사",
+          missingEnPrompt: "EN",
+          missingKoPrompt: "KO",
+        }[key] + ` ${count}`;
+    }
+  });
+}
+
+function highlightMVSceneIssueIndexes(indexes) {
+  if (typeof document.querySelectorAll !== "function") return;
+  document.querySelectorAll(".mv-scene-overview-card").forEach((card) => {
+    if (card?.style) {
+      card.style.boxShadow = "";
+      card.style.borderColor = "";
+    }
+    if (card?.dataset) {
+      delete card.dataset.qualityHighlight;
+    }
+  });
+  indexes.forEach((index) => {
+    const card = document.querySelector(
+      `.mv-scene-overview-card[data-scene-index="${index}"]`,
+    );
+    if (card?.style) {
+      card.style.boxShadow = "0 0 0 2px rgba(245, 158, 11, 0.45)";
+      card.style.borderColor = "rgba(245, 158, 11, 0.7)";
+    }
+    if (card?.dataset) {
+      card.dataset.qualityHighlight = "true";
+    }
+  });
 }
 
 window.focusMVFirstReviewScene = function () {
   if (!Array.isArray(window.currentScenes)) return false;
   const reviewIndexes = getMVSceneReviewIndexes(window.currentScenes);
   if (!reviewIndexes.length) return false;
+  highlightMVSceneIssueIndexes(reviewIndexes);
   if (typeof window.focusMVSceneCard === "function") {
     window.focusMVSceneCard(reviewIndexes[0]);
+    return true;
+  }
+  return false;
+};
+
+window.focusMVSceneIssue = function (issueType) {
+  if (!Array.isArray(window.currentScenes)) return false;
+  const issueIndexes = getMVSceneIssueIndexes(window.currentScenes, issueType);
+  if (!issueIndexes.length) return false;
+  highlightMVSceneIssueIndexes(issueIndexes);
+  if (typeof window.focusMVSceneCard === "function") {
+    window.focusMVSceneCard(issueIndexes[0]);
     return true;
   }
   return false;

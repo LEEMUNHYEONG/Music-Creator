@@ -1,5 +1,37 @@
 # MV 개선작업 이력
 
+## 2026-05-06: 씬 품질 요약 누락 유형별 필터/하이라이트 표시
+
+### 작업 목적
+
+전체 품질 요약에서 시간, 메타데이터, 가사, EN, KO 누락 유형별로 문제 씬을 빠르게 찾고 화면에서 강조할 수 있도록 개선했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `getMVSceneIssueIndexes(scenesArg, issueType)` 추가
+   - `focusMVSceneIssue(issueType)` 추가
+   - `highlightMVSceneIssueIndexes(indexes)` 추가
+   - 전체 품질 요약에 시간/메타/가사/EN/KO 필터 버튼 추가
+   - 입력 변경 시 필터 버튼의 카운트와 비활성화 상태 갱신
+   - 필터 클릭 시 해당 누락 유형의 씬 카드를 하이라이트하고 첫 씬으로 이동
+
+2. `tests/mv_scene_timing_editor_smoke.js`
+   - 준비 완료 상태에서 유형별 필터 버튼이 비활성화되는지 확인
+   - 누락 유형별 씬 인덱스 계산이 정확한지 확인
+   - `focusMVSceneIssue(issueType)`가 첫 문제 씬으로 포커스 이동을 요청하는지 확인
+
+3. `MV_테스트_실행_가이드.md`, `MV_중복함수_정리계획.md`
+   - 보호 범위와 진행 상태에 누락 유형별 필터/하이라이트 항목 추가
+   - 다음 추천 작업을 필터 선택 상태와 카드 안내 문구 연결로 갱신
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (69 checks)
+```
+
 ## 2026-05-06: 씬 품질 요약의 확인 필요 씬 이동 보강
 
 ### 작업 목적
