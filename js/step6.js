@@ -2561,6 +2561,107 @@ window.loadMVSettings = function () {
   }
 };
 
+// --- Extracted character sheet helpers ---
+window.toggleCharacterSheet = function (charIndex) {
+  const sheetArea = document.getElementById(`mvCharacter${charIndex}_sheetArea`);
+  if (sheetArea) {
+    const isVisible = sheetArea.style.display !== "none";
+    sheetArea.style.display = isVisible ? "none" : "block";
+  }
+};
+
+window.copyCharacterSheet = function (charIndex, event) {
+  const sheetEl = document.getElementById(`mvCharacter${charIndex}_sheet`);
+  if (!sheetEl || !sheetEl.value.trim()) {
+    alert("복사할 캐릭터 시트가 없습니다.");
+    return;
+  }
+  navigator.clipboard.writeText(sheetEl.value).then(() => {
+    if (typeof window.showCopyIndicator === "function") {
+      window.showCopyIndicator(`📋 인물 ${charIndex} 캐릭터 시트가 복사되었습니다!`);
+    }
+  }).catch((err) => {
+    console.error("복사 실패:", err);
+    sheetEl.select();
+    document.execCommand("copy");
+    if (typeof window.showCopyIndicator === "function") {
+      window.showCopyIndicator(`📋 인물 ${charIndex} 캐릭터 시트가 복사되었습니다!`);
+    }
+  });
+};
+
+window.getCharacterSheetSummary = function (charIndex) {
+  const sheetEl = document.getElementById(`mvCharacter${charIndex}_sheet`);
+  if (!sheetEl || !sheetEl.value.trim()) return "";
+
+  const sheet = sheetEl.value;
+  const sections = ["[Identity]", "[Body]", "[Face]", "[Hair]", "[Outfit]", "[Footwear]"];
+  const lines = sheet.split("\n");
+  let summary = "";
+  let inSection = false;
+
+  for (const line of lines) {
+    const trimLine = line.trim();
+
+    for (const sec of sections) {
+      if (trimLine.startsWith(sec) || trimLine === sec) {
+        inSection = true;
+        summary += `\n${sec}\n`;
+        break;
+      }
+    }
+
+    if (inSection && trimLine.startsWith("-")) {
+      summary += trimLine + "\n";
+    }
+
+    if (inSection && trimLine.startsWith("[") && !sections.some((s) => trimLine.startsWith(s))) {
+      if (
+        trimLine.startsWith("[Makeup]") ||
+        trimLine.startsWith("[Pose]") ||
+        trimLine.startsWith("[Accessories")
+      ) {
+        inSection = false;
+      }
+    }
+  }
+
+  return summary.trim();
+};
+
+window.getCharacterSheetFull = function (charIndex) {
+  const sheetEl = document.getElementById(`mvCharacter${charIndex}_sheet`);
+  return sheetEl?.value?.trim() || "";
+};
+
+window.getAllCharacterSheetsSummary = function () {
+  const characterCount = parseInt(
+    document.getElementById("mvCharacterCount")?.value || "1",
+  );
+  const summaries = [];
+  for (let i = 1; i <= characterCount; i++) {
+    const summary = window.getCharacterSheetSummary(i);
+    if (summary) {
+      summaries.push(`【인물 ${i} 캐릭터 시트 요약】\n${summary}`);
+    }
+  }
+  return summaries.join("\n\n");
+};
+
+window.getAllCharacterSheetsFull = function () {
+  const characterCount = parseInt(
+    document.getElementById("mvCharacterCount")?.value || "1",
+  );
+  const fullSheets = [];
+  for (let i = 1; i <= characterCount; i++) {
+    const fullText = window.getCharacterSheetFull(i);
+    if (fullText) {
+      fullSheets.push(`【인물 ${i} 캐릭터 시트 전체 원본】\n${fullText}`);
+    }
+  }
+  return fullSheets.join("\n\n---\n\n");
+};
+
 // --- Extracted generateSRTPreview ---
 window.generateSRTPreview = function () {
   try {

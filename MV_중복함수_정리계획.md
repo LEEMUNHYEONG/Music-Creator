@@ -95,6 +95,15 @@ MV 화면/프롬프트/씬 관련 함수는 최종적으로 `js/step6.js`가 소
 12. `loadMVSettings`
     - 완료: 전역 MV 설정 복원 흐름을 `js/step6.js` 소유로 이관했습니다.
 
+13. `toggleCharacterSheet`
+    - 완료: 캐릭터 시트 보기/숨기기 UI 보조 함수를 `js/step6.js` 소유로 이관했습니다.
+
+14. `copyCharacterSheet`
+    - 완료: 캐릭터 시트 복사 및 폴백 복사 흐름을 `js/step6.js` 소유로 이관했습니다.
+
+15. `getCharacterSheetSummary`, `getCharacterSheetFull`, `getAllCharacterSheetsSummary`, `getAllCharacterSheetsFull`
+    - 완료: MV 프롬프트 생성에 주입되는 캐릭터 시트 요약/원본 추출 함수를 `js/step6.js` 소유로 이관했습니다.
+
 ## 5. 추가된 보호 테스트
 
 중복 상태를 실수로 바꾸지 않도록 다음 테스트를 추가했습니다.

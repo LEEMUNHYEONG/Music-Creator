@@ -1189,6 +1189,67 @@ npm run test:mv
 MV smoke test suite: PASS (37 checks)
 ```
 
+## 2026-05-06: MV 캐릭터 시트 보조 함수 보호 테스트 추가
+
+### 작업 목적
+
+캐릭터 시트 보조 함수를 향후 `js/step6.js`로 이관하기 전에 현재 동작을 테스트로 고정했습니다.
+
+### 변경 내용
+
+1. `tests/mv_character_sheet_helpers_smoke.js`
+   - 캐릭터 시트 영역 보기/숨기기 토글 확인
+   - 캐릭터 시트 클립보드 복사와 폴백 복사 확인
+   - 빈 캐릭터 시트 복사 방지 확인
+   - 프롬프트 주입용 요약 추출 확인
+   - 전체 캐릭터 시트 원본 결합 확인
+
+2. `tests/run_mv_smoke_tests.js`
+   - 캐릭터 시트 보조 함수 테스트를 통합 실행 목록에 추가
+
+3. `MV_테스트_실행_가이드.md`
+   - 현재 보호 범위에 캐릭터 시트 보조 함수 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (39 checks)
+```
+
+## 2026-05-06: MV 캐릭터 시트 보조 함수 step6.js 이관
+
+### 작업 목적
+
+MV 캐릭터 시트 보조 함수의 소유권을 `js/step6.js`로 옮겨, 캐릭터 시트 정보가 MV 프롬프트 생성 흐름과 같은 파일에서 관리되도록 정리했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `toggleCharacterSheet` 추가
+   - `copyCharacterSheet` 추가
+   - `getCharacterSheetSummary` 추가
+   - `getCharacterSheetFull` 추가
+   - `getAllCharacterSheetsSummary` 추가
+   - `getAllCharacterSheetsFull` 추가
+
+2. `app.js`
+   - 위 6개 함수의 중복 전역 정의 제거
+   - AI 캐릭터 시트 생성 함수 `generateCharacterSheet`와 캐릭터 입력 UI 생성 함수 `updateCharacterInputs`는 기존 위치 유지
+
+3. `tests/mv_character_sheet_helpers_smoke.js`
+   - 테스트 기준 파일을 `app.js`에서 `js/step6.js`로 변경
+
+4. `MV_중복함수_정리계획.md`
+   - 캐릭터 시트 보조 함수 이관 완료 기록 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (39 checks)
+```
+
 ## 2026-05-06: MV 설정 함수 step6.js 이관
 
 ### 작업 목적
