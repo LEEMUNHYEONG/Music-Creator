@@ -1,5 +1,35 @@
 # MV 개선작업 이력
 
+## 2026-05-06: 씬 편집 UI 접근성/키보드 포커스 보강
+
+### 작업 목적
+
+타임라인 프리뷰에서 특정 씬으로 이동할 때 키보드 포커스도 함께 이동하고, 시간/메타데이터 편집 안내 메시지가 보조기기에 자연스럽게 전달되도록 개선했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - 타임라인 씬 버튼에 씬 번호, 시간, 설명을 포함한 `aria-label` 추가
+   - `focusMVSceneCard(sceneIndex)`가 스크롤뿐 아니라 해당 씬 카드에 키보드 포커스를 이동하도록 보강
+   - 씬 카드에 `tabindex="-1"`과 `aria-labelledby` 추가
+   - 시간/가사/메타데이터 입력에 안내 메시지 `aria-describedby` 연결
+   - 안내 메시지에 `role="status"`, `aria-live="polite"`, `aria-hidden` 상태 갱신 추가
+
+2. `tests/mv_scene_timeline_preview_smoke.js`
+   - 타임라인 버튼의 `aria-label` 유지 확인
+   - 타임라인 버튼 이동 시 씬 카드 스크롤과 포커스가 함께 호출되는지 확인
+
+3. `tests/mv_scene_timing_editor_smoke.js`
+   - 안내 메시지 표시/숨김 상태에 따라 `aria-hidden`이 갱신되는지 확인
+   - 씬 편집 카드와 입력 필드의 접근성 속성 마커 유지 확인
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (69 checks)
+```
+
 ## 2026-05-06: 씬 편집값 기반 타임라인 프리뷰 즉시 갱신
 
 ### 작업 목적

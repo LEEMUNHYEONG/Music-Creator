@@ -190,6 +190,7 @@ window.renderMVSceneTimelinePreview = function (scenesArg) {
           onclick="window.focusMVSceneCard(${index})"
           style="min-width: 170px; max-width: 220px; text-align: left; padding: 10px 12px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text-primary); border-radius: 8px; cursor: pointer;"
           title="${label.sceneText.replace(/"/g, "&quot;")}"
+          aria-label="${`${label.title} ${label.time} ${label.sceneText}`.replace(/"/g, "&quot;")}"
         >
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
             <strong style="font-size: 0.85rem; color: var(--text-primary);">${label.title}</strong>
@@ -241,6 +242,9 @@ window.focusMVSceneCard = function (sceneIndex) {
     const el = document.querySelector(selector);
     if (el && typeof el.scrollIntoView === "function") {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (typeof el.focus === "function") {
+        el.focus({ preventScroll: true });
+      }
       return;
     }
   }
@@ -309,6 +313,9 @@ function updateMVSceneEditorNotice(index, messages) {
     ? messages.filter(Boolean)
     : [];
   noticeEl.textContent = cleanMessages.join(" ");
+  if (typeof noticeEl.setAttribute === "function") {
+    noticeEl.setAttribute("aria-hidden", cleanMessages.length ? "false" : "true");
+  }
   if (noticeEl.style) {
     noticeEl.style.display = cleanMessages.length ? "block" : "none";
   }
@@ -590,10 +597,10 @@ window.renderSceneOverview = function (scenesArg) {
     const timing = getMVSceneTimingParts(scene);
 
     html += `
-                <div class="mv-scene-overview-card" style="margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);" data-scene-index="${index}">
+                <div class="mv-scene-overview-card" style="margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);" data-scene-index="${index}" tabindex="-1" aria-labelledby="scene_overview_title_${index}">
                     <div class="mv-scene-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <div style="display: flex; align-items: center; gap: 10px;">
-                            <h4 style="margin: 0; color: var(--text-primary);">씬 ${index + 1}</h4>
+                            <h4 id="scene_overview_title_${index}" style="margin: 0; color: var(--text-primary);">씬 ${index + 1}</h4>
                             <span style="color: var(--accent); font-weight: 600;">${scene.time}</span>
                             ${scene._isFilled ? `<span style="background: #e67e22; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; font-weight: 700;">⚠ 자동보충 (재생성 권장)</span>` : ""}
                         </div>
@@ -616,40 +623,40 @@ window.renderSceneOverview = function (scenesArg) {
                     <div class="mv-scene-timing-editor-grid" style="display: grid; grid-template-columns: minmax(120px, 160px) minmax(120px, 160px) 1fr; gap: 12px; margin-bottom: 15px; align-items: end;">
                         <div>
                             <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">시작 시간</label>
-                            <input id="scene_time_start_${index}" class="scene-time-start" data-index="${index}" value="${timing.startText}" placeholder="0:00" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem;">
+                            <input id="scene_time_start_${index}" class="scene-time-start" data-index="${index}" value="${timing.startText}" placeholder="0:00" aria-describedby="scene_editor_notice_${index}" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem;">
                         </div>
                         <div>
                             <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">종료 시간</label>
-                            <input id="scene_time_end_${index}" class="scene-time-end" data-index="${index}" value="${timing.endText}" placeholder="0:08" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem;">
+                            <input id="scene_time_end_${index}" class="scene-time-end" data-index="${index}" value="${timing.endText}" placeholder="0:08" aria-describedby="scene_editor_notice_${index}" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem;">
                         </div>
                         <div>
                             <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">가사 구간</label>
-                            <textarea id="scene_lyrics_${index}" class="scene-lyrics" data-index="${index}" style="width: 100%; min-height: 52px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; resize: vertical;">${scene.lyrics || ""}</textarea>
+                            <textarea id="scene_lyrics_${index}" class="scene-lyrics" data-index="${index}" aria-describedby="scene_editor_notice_${index}" style="width: 100%; min-height: 52px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; resize: vertical;">${scene.lyrics || ""}</textarea>
                         </div>
                     </div>
                     <div class="mv-scene-metadata-editor-grid" style="display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 12px; margin-bottom: 15px;">
                         <div>
                             <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">장소</label>
-                            <input id="scene_location_${index}" class="scene-location" data-index="${index}" value="${escapeMVAttribute(scene.location)}" placeholder="rainy alley" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
+                            <input id="scene_location_${index}" class="scene-location" data-index="${index}" value="${escapeMVAttribute(scene.location)}" placeholder="rainy alley" aria-describedby="scene_editor_notice_${index}" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
                         </div>
                         <div>
                             <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">감정</label>
-                            <input id="scene_emotion_${index}" class="scene-emotion" data-index="${index}" value="${escapeMVAttribute(scene.emotion)}" placeholder="hopeful" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
+                            <input id="scene_emotion_${index}" class="scene-emotion" data-index="${index}" value="${escapeMVAttribute(scene.emotion)}" placeholder="hopeful" aria-describedby="scene_editor_notice_${index}" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
                         </div>
                         <div>
                             <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">무드</label>
-                            <input id="scene_mood_${index}" class="scene-mood" data-index="${index}" value="${escapeMVAttribute(scene.mood)}" placeholder="warm sunrise optimism" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
+                            <input id="scene_mood_${index}" class="scene-mood" data-index="${index}" value="${escapeMVAttribute(scene.mood)}" placeholder="warm sunrise optimism" aria-describedby="scene_editor_notice_${index}" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
                         </div>
                         <div>
                             <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">조명</label>
-                            <input id="scene_lighting_${index}" class="scene-lighting" data-index="${index}" value="${escapeMVAttribute(scene.lighting)}" placeholder="blue-hour side light" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
+                            <input id="scene_lighting_${index}" class="scene-lighting" data-index="${index}" value="${escapeMVAttribute(scene.lighting)}" placeholder="blue-hour side light" aria-describedby="scene_editor_notice_${index}" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
                         </div>
                         <div>
                             <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">카메라</label>
-                            <input id="scene_camera_work_${index}" class="scene-camera-work" data-index="${index}" value="${escapeMVAttribute(scene.cameraWork)}" placeholder="slow dolly-in" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
+                            <input id="scene_camera_work_${index}" class="scene-camera-work" data-index="${index}" value="${escapeMVAttribute(scene.cameraWork)}" placeholder="slow dolly-in" aria-describedby="scene_editor_notice_${index}" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
                         </div>
                     </div>
-                    <div id="scene_editor_notice_${index}" class="mv-scene-editor-notice" style="display: none; margin: -4px 0 15px 0; padding: 10px 12px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 6px; color: var(--text-primary); font-size: 0.82rem; line-height: 1.5;"></div>
+                    <div id="scene_editor_notice_${index}" class="mv-scene-editor-notice" role="status" aria-live="polite" aria-hidden="true" style="display: none; margin: -4px 0 15px 0; padding: 10px 12px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 6px; color: var(--text-primary); font-size: 0.82rem; line-height: 1.5;"></div>
 
                     <div class="mv-scene-prompt-editor-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                         <div>

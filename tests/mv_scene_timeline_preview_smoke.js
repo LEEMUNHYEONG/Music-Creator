@@ -45,6 +45,7 @@ assert.ok(html.includes("0:00-0:08"));
 assert.ok(html.includes("비 오는 골목"));
 assert.ok(html.includes("lonely · rainy alley"));
 assert.ok(html.includes("window.focusMVSceneCard(1)"));
+assert.ok(html.includes('aria-label="씬 1 0:00-0:08'));
 assert.strictEqual(window.renderMVSceneTimelinePreview([]), "");
 
 let refreshedHtml = "";
@@ -69,13 +70,19 @@ elements.delete(".mv-scene-timeline-preview");
 assert.strictEqual(window.refreshMVSceneTimelinePreview(), false);
 
 let scrolled = 0;
+let focused = 0;
 elements.set('.mv-scene-overview-card[data-scene-index="1"]', {
   scrollIntoView(options) {
     scrolled += 1;
     assert.strictEqual(options.block, "center");
   },
+  focus(options) {
+    focused += 1;
+    assert.strictEqual(options.preventScroll, true);
+  },
 });
 window.focusMVSceneCard(1);
 assert.strictEqual(scrolled, 1);
+assert.strictEqual(focused, 1);
 
 console.log("MV scene timeline preview smoke test: PASS");
