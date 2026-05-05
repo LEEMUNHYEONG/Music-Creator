@@ -100,6 +100,103 @@ function normalizeMVPrompts(marketing) {
   };
 }
 
+function parseMVSceneTime(time) {
+  if (typeof time !== "string" || !time.trim()) {
+    return { startSeconds: null, endSeconds: null, durationSeconds: null };
+  }
+
+  const parsePart = (part) => {
+    const segments = String(part || "")
+      .trim()
+      .split(":")
+      .map((value) => parseInt(value, 10));
+    if (segments.some((value) => Number.isNaN(value))) return null;
+    if (segments.length === 2) return segments[0] * 60 + segments[1];
+    if (segments.length === 3) return segments[0] * 3600 + segments[1] * 60 + segments[2];
+    return null;
+  };
+
+  const [startPart, endPart] = time.split("-");
+  const startSeconds = parsePart(startPart);
+  const endSeconds = parsePart(endPart);
+  const durationSeconds =
+    startSeconds !== null && endSeconds !== null && endSeconds >= startSeconds
+      ? endSeconds - startSeconds
+      : null;
+
+  return { startSeconds, endSeconds, durationSeconds };
+}
+
+function formatMVSceneTime(startSeconds, endSeconds) {
+  if (
+    typeof startSeconds !== "number" ||
+    typeof endSeconds !== "number" ||
+    Number.isNaN(startSeconds) ||
+    Number.isNaN(endSeconds)
+  ) {
+    return "";
+  }
+
+  const formatPart = (seconds) => {
+    const safeSeconds = Math.max(0, Math.floor(seconds));
+    const minutes = Math.floor(safeSeconds / 60);
+    const remainder = safeSeconds % 60;
+    return `${minutes}:${String(remainder).padStart(2, "0")}`;
+  };
+
+  return `${formatPart(startSeconds)}-${formatPart(endSeconds)}`;
+}
+
+function normalizeMVScene(scene, index) {
+  const source =
+    scene && typeof scene === "object" && !Array.isArray(scene)
+      ? cloneData(scene, {})
+      : { scene: String(scene || "") };
+  const parsedTime = parseMVSceneTime(source.time);
+  const startSeconds =
+    typeof source.startSeconds === "number" ? source.startSeconds : parsedTime.startSeconds;
+  const endSeconds =
+    typeof source.endSeconds === "number" ? source.endSeconds : parsedTime.endSeconds;
+  const durationSeconds =
+    typeof source.durationSeconds === "number"
+      ? source.durationSeconds
+      : startSeconds !== null && endSeconds !== null && endSeconds >= startSeconds
+        ? endSeconds - startSeconds
+        : parsedTime.durationSeconds;
+  const time =
+    typeof source.time === "string" && source.time.trim()
+      ? source.time
+      : formatMVSceneTime(startSeconds, endSeconds);
+
+  return {
+    ...source,
+    id: source.id || `scene-${index + 1}`,
+    index,
+    sceneNumber: index + 1,
+    time,
+    startSeconds,
+    endSeconds,
+    durationSeconds,
+    scene: source.scene || source.description || source.lyrics || `씬 ${index + 1}`,
+    prompt: source.prompt || source.promptEn || "",
+    promptKo: source.promptKo || "",
+    runwayPrompt: source.runwayPrompt || "",
+    runwayPromptKo: source.runwayPromptKo || "",
+    location: source.location || "",
+    emotion: source.emotion || "",
+    mood: source.mood || "",
+    lighting: source.lighting || "",
+    characterAction: source.characterAction || "",
+    cameraWork: source.cameraWork || "",
+    _isFilled: !!source._isFilled,
+  };
+}
+
+window.normalizeMVScenes = function (scenes) {
+  if (!Array.isArray(scenes)) return [];
+  return scenes.map((scene, index) => normalizeMVScene(scene, index));
+};
+
 /**
  * MV 데이터의 신규 구조(marketing.mv)와 기존 구조를 함께 지원합니다.
  * 기존 프로젝트가 깨지지 않도록 legacy 필드는 유지하고, 새 필드만 병행 생성합니다.
@@ -128,7 +225,7 @@ window.getMarketingMVData = function (marketing) {
   return {
     settings,
     prompts,
-    scenes: cloneData(scenesSource, []),
+    scenes: window.normalizeMVScenes(scenesSource),
     subtitles: cloneData(mv.subtitles || m.srtSubtitles || [], []),
     exports: cloneData(mv.exports || [], []),
     schemaVersion: mv.schemaVersion || 1,
@@ -143,7 +240,7 @@ window.syncMarketingMVModel = function (marketing) {
     schemaVersion: 1,
     settings: cloneData(mv.settings, {}),
     prompts: cloneData(mv.prompts, {}),
-    scenes: cloneData(mv.scenes, []),
+    scenes: window.normalizeMVScenes(mv.scenes),
     subtitles: cloneData(mv.subtitles, []),
     exports: cloneData(mv.exports, []),
     updatedAt: new Date().toISOString(),

@@ -157,6 +157,9 @@ assert.strictEqual(marketing.mv.prompts.background.ko, "배경 프롬프트");
 assert.strictEqual(marketing.mv.prompts.character.en, "character prompt en");
 assert.strictEqual(marketing.mv.scenes.length, 1);
 assert.strictEqual(marketing.mv.scenes[0].scene, "비 오는 골목");
+assert.strictEqual(marketing.mv.scenes[0].id, "scene-1");
+assert.strictEqual(marketing.mv.scenes[0].index, 0);
+assert.strictEqual(marketing.mv.scenes[0].sceneNumber, 1);
 
 assert.strictEqual(marketing.mvSettings.minutes, "3");
 assert.strictEqual(marketing.mvPrompts.thumbnail.en, "thumbnail prompt en");

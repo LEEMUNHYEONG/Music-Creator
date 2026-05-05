@@ -1859,3 +1859,40 @@ MV smoke test suite: PASS (53 checks)
 npm run test:mv
 MV smoke test suite: PASS (55 checks)
 ```
+
+## 2026-05-06: MV 씬 데이터 모델 정규화
+
+### 작업 목적
+
+`marketing.mv.scenes`를 앞으로 타임라인/프리뷰 UI와 가사 기반 씬 분할 고도화의 기준 데이터로 쓰기 위해, 저장 시 씬별 공통 필드가 항상 보정되도록 정규화 계층을 추가했습니다.
+
+### 변경 내용
+
+1. `js/storage.js`
+   - `window.normalizeMVScenes(scenes)` 추가
+   - 씬별 `id`, `index`, `sceneNumber` 자동 부여
+   - `time` 문자열에서 `startSeconds`, `endSeconds`, `durationSeconds` 계산
+   - `startSeconds/endSeconds`만 있는 씬은 `time` 문자열 자동 생성
+   - 기존 `promptEn`, `description`, `lyrics` 같은 과거/대체 필드를 `prompt`, `scene`으로 보정
+   - 알 수 없는 기존 필드는 그대로 보존
+   - `getMarketingMVData()`와 `syncMarketingMVModel()`이 항상 정규화된 씬 배열을 반환/저장하도록 연결
+
+2. `tests/mv_scene_model_normalization_smoke.js`
+   - 기존 `mvScenes`만 있는 프로젝트가 신규 `marketing.mv.scenes`로 안전하게 변환되는지 확인
+   - 문자열 형태의 오래된 씬 데이터도 안전하게 씬 객체로 보정되는지 확인
+   - 신규 `marketing.mv.scenes`가 legacy `mvScenes`보다 우선되는지 확인
+   - 초 단위 시간 필드와 `time` 문자열 상호 보정 확인
+
+3. `tests/mv_model_storage_smoke.js`
+   - 저장된 MV 씬에 `id`, `index`, `sceneNumber`가 포함되는지 추가 확인
+
+4. `MV_테스트_실행_가이드.md`
+   - 현재 정상 기준을 `PASS (57 checks)`로 갱신
+   - 보호 범위에 `marketing.mv.scenes` 정규화 모델 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (57 checks)
+```

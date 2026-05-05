@@ -203,9 +203,9 @@ MV 함수 소유권 정리는 완료됐으므로, 다음 단계는 구조 정리
 1. 완료: `app.js`의 6단계 복원 로직을 `restoreMarketingMVStepData(projectData)` 헬퍼로 분리
 2. 완료: `restoreMarketingMVStepData(projectData)` 내부를 설정/프롬프트/씬 표시 헬퍼로 세분화
 3. 완료: `js/step6.js` 안의 MV 설정/캐릭터/씬/SRT 영역을 내부 섹션 단위로 표시하고 보호 테스트 추가
+4. 완료: MV 씬 데이터 모델을 `marketing.mv.scenes` 기준으로 정규화
 
 다음 추천 순서:
 
-1. MV 씬 데이터 모델을 `marketing.mv.scenes` 기준으로 더 엄격하게 확장
-2. 가사 기반 씬 분할 고도화
-3. 씬 카드/타임라인 프리뷰 UI 추가
+1. 가사 기반 씬 분할 고도화
+2. 씬 카드/타임라인 프리뷰 UI 추가
