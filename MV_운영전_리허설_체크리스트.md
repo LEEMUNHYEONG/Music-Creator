@@ -17,7 +17,7 @@
    ```text
    npm run test:mv
    ```
-   기대값: `MV smoke test suite: PASS (73 checks)`
+   기대값: `MV smoke test suite: PASS (75 checks)`
 
 3. 기존 백업 위치 확인
    ```text
@@ -74,7 +74,7 @@
 
 리허설은 아래 조건을 모두 만족하면 통과로 봅니다.
 
-1. `npm run test:mv`가 `PASS (73 checks)`로 끝납니다.
+1. `npm run test:mv`가 `PASS (75 checks)`로 끝납니다.
 2. 실제 프로젝트에서 MV 6단계 화면이 열립니다.
 3. 씬 편집값을 저장/확정해도 데이터가 사라지지 않습니다.
 4. 프로젝트 재진입 후 `marketing.mv` 기준 데이터가 복원됩니다.
@@ -96,7 +96,7 @@
 
 ```text
 npm run test:mv
-MV smoke test suite: PASS (73 checks)
+MV smoke test suite: PASS (75 checks)
 ```
 
 운영 전 남은 확인은 실제 사용자가 선택한 프로젝트 1개로 위 수동 리허설을 한 번 수행하는 것입니다.
