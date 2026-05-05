@@ -138,9 +138,54 @@ async function getMVGridColumns(cdp, width) {
       }
       mvSection.classList.add("active");
       mvSection.style.display = "block";
+      window.currentScenes = [{
+        time: "0:00-0:08",
+        startSeconds: 0,
+        endSeconds: 8,
+        durationSeconds: 8,
+        scene: "responsive layout check scene",
+        lyrics: "responsive lyric line",
+        location: "rainy alley",
+        emotion: "lonely",
+        mood: "quiet negative space",
+        lighting: "blue-hour side light",
+        cameraWork: "slow dolly-in",
+        prompt: "responsive prompt",
+        promptKo: "반응형 프롬프트",
+      }];
+      if (typeof window.renderSceneOverview === "function") {
+        window.renderSceneOverview(window.currentScenes);
+      }
+      const timingGrid = document.querySelector(".mv-scene-timing-editor-grid");
+      const metadataGrid = document.querySelector(".mv-scene-metadata-editor-grid");
+      const promptGrid = document.querySelector(".mv-scene-prompt-editor-grid");
+      const countGridColumns = (grid) => {
+        const columns = getComputedStyle(grid).gridTemplateColumns;
+        let depth = 0;
+        const tokens = [];
+        let token = "";
+        for (const char of columns) {
+          if (char === "(") depth += 1;
+          if (char === ")") depth -= 1;
+          if (char === " " && depth === 0) {
+            if (token.trim()) tokens.push(token.trim());
+            token = "";
+          } else {
+            token += char;
+          }
+        }
+        if (token.trim()) tokens.push(token.trim());
+        return tokens.reduce((count, item) => {
+          const repeatMatch = item.match(/^repeat\\((\\d+),/);
+          return count + (repeatMatch ? Number(repeatMatch[1]) : 1);
+        }, 0);
+      };
       return {
-        detailColumns: getComputedStyle(detailGrid).gridTemplateColumns.split(" ").filter(Boolean).length,
-        settingsColumns: getComputedStyle(settingsGrid).gridTemplateColumns.split(" ").filter(Boolean).length,
+        detailColumns: countGridColumns(detailGrid),
+        settingsColumns: countGridColumns(settingsGrid),
+        timingColumns: countGridColumns(timingGrid),
+        metadataColumns: countGridColumns(metadataGrid),
+        promptColumns: countGridColumns(promptGrid),
       };
     })()`,
   });
@@ -162,13 +207,28 @@ async function getMVGridColumns(cdp, width) {
     await cdp.waitForEvent("Page.loadEventFired");
 
     const phone = await getMVGridColumns(cdp, 390);
-    assert.deepStrictEqual(phone, { detailColumns: 1, settingsColumns: 1 });
+    assert.deepStrictEqual(phone, {
+      detailColumns: 1,
+      settingsColumns: 1,
+      timingColumns: 1,
+      metadataColumns: 1,
+      promptColumns: 1,
+    });
 
     const tablet = await getMVGridColumns(cdp, 700);
-    assert.deepStrictEqual(tablet, { detailColumns: 2, settingsColumns: 2 });
+    assert.deepStrictEqual(tablet, {
+      detailColumns: 2,
+      settingsColumns: 2,
+      timingColumns: 1,
+      metadataColumns: 1,
+      promptColumns: 1,
+    });
 
     const narrowDesktop = await getMVGridColumns(cdp, 850);
     assert.strictEqual(narrowDesktop.detailColumns, 3);
+    assert.strictEqual(narrowDesktop.timingColumns, 3);
+    assert.strictEqual(narrowDesktop.metadataColumns, 5);
+    assert.strictEqual(narrowDesktop.promptColumns, 2);
 
     cdp.close();
     console.log("MV responsive layout smoke test: PASS");

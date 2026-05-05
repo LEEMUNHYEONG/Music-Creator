@@ -2106,6 +2106,38 @@ npm run test:mv
 MV smoke test suite: PASS (69 checks)
 ```
 
+## 2026-05-06: 씬 편집 UI 모바일 표시 보강
+
+### 작업 목적
+
+씬별 타임라인, 가사 구간, 메타데이터, 프롬프트 편집 영역이 작은 화면에서 가로로 눌리거나 넘치지 않도록 모바일 레이아웃을 보강했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - 씬 카드 헤더와 버튼 영역에 반응형 제어용 클래스 추가
+   - 타임라인/가사 구간 그리드에 `mv-scene-timing-editor-grid` 클래스 추가
+   - 장소/감정/무드/조명/카메라 그리드에 `mv-scene-metadata-editor-grid` 클래스 추가
+   - 영어/한글 프롬프트 편집 그리드에 `mv-scene-prompt-editor-grid` 클래스 추가
+
+2. `styles.css`
+   - 768px 이하에서 씬 카드 헤더를 세로 배치
+   - 씬 카드 버튼을 줄바꿈 가능한 폭으로 조정
+   - 타임라인/메타데이터/프롬프트 편집 그리드를 모바일에서 1열로 전환
+   - 입력 필드가 부모 폭을 밀어내지 않도록 `min-width: 0` 보강
+
+3. `tests/mv_responsive_layout_smoke.js`
+   - Chrome headless에서 390px, 700px, 850px 폭을 실제 계산
+   - 390px/700px에서는 씬 편집 그리드가 1열인지 확인
+   - 850px에서는 데스크톱 편집 그리드 컬럼이 유지되는지 확인
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (69 checks)
+```
+
 ## 2026-05-06: 편집된 씬 메타데이터의 재생성 프롬프트 우선 반영
 
 ### 작업 목적

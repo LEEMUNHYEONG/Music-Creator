@@ -1821,6 +1821,17 @@ footer p + p {
 #marketing-mv .mv-detail-grid #mvLocationTags .tag-btn {
   flex-shrink: 0;
 }
+
+#marketing-mv .mv-scene-card-header,
+#marketing-mv .mv-scene-card-actions {
+  min-width: 0;
+}
+
+#marketing-mv .mv-scene-timing-editor-grid input,
+#marketing-mv .mv-scene-metadata-editor-grid input,
+#marketing-mv .mv-scene-prompt-editor-grid textarea {
+  min-width: 0;
+}
 /* ═══════════════════════════════════════════════════════════════
    반응형 레이아웃 & 크로스 플랫폼 최적화
 ═══════════════════════════════════════════════════════════════ */
@@ -2174,6 +2185,27 @@ header {
   .sidebar.open + .sidebar-overlay,
   .sidebar-overlay.active {
     display: block;
+  }
+
+  #marketing-mv .mv-scene-card-header {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  #marketing-mv .mv-scene-card-actions {
+    flex-wrap: wrap !important;
+    width: 100% !important;
+  }
+
+  #marketing-mv .mv-scene-card-actions .btn {
+    flex: 1 1 110px !important;
+  }
+
+  #marketing-mv .mv-scene-timing-editor-grid,
+  #marketing-mv .mv-scene-metadata-editor-grid,
+  #marketing-mv .mv-scene-prompt-editor-grid {
+    grid-template-columns: 1fr !important;
   }
 }
 

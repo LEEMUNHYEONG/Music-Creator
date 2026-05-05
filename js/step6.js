@@ -535,13 +535,13 @@ window.renderSceneOverview = function (scenesArg) {
 
     html += `
                 <div class="mv-scene-overview-card" style="margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);" data-scene-index="${index}">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div class="mv-scene-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <h4 style="margin: 0; color: var(--text-primary);">씬 ${index + 1}</h4>
                             <span style="color: var(--accent); font-weight: 600;">${scene.time}</span>
                             ${scene._isFilled ? `<span style="background: #e67e22; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; font-weight: 700;">⚠ 자동보충 (재생성 권장)</span>` : ""}
                         </div>
-                        <div style="display: flex; gap: 8px;">
+                        <div class="mv-scene-card-actions" style="display: flex; gap: 8px;">
                             <button class="btn btn-small btn-primary" onclick="regenerateSceneOverviewPrompt(${index})" title="이 씬의 프롬프트 재생성" style="padding: 6px 12px; font-size: 0.8rem;">
                                 <i class="fas fa-sync-alt"></i> 재생성
                             </button>
@@ -557,7 +557,7 @@ window.renderSceneOverview = function (scenesArg) {
                         <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">📝 장면 설명:</label>
                         <textarea class="scene-description" data-index="${index}" style="width: 100%; min-height: 80px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; resize: vertical;">${scene.scene || ""}</textarea>
                     </div>
-                    <div style="display: grid; grid-template-columns: minmax(120px, 160px) minmax(120px, 160px) 1fr; gap: 12px; margin-bottom: 15px; align-items: end;">
+                    <div class="mv-scene-timing-editor-grid" style="display: grid; grid-template-columns: minmax(120px, 160px) minmax(120px, 160px) 1fr; gap: 12px; margin-bottom: 15px; align-items: end;">
                         <div>
                             <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">시작 시간</label>
                             <input id="scene_time_start_${index}" class="scene-time-start" data-index="${index}" value="${timing.startText}" placeholder="0:00" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem;">
@@ -571,7 +571,7 @@ window.renderSceneOverview = function (scenesArg) {
                             <textarea id="scene_lyrics_${index}" class="scene-lyrics" data-index="${index}" style="width: 100%; min-height: 52px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; resize: vertical;">${scene.lyrics || ""}</textarea>
                         </div>
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 12px; margin-bottom: 15px;">
+                    <div class="mv-scene-metadata-editor-grid" style="display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 12px; margin-bottom: 15px;">
                         <div>
                             <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">장소</label>
                             <input id="scene_location_${index}" class="scene-location" data-index="${index}" value="${escapeMVAttribute(scene.location)}" placeholder="rainy alley" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
@@ -594,7 +594,7 @@ window.renderSceneOverview = function (scenesArg) {
                         </div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div class="mv-scene-prompt-editor-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                         <div>
                             <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">⛵ 통합 프롬프트 (EN):</label>
                             <textarea id="scene_overview_${index}_en" class="scene-overview-en" data-index="${index}" style="width: 100%; min-height: 100px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${existingPrompt}</textarea>
