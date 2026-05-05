@@ -413,6 +413,63 @@ window.renderSceneOverview = function (scenesArg) {
 };
 
 // === MV Step 6: MV generation flows ===
+window.allocateLyricsToMVScenes = function (lyrics, sceneCount) {
+  const count = Math.max(parseInt(sceneCount, 10) || 0, 0);
+  if (count === 0) return [];
+
+  const rawLines = String(lyrics || "")
+    .replace(/\r\n/g, "\n")
+    .split("\n");
+  const sectionLabelPattern =
+    /^\s*(?:\[[^\]]+\]|\([^)]+\)|(?:verse|chorus|bridge|intro|outro|pre-chorus|hook|refrain|간주|전주|후렴|벌스|브릿지)\s*\d*\s*:?)\s*$/i;
+  const lines = rawLines
+    .map((line) => line.trim())
+    .filter((line) => line && !sectionLabelPattern.test(line));
+
+  if (lines.length === 0) return Array(count).fill("");
+
+  if (count >= lines.length) {
+    return Array.from({ length: count }, (_, index) => {
+      const lineIndex = Math.min(
+        lines.length - 1,
+        Math.floor((index / count) * lines.length),
+      );
+      return lines[lineIndex] || "";
+    });
+  }
+
+  const weights = lines.map((line) => Math.max(line.length, 1));
+  let cursor = 0;
+  let remainingWeight = weights.reduce((sum, weight) => sum + weight, 0);
+  const allocated = [];
+
+  for (let sceneIndex = 0; sceneIndex < count; sceneIndex++) {
+    const remainingScenes = count - sceneIndex;
+    const remainingLines = lines.length - cursor;
+    const targetWeight = remainingWeight / remainingScenes;
+    const chunk = [];
+    let chunkWeight = 0;
+
+    while (cursor < lines.length && remainingLines - chunk.length > remainingScenes - 1) {
+      chunk.push(lines[cursor]);
+      chunkWeight += weights[cursor];
+      cursor += 1;
+      if (chunkWeight >= targetWeight) break;
+    }
+
+    if (chunk.length === 0 && cursor < lines.length) {
+      chunk.push(lines[cursor]);
+      chunkWeight += weights[cursor];
+      cursor += 1;
+    }
+
+    remainingWeight -= chunkWeight;
+    allocated.push(chunk.join(" ").trim());
+  }
+
+  return allocated;
+};
+
 // --- Extracted generateMVDetailPrompts ---
 window.generateMVDetailPrompts = async function (
   era,
@@ -1063,18 +1120,10 @@ window.generateSceneOverview = async function () {
     // 가사에서 지시어 제거
     const cleanLyrics = extractLyricsOnly(finalLyrics);
     const lyricsLines = cleanLyrics.split("\n").filter((line) => line.trim());
-
-    // 전체 씬에 매핑할 가사 사전 배분 (1:1 매치 유지)
-    const preAllocatedLyrics = [];
-    for (let i = 0; i < imageCount; i++) {
-        const startIdx = Math.floor((i / imageCount) * lyricsLines.length);
-        const endIdx = Math.max(startIdx + 1, Math.floor(((i + 1) / imageCount) * lyricsLines.length));
-        let allocated = lyricsLines.slice(startIdx, endIdx).join(" ").trim();
-        if (!allocated && lyricsLines.length > 0) {
-            allocated = lyricsLines[Math.min(startIdx, lyricsLines.length - 1)] || "";
-        }
-        preAllocatedLyrics.push(allocated);
-    }
+    const preAllocatedLyrics =
+      typeof window.allocateLyricsToMVScenes === "function"
+        ? window.allocateLyricsToMVScenes(cleanLyrics, imageCount)
+        : lyricsLines.slice(0, imageCount);
 
     // AI 기반 씬 생성 시도 (Gemini API 사용)
     let scenes = [];

@@ -1896,3 +1896,38 @@ MV smoke test suite: PASS (55 checks)
 npm run test:mv
 MV smoke test suite: PASS (57 checks)
 ```
+
+## 2026-05-06: 가사 기반 씬 분할 1차 고도화
+
+### 작업 목적
+
+기존 씬 생성은 가사를 줄 수 기준으로 단순 균등 분배했습니다. 후렴/벌스 같은 파트 라벨이나 줄 길이 차이가 반영되지 않아 씬별 가사 맥락이 어색해질 수 있었습니다. 이를 개선하기 위해 가사 분배 전용 헬퍼를 추가했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `window.allocateLyricsToMVScenes(lyrics, sceneCount)` 추가
+   - `[Verse]`, `[Chorus]`, `(Bridge)`, `후렴`, `벌스` 같은 파트 라벨 제거
+   - 씬 수가 가사 줄 수보다 적을 때는 줄 길이 가중치 기반으로 연속 구간 배분
+   - 씬 수가 가사 줄 수보다 많을 때는 전체 흐름 기준으로 가사 줄을 비례 배치
+   - `generateSceneOverview()`의 `preAllocatedLyrics` 생성 로직을 새 헬퍼로 연결
+
+2. `tests/mv_lyrics_scene_allocation_smoke.js`
+   - 파트 라벨 제거 확인
+   - 2개/4개 씬 배분에서 처음과 마지막 가사 흐름 보존 확인
+   - 씬 수가 가사 줄 수보다 많은 경우의 비례 배치 확인
+   - 빈 가사와 0개 씬 입력 가드 확인
+
+3. `tests/run_mv_smoke_tests.js`
+   - 가사 기반 씬 분할 보호 테스트를 통합 실행 목록에 추가
+
+4. `MV_테스트_실행_가이드.md`
+   - 현재 정상 기준을 `PASS (59 checks)`로 갱신
+   - 보호 범위에 가사 기반 씬 분할 헬퍼 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (59 checks)
+```
