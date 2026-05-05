@@ -1360,6 +1360,33 @@ npm run test:mv
 MV smoke test suite: PASS (49 checks)
 ```
 
+## 2026-05-06: MV 프롬프트 다운로드 함수 step6.js 이관
+
+### 작업 목적
+
+MV 프롬프트 TXT 다운로드 함수 `downloadMVPrompts`를 `js/step6.js`로 옮겨 MV 결과물 내보내기 흐름을 MV 소유 파일에서 관리하도록 정리했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `downloadMVPrompts` 추가
+
+2. `app.js`
+   - `downloadMVPrompts` 중복 전역 정의 제거
+
+3. `tests/mv_download_prompts_smoke.js`
+   - 테스트 기준 파일을 `app.js`에서 `js/step6.js`로 변경
+
+4. `MV_중복함수_정리계획.md`
+   - MV 프롬프트 다운로드 함수 이관 완료 기록 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (49 checks)
+```
+
 ## 2026-05-06: MV 프롬프트 다운로드 보호 테스트 추가
 
 ### 작업 목적

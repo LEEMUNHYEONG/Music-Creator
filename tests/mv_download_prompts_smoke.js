@@ -61,13 +61,13 @@ global.URL = {
   },
 };
 
-const appSource = fs.readFileSync(path.resolve(__dirname, "../app.js"), "utf8");
-const start = appSource.indexOf("window.downloadMVPrompts = function () {");
-const end = appSource.indexOf("if (typeof document !== \"undefined\")", start);
-assert.ok(start !== -1, "downloadMVPrompts should exist in app.js");
-assert.ok(end !== -1, "downloadMVPrompts block should end before DOM init");
-vm.runInThisContext(appSource.slice(start, end), {
-  filename: "app.js.download-mv-prompts-slice",
+const step6Source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
+const start = step6Source.indexOf("window.downloadMVPrompts = function () {");
+const end = step6Source.indexOf("// --- Extracted generateSRTPreview ---", start);
+assert.ok(start !== -1, "downloadMVPrompts should exist in js/step6.js");
+assert.ok(end !== -1, "downloadMVPrompts block should end before SRT helpers");
+vm.runInThisContext(step6Source.slice(start, end), {
+  filename: "js/step6.js.download-mv-prompts-slice",
 });
 
 addElement("mvCombinedPromptKo", "통합 한글");
