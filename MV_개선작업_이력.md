@@ -2443,6 +2443,33 @@ npm run test:mv
 MV smoke test suite: PASS (69 checks)
 ```
 
+## 2026-05-06: MV 6단계 사용자 시나리오 최종 통합 점검
+
+### 작업 목적
+
+MV 6단계 개선 작업의 마지막 확인 단계로, 사용자가 실제로 거치는 편집 확정, 프로젝트 저장, 6단계 복원 흐름이 하나로 이어지는지 보호 테스트를 추가했습니다.
+
+### 변경 내용
+
+1. `tests/mv_user_flow_integration_smoke.js`
+   - 씬별 설명, 시간, 가사, 장소, 감정, 무드, 조명, 카메라, EN/KO 프롬프트 편집값을 확정
+   - 확정 후 결과 화면 표시와 `mvTotalImages` 반영 확인
+   - `saveCurrentProject()`를 통한 `marketing.mv` 정규화 저장 확인
+   - 저장된 프로젝트를 `restoreStepData(6)`로 다시 복원해 MV 설정, 프롬프트, 씬 데이터가 유지되는지 확인
+
+2. `tests/run_mv_smoke_tests.js`
+   - MV 통합 테스트에 사용자 시나리오 최종 점검 포함
+
+3. `MV_중복함수_정리계획.md`, `MV_테스트_실행_가이드.md`
+   - 진행 상태와 보호 범위에 사용자 시나리오 통합 점검 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (73 checks)
+```
+
 ## 2026-05-06: 실제 Chrome 기준 MV 6단계 시각 안정성 점검 자동화
 
 ### 작업 목적

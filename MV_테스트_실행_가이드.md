@@ -77,6 +77,7 @@ MV smoke test suite: PASS (69 checks)
 40. 씬 개요 확정 전 확인 필요 항목이 남아 있을 때 확인 알림 표시
 41. 씬 개요 확정 전 확인 알림에서 취소 시 첫 문제 씬 이동 안내 표시
 42. 실제 Chrome 렌더링 기준 MV 6단계 씬 카드의 주요 화면 폭별 시각 안정성
+43. MV 6단계 사용자 시나리오 기준 편집 확정, 프로젝트 저장, 복원 통합 흐름
 
 ## 실패했을 때 확인 순서
 
@@ -107,6 +108,9 @@ MV smoke test suite: PASS (69 checks)
 
 `tests/mv_step6_visual_sanity_check.js`도 실제 Chrome headless 런타임을 사용합니다.  
 이 테스트는 390px, 700px, 1280px 화면 폭에서 MV 6단계 씬 카드가 주요 섹션을 렌더링하고, 페이지 가로 넘침이나 카드 밖으로 빠지는 입력/버튼이 없는지 확인합니다.
+
+`tests/mv_user_flow_integration_smoke.js`는 실제 사용자 흐름에 가까운 통합 테스트입니다.  
+씬 개요 편집값을 확정하고 프로젝트를 저장한 뒤, 저장된 `marketing.mv` 모델을 다시 6단계 화면으로 복원할 수 있는지 확인합니다.
 
 ## 개선 작업 전 권장 절차
 
