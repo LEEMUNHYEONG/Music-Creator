@@ -1357,6 +1357,34 @@ MV 씬 개요 저장과 결과 화면 렌더링을 담당하는 `saveSceneOvervi
 
 ```text
 npm run test:mv
+MV smoke test suite: PASS (49 checks)
+```
+
+## 2026-05-06: MV 프롬프트 다운로드 보호 테스트 추가
+
+### 작업 목적
+
+`downloadMVPrompts`를 향후 `js/step6.js`로 이관하기 전에 TXT 다운로드 포맷과 빈 씬 가드 동작을 테스트로 고정했습니다.
+
+### 변경 내용
+
+1. `tests/mv_download_prompts_smoke.js`
+   - 통합/배경/인물 프롬프트 다운로드 텍스트 포함 확인
+   - 씬별 textarea 값 우선 사용 확인
+   - textarea가 없을 때 `currentScenes` 값 fallback 확인
+   - 다운로드 파일명 `mv-prompts.txt` 확인
+   - 빈 씬 목록일 때 경고 알림 확인
+
+2. `tests/run_mv_smoke_tests.js`
+   - MV 프롬프트 다운로드 보호 테스트를 통합 실행 목록에 추가
+
+3. `MV_테스트_실행_가이드.md`
+   - 현재 보호 범위에 MV 프롬프트 TXT 다운로드 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
 MV smoke test suite: PASS
 ```
 
