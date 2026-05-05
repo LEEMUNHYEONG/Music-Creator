@@ -26,7 +26,7 @@ npm run test:mv
 정상 통과 시 마지막 줄에 아래와 비슷한 결과가 표시됩니다.
 
 ```text
-MV smoke test suite: PASS (63 checks)
+MV smoke test suite: PASS (65 checks)
 ```
 
 이 결과는 MV 관련 핵심 보호 테스트가 모두 통과했다는 뜻입니다.
@@ -60,6 +60,7 @@ MV smoke test suite: PASS (63 checks)
 23. 가사 기반 씬 분할 헬퍼의 파트 라벨 제거와 구간 배분
 24. 씬 카드/타임라인 프리뷰 렌더링과 씬 카드 포커스
 25. 가사 감정 키워드 기반 장소/조명/카메라 톤 추천
+26. MV 6단계 상세 설정 그리드의 모바일/태블릿/좁은 데스크톱 반응형 컬럼 유지
 
 ## 실패했을 때 확인 순서
 

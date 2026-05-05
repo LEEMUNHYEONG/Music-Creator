@@ -9,6 +9,7 @@ const checks = [
 const tests = [
   "tests/mv_duplicate_ownership_check.js",
   "tests/mv_chrome_runtime_check.js",
+  "tests/mv_responsive_layout_smoke.js",
   "tests/mv_confirm_scene_overview_smoke.js",
   "tests/mv_generate_thumbnail_prompts_smoke.js",
   "tests/mv_generate_character_sheet_smoke.js",

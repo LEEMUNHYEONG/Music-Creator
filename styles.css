@@ -2180,7 +2180,7 @@ header {
 /* ───────────────────────────────────────────────────────────────
    MV 그리드 (900px 이하)
 ─────────────────────────────────────────────────────────────────*/
-@media (max-width: 900px) {
+@media (min-width: 769px) and (max-width: 900px) {
   #marketing-mv .mv-detail-grid {
     grid-template-columns: repeat(3, minmax(120px, 1fr));
   }
