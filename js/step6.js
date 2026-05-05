@@ -321,6 +321,55 @@ function updateMVSceneEditorNotice(index, messages) {
   }
 }
 
+function getMVSceneEditorSummaryText(scene, index) {
+  const timing = getMVSceneTimingParts(scene);
+  const metadataValues = [
+    scene?.location,
+    scene?.emotion,
+    scene?.mood,
+    scene?.lighting,
+    scene?.cameraWork,
+  ].map((value) => String(value || "").trim());
+  const metadataCount = metadataValues.filter(Boolean).length;
+  const duration =
+    typeof scene?.durationSeconds === "number"
+      ? scene.durationSeconds
+      : timing.startSeconds !== null && timing.endSeconds !== null
+        ? timing.endSeconds - timing.startSeconds
+        : null;
+  const timeSummary =
+    duration !== null && duration >= 0
+      ? `${timing.startText}-${timing.endText} / ${duration}초`
+      : `${timing.startText || "시작 미정"}-${timing.endText || "종료 미정"}`;
+  const enEl = document.getElementById(`scene_overview_${index}_en`);
+  const koEl = document.getElementById(`scene_overview_${index}_ko`);
+  const enPrompt = String(enEl?.value || scene?.prompt || "").trim();
+  const koPrompt = String(koEl?.value || scene?.promptKo || "").trim();
+  const lyrics = String(scene?.lyrics || "").trim();
+
+  return [
+    `저장/재생성 전 상태: ${timeSummary}`,
+    `메타데이터 ${metadataCount}/5`,
+    lyrics ? "가사 있음" : "가사 없음",
+    enPrompt ? "EN 있음" : "EN 없음",
+    koPrompt ? "KO 있음" : "KO 없음",
+  ].join(" · ");
+}
+
+function renderMVSceneEditorSummary(scene, index) {
+  return `
+    <div id="scene_editor_summary_${index}" class="mv-scene-editor-summary" role="status" aria-live="polite" style="margin: -2px 0 15px 0; padding: 9px 12px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.22); border-radius: 6px; color: var(--text-secondary); font-size: 0.8rem; line-height: 1.45;">
+      ${getMVSceneEditorSummaryText(scene, index)}
+    </div>
+  `;
+}
+
+function updateMVSceneEditorSummary(scene, index) {
+  const summaryEl = document.getElementById(`scene_editor_summary_${index}`);
+  if (!summaryEl) return;
+  summaryEl.textContent = getMVSceneEditorSummaryText(scene, index);
+}
+
 window.updateMVSceneTimelineFromEditor = function (scene, index) {
   if (!scene) return scene;
 
@@ -379,6 +428,7 @@ window.updateMVSceneTimelineFromEditor = function (scene, index) {
     notices.push("장소/감정/무드/조명/카메라 메타데이터가 비어 있습니다. 재생성 품질을 높이려면 최소 한 가지를 입력하세요.");
   }
   updateMVSceneEditorNotice(index, notices);
+  updateMVSceneEditorSummary(scene, index);
 
   return scene;
 };
@@ -657,6 +707,7 @@ window.renderSceneOverview = function (scenesArg) {
                         </div>
                     </div>
                     <div id="scene_editor_notice_${index}" class="mv-scene-editor-notice" role="status" aria-live="polite" aria-hidden="true" style="display: none; margin: -4px 0 15px 0; padding: 10px 12px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 6px; color: var(--text-primary); font-size: 0.82rem; line-height: 1.5;"></div>
+                    ${renderMVSceneEditorSummary(scene, index)}
 
                     <div class="mv-scene-prompt-editor-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                         <div>
@@ -698,6 +749,19 @@ window.renderSceneOverview = function (scenesArg) {
       };
       field.addEventListener("input", syncTimelinePreview);
       field.addEventListener("change", syncTimelinePreview);
+    });
+
+    const summaryFields = container.querySelectorAll(
+      ".scene-overview-en,.scene-overview-ko",
+    );
+    summaryFields.forEach((field) => {
+      const syncEditorSummary = (event) => {
+        const index = Number(event.target?.dataset?.index);
+        if (!Number.isInteger(index) || !window.currentScenes?.[index]) return;
+        updateMVSceneEditorSummary(window.currentScenes[index], index);
+      };
+      field.addEventListener("input", syncEditorSummary);
+      field.addEventListener("change", syncEditorSummary);
     });
   }
   

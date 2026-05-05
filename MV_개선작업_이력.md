@@ -1,5 +1,35 @@
 # MV 개선작업 이력
 
+## 2026-05-06: 씬 개요 편집 카드 상태 요약 표시
+
+### 작업 목적
+
+씬을 저장하거나 재생성하기 전에 현재 카드의 시간, 메타데이터, 가사, 영어/한글 프롬프트 준비 상태를 한 줄로 확인할 수 있도록 개선했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `getMVSceneEditorSummaryText(scene, index)` 추가
+   - `renderMVSceneEditorSummary(scene, index)` 추가
+   - `updateMVSceneEditorSummary(scene, index)` 추가
+   - 시간/가사/메타데이터 입력 변경 시 상태 요약도 즉시 갱신
+   - 영어/한글 씬 개요 프롬프트 입력 변경 시 EN/KO 준비 상태 갱신
+
+2. `tests/mv_scene_timing_editor_smoke.js`
+   - 상태 요약이 최신 시간, 메타데이터 개수, 가사/EN/KO 상태를 반영하는지 확인
+   - 씬 개요 렌더링 구간에 상태 요약 마커와 프롬프트 입력 리스너가 유지되는지 확인
+
+3. `MV_테스트_실행_가이드.md`, `MV_중복함수_정리계획.md`
+   - 보호 범위와 진행 상태에 씬 카드 상태 요약 항목 추가
+   - 다음 추천 작업을 전체 씬 품질 요약/누락 항목 집계로 갱신
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (69 checks)
+```
+
 ## 2026-05-06: 씬 편집 UI 접근성/키보드 포커스 보강
 
 ### 작업 목적

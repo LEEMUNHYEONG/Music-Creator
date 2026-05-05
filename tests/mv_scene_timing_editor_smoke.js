@@ -30,6 +30,8 @@ elements.set("scene_emotion_0", { value: "hopeful" });
 elements.set("scene_mood_0", { value: "warm open horizon" });
 elements.set("scene_lighting_0", { value: "golden sunrise backlight" });
 elements.set("scene_camera_work_0", { value: "slow crane-up" });
+elements.set("scene_overview_0_en", { value: "A hopeful rooftop scene" });
+elements.set("scene_overview_0_ko", { value: "희망적인 옥상 장면" });
 elements.set("scene_editor_notice_0", {
   attributes: {},
   textContent: "",
@@ -38,6 +40,7 @@ elements.set("scene_editor_notice_0", {
     this.attributes[name] = value;
   },
 });
+elements.set("scene_editor_summary_0", { textContent: "" });
 
 const scene = {
   time: "0:00-0:08",
@@ -64,6 +67,11 @@ assert.strictEqual(scene.cameraWork, "slow crane-up");
 assert.strictEqual(elements.get("scene_editor_notice_0").textContent, "");
 assert.strictEqual(elements.get("scene_editor_notice_0").style.display, "none");
 assert.strictEqual(elements.get("scene_editor_notice_0").attributes["aria-hidden"], "true");
+assert.ok(elements.get("scene_editor_summary_0").textContent.includes("0:08-0:17 / 9초"));
+assert.ok(elements.get("scene_editor_summary_0").textContent.includes("메타데이터 5/5"));
+assert.ok(elements.get("scene_editor_summary_0").textContent.includes("가사 있음"));
+assert.ok(elements.get("scene_editor_summary_0").textContent.includes("EN 있음"));
+assert.ok(elements.get("scene_editor_summary_0").textContent.includes("KO 있음"));
 
 elements.set("scene_time_start_1", { value: "0:30" });
 elements.set("scene_time_end_1", { value: "0:20" });
@@ -139,5 +147,7 @@ assert.ok(renderOverviewSource.includes('aria-labelledby="scene_overview_title_$
 assert.ok(renderOverviewSource.includes('role="status"'));
 assert.ok(renderOverviewSource.includes('aria-live="polite"'));
 assert.ok(renderOverviewSource.includes('aria-describedby="scene_editor_notice_${index}"'));
+assert.ok(renderOverviewSource.includes("renderMVSceneEditorSummary(scene, index)"));
+assert.ok(renderOverviewSource.includes(".scene-overview-en,.scene-overview-ko"));
 
 console.log("MV scene timing editor smoke test: PASS");
