@@ -1388,6 +1388,34 @@ npm run test:mv
 MV smoke test suite: PASS (51 checks)
 ```
 
+## 2026-05-06: MV SRT 내보내기 함수 step6.js 이관
+
+### 작업 목적
+
+SRT 자막 복사/다운로드 함수 `copySRTContent`, `downloadSRT`를 `js/step6.js`로 옮겨 MV/SRT 결과물 내보내기 흐름을 MV 소유 파일에서 관리하도록 정리했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `copySRTContent` 추가
+   - `downloadSRT` 추가
+
+2. `app.js`
+   - 위 2개 함수의 중복 전역 정의 제거
+
+3. `tests/mv_srt_export_smoke.js`
+   - 테스트 기준 파일을 `app.js`에서 `js/step6.js`로 변경
+
+4. `MV_중복함수_정리계획.md`
+   - SRT 내보내기 함수 이관 완료 기록 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (51 checks)
+```
+
 ## 2026-05-06: MV 프롬프트 다운로드 함수 step6.js 이관
 
 ### 작업 목적

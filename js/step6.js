@@ -3721,6 +3721,114 @@ window.switchLyricsMode = function (mode) {
 // 캐릭터 시트 생성/관리 함수들
 // ═══════════════════════════════════════════════════════════════
 
+window.copySRTContent = function (event) {
+  try {
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+
+    if (!window.currentSRTContent) {
+      alert(
+        '⚠️ 복사할 SRT 자막이 없습니다.\n\n먼저 "SRT 자막 생성" 버튼을 클릭하여 자막을 생성해주세요.',
+      );
+      return;
+    }
+
+    navigator.clipboard
+      .writeText(window.currentSRTContent)
+      .then(() => {
+        if (typeof window.showCopyIndicator === "function") {
+          window.showCopyIndicator("✅ SRT 자막이 클립보드에 복사되었습니다!");
+        } else {
+          alert("✅ SRT 자막이 클립보드에 복사되었습니다!");
+        }
+      })
+      .catch(() => {
+        // 폴백
+        const textarea = document.createElement("textarea");
+        textarea.value = window.currentSRTContent;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+        if (typeof window.showCopyIndicator === "function") {
+          window.showCopyIndicator("✅ SRT 자막이 클립보드에 복사되었습니다!");
+        } else {
+          alert("✅ SRT 자막이 클립보드에 복사되었습니다!");
+        }
+      });
+  } catch (error) {
+    console.error("❌ SRT 자막 복사 오류:", error);
+    alert("SRT 자막 복사 중 오류가 발생했습니다:\n\n" + error.message);
+  }
+};
+
+// SRT 파일 다운로드
+window.downloadSRT = function (platform) {
+  try {
+    if (!window.currentSRTContent) {
+      alert(
+        '⚠️ 다운로드할 SRT 자막이 없습니다.\n\n먼저 "SRT 자막 생성" 버튼을 클릭하여 자막을 생성해주세요.',
+      );
+      return;
+    }
+
+    // 제목 가져오기
+    const titleEl =
+      document.getElementById("finalTitleText") ||
+      document.getElementById("songTitle") ||
+      document.getElementById("sunoTitle");
+    const title = titleEl?.textContent || titleEl?.value || "자막";
+
+    // 파일명 생성 (특수문자 제거)
+    const safeTitle =
+      title
+        .replace(/[^a-zA-Z0-9가-힣\s]/g, "")
+        .trim()
+        .replace(/\s+/g, "_") || "subtitle";
+    const filename = `${safeTitle}.srt`;
+
+    // 플랫폼에 따라 줄바꿈 문자 결정
+    const lineEnding = platform === "win" ? "\r\n" : "\n";
+
+    // 줄바꿈 문자 변환
+    let srtContent = window.currentSRTContent;
+    if (platform === "win") {
+      srtContent = srtContent.replace(/\n/g, "\r\n");
+    }
+
+    // Blob 생성 및 다운로드
+    const blob = new Blob([srtContent], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    const platformName = platform === "win" ? "윈도우용" : "맥용";
+    if (typeof window.showCopyIndicator === "function") {
+      window.showCopyIndicator(
+        `✅ ${platformName} SRT 파일이 다운로드되었습니다!\n\n파일명: ${filename}`,
+      );
+    } else {
+      alert(
+        `✅ ${platformName} SRT 파일이 다운로드되었습니다!\n\n파일명: ${filename}`,
+      );
+    }
+
+    console.log("✅ SRT 파일 다운로드 완료:", filename);
+  } catch (error) {
+    console.error("❌ SRT 파일 다운로드 오류:", error);
+    alert("SRT 파일 다운로드 중 오류가 발생했습니다:\n\n" + error.message);
+  }
+};
+
 // --- Extracted generateSRTPreview ---
 window.generateSRTPreview = function () {
   try {

@@ -86,13 +86,13 @@ window.showCopyIndicator = function showCopyIndicatorStub(message) {
   toasts.push(message);
 };
 
-const appSource = fs.readFileSync(path.resolve(__dirname, "../app.js"), "utf8");
-const start = appSource.indexOf("window.copySRTContent = function");
-const end = appSource.indexOf("// ═══════════════════════════════════════════════════════════════\n// localStorage 용량 관리 함수", start);
-assert.ok(start !== -1, "copySRTContent should exist in app.js");
-assert.ok(end !== -1, "SRT export block should end before storage helpers");
-vm.runInThisContext(appSource.slice(start, end), {
-  filename: "app.js.srt-export-slice",
+const step6Source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
+const start = step6Source.indexOf("window.copySRTContent = function");
+const end = step6Source.indexOf("// --- Extracted generateSRTPreview ---", start);
+assert.ok(start !== -1, "copySRTContent should exist in js/step6.js");
+assert.ok(end !== -1, "SRT export block should end before SRT preview");
+vm.runInThisContext(step6Source.slice(start, end), {
+  filename: "js/step6.js.srt-export-slice",
 });
 
 window.currentSRTContent = "1\n00:00:00,000 --> 00:00:02,000\nHello\n";
