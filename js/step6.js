@@ -1,5 +1,15 @@
-// js/step6.js - Extracted Logic
+// js/step6.js - MV Step 6 Logic
+//
+// Section map:
+// 1. Core utilities
+// 2. Prompt and scene review rendering
+// 3. MV generation flows
+// 4. Location, settings, and character helpers
+// 5. Prompt persistence and export
+// 6. SRT export and preview
+// 7. Translation, regeneration, copy, and tag actions
 
+// === MV Step 6: Core utilities ===
 /**
  * AI의 응답 문자열에서 JSON 데이터를 안전하게 추출하여 파싱합니다.
  * @param {string} str AI 응답 문자열
@@ -151,6 +161,7 @@ function getArtisticKeywords(emotion) {
     "cinematic lighting, rich color palette, masterful composition, photorealistic detail, fine art quality, 8k ultra detail";
 }
 
+// === MV Step 6: Prompt and scene review rendering ===
 // --- UI 렌더링 함수: MV 썸네일/배경/인물 프롬프트 표시 ---
 window.renderMvThumbnailPromptsUI = function (prompts) {
   if (!prompts) return;
@@ -401,6 +412,7 @@ window.renderSceneOverview = function (scenesArg) {
   });
 };
 
+// === MV Step 6: MV generation flows ===
 // --- Extracted generateMVDetailPrompts ---
 window.generateMVDetailPrompts = async function (
   era,
@@ -2592,6 +2604,7 @@ window.getMVLocationKoString = function () {
     .join(", ");
 };
 
+// === MV Step 6: Location, settings, and character helpers ===
 // --- Extracted getMVLocationValues ---
 window.getMVLocationValues = function () {
   const container = document.getElementById("mvLocationTags");
@@ -3512,8 +3525,8 @@ window.updateMVPromptTranslation = async function (type) {
   }
 };
 
+// === MV Step 6: Prompt persistence and export ===
 // window.generateMVThumbnailPrompts 함수는 js/step6.js에서 선언 및 구현됩니다. (중복 방지)
-
 
 // 프롬프트 저장
 window.saveMVPrompt = function (type) {
@@ -3668,10 +3681,8 @@ window.downloadMVPrompts = function () {
   URL.revokeObjectURL(url);
 };
 
-// 한글 프롬프트 수정 시 자동 영어 번역 (또는 그 반대)
-// ═══════════════════════════════════════════════════════════════
+// === MV Step 6: Legacy cross-step helpers ===
 // 가사 작성 모드 전환 함수
-// ═══════════════════════════════════════════════════════════════
 window.switchLyricsMode = function (mode) {
   try {
     const manualMode = document.getElementById("manualMode");
@@ -3713,13 +3724,7 @@ window.switchLyricsMode = function (mode) {
   }
 };
 
-// ═══════════════════════════════════════════════════════════════
-// MV 설정 관련 함수들
-// ═══════════════════════════════════════════════════════════════
-// 장소 유형 다중 선택: value -> { en, ko } (씬 프롬프트 반영용)
-// ═══════════════════════════════════════════════════════════════
-// 캐릭터 시트 생성/관리 함수들
-// ═══════════════════════════════════════════════════════════════
+// === MV Step 6: SRT export and preview ===
 
 window.copySRTContent = function (event) {
   try {
@@ -3939,6 +3944,7 @@ window.generateSRTPreview = function () {
 };
 
 
+// === MV Step 6: Translation, regeneration, copy, and tag actions ===
 // --- Restored Translation Sync Functions ---
 window.syncMVPromptTranslation = async function (type, sourceLang) {
   try {

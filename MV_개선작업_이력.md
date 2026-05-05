@@ -1827,3 +1827,35 @@ MV smoke test suite: PASS (53 checks)
 npm run test:mv
 MV smoke test suite: PASS (53 checks)
 ```
+
+## 2026-05-06: step6.js 내부 섹션 경계 정리
+
+### 작업 목적
+
+`js/step6.js`가 MV 6단계의 설정, 캐릭터, 씬, SRT, 번역/재생성 기능을 모두 담고 있어 다음 작업자가 파일 구조를 빠르게 파악하기 어려웠습니다. 기능 이동 없이 섹션 경계를 먼저 명확히 해서 이후 실제 분리 작업의 기준선을 만들었습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - 파일 상단에 섹션 맵 추가
+   - 핵심 유틸, 프롬프트/씬 리뷰 렌더링, MV 생성 흐름, 장소/설정/캐릭터 헬퍼, 프롬프트 저장/내보내기, SRT, 번역/재생성/복사/태그 액션 섹션 경계 추가
+   - 기존 테스트가 의존하는 `// --- Extracted ... ---`, `// --- Restored ... ---` 보호 마커는 유지
+
+2. `tests/mv_step6_section_order_check.js`
+   - 섹션 경계가 지정된 순서로 유지되는지 확인
+   - 기존 slice 기반 테스트가 사용하는 보호 마커가 사라지지 않는지 확인
+   - MV 설정/캐릭터/SRT 블록의 상대 위치가 깨지지 않는지 확인
+
+3. `tests/run_mv_smoke_tests.js`
+   - step6 섹션 순서 체크를 통합 테스트에 추가
+
+4. `MV_테스트_실행_가이드.md`
+   - 현재 정상 기준을 `PASS (55 checks)`로 갱신
+   - 보호 범위에 `js/step6.js` 내부 섹션 경계/보호 마커 유지 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (55 checks)
+```
