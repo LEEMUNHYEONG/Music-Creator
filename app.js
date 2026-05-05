@@ -459,206 +459,217 @@ window.setReadOnlyMode = function (readonly) {
 // ═══════════════════════════════════════════════════════════════
 // 단계별 데이터 복원 함수
 // ═══════════════════════════════════════════════════════════════
-function restoreMarketingMVStepData(projectData) {
-  if (!projectData.marketing) return;
+function setMVRestoreValue(id, val) {
+  const el = document.getElementById(id);
+  if (el && val !== undefined && val !== null) el.value = val;
+}
 
-  window.isRestoringStepData = true; // 복원 중 자동 저장 방지
-
-  const m = projectData.marketing;
+function restoreMarketingSummaryData(marketing) {
   const mResult = document.getElementById("marketingResult");
   if (mResult) {
     mResult.classList.remove("hidden");
     mResult.style.display = "block";
   }
 
-  if (m.youtubeDesc) {
+  if (marketing.youtubeDesc) {
     const el = document.getElementById("youtubeDesc");
-    if (el) el.textContent = m.youtubeDesc;
+    if (el) el.textContent = marketing.youtubeDesc;
   }
-  if (m.tiktokDesc) {
+  if (marketing.tiktokDesc) {
     const el = document.getElementById("tiktokDesc");
-    if (el) el.textContent = m.tiktokDesc;
+    if (el) el.textContent = marketing.tiktokDesc;
   }
-  if (m.hashtags) {
+  if (marketing.hashtags) {
     const el = document.getElementById("hashtagsContent");
-    if (el) el.textContent = m.hashtags;
+    if (el) el.textContent = marketing.hashtags;
   }
+}
 
-  // 썸네일 복구
+function restoreMarketingThumbnails(marketing) {
   const tGrid = document.getElementById("thumbnailsGrid");
-  if (tGrid) {
-    const thumbs = m.thumbnailsData || m.thumbnails || [];
-    if (thumbs.length > 0) {
-      let html = "";
-      thumbs.forEach(t => {
-        const img = typeof t === 'object' ? t.img : "";
-        const text = typeof t === 'object' ? t.text : t;
-        html += `<div class="thumbnail-card" style="background:var(--bg-card);border-radius:12px;border:1px solid var(--border);overflow:hidden;">
-          ${img ? `<img src="${img}" style="width:100%;height:160px;object-fit:cover;">` : `<div style="width:100%;height:160px;background:var(--bg-input);display:flex;align-items:center;justify-content:center;"><i class="fas fa-image" style="font-size:2rem;color:var(--text-secondary);"></i></div>`}
-          <div style="padding:12px;">
-            <div style="font-weight:600;margin-bottom:8px;font-size:0.9rem;color:var(--text-primary);cursor:pointer;" onclick="copyToClipboard(null, '${text.replace(/'/g, "\\'")}', event)">${text}</div>
-            <button class="btn btn-small btn-success" style="width:100%;" onclick="copyToClipboard(null, '${text.replace(/'/g, "\\'")}', event)">복사</button>
-          </div>
-        </div>`;
-      });
-      tGrid.innerHTML = html;
-    }
+  if (!tGrid) return;
+
+  const thumbs = marketing.thumbnailsData || marketing.thumbnails || [];
+  if (thumbs.length === 0) return;
+
+  let html = "";
+  thumbs.forEach(t => {
+    const img = typeof t === 'object' ? t.img : "";
+    const text = typeof t === 'object' ? t.text : t;
+    html += `<div class="thumbnail-card" style="background:var(--bg-card);border-radius:12px;border:1px solid var(--border);overflow:hidden;">
+      ${img ? `<img src="${img}" style="width:100%;height:160px;object-fit:cover;">` : `<div style="width:100%;height:160px;background:var(--bg-input);display:flex;align-items:center;justify-content:center;"><i class="fas fa-image" style="font-size:2rem;color:var(--text-secondary);"></i></div>`}
+      <div style="padding:12px;">
+        <div style="font-weight:600;margin-bottom:8px;font-size:0.9rem;color:var(--text-primary);cursor:pointer;" onclick="copyToClipboard(null, '${text.replace(/'/g, "\\'")}', event)">${text}</div>
+        <button class="btn btn-small btn-success" style="width:100%;" onclick="copyToClipboard(null, '${text.replace(/'/g, "\\'")}', event)">복사</button>
+      </div>
+    </div>`;
+  });
+  tGrid.innerHTML = html;
+}
+
+function getMarketingMVRestoreData(marketing) {
+  if (typeof window.getMarketingMVData === "function") {
+    return window.getMarketingMVData(marketing);
   }
 
-  // MV 설정 복구
-  const mvData =
-    typeof window.getMarketingMVData === "function"
-      ? window.getMarketingMVData(m)
-      : {
-          settings: m.mvSettings || {},
-          prompts: m.mvPrompts || {},
-          scenes: m.mvScenes || [],
-        };
-  const s = mvData.settings || {};
-  const setV = (id, val) => {
-    const el = document.getElementById(id);
-    if (el && val !== undefined && val !== null) el.value = val;
+  return {
+    settings: marketing.mvSettings || {},
+    prompts: marketing.mvPrompts || {},
+    scenes: marketing.mvScenes || [],
   };
+}
 
-  // 시간 및 재생 간격
-  setV("mvMinutes", s.minutes);
-  setV("mvSeconds", s.seconds);
-  setV("mvInterval", s.interval);
+function restoreMVSettingsFields(settings) {
+  setMVRestoreValue("mvMinutes", settings.minutes);
+  setMVRestoreValue("mvSeconds", settings.seconds);
+  setMVRestoreValue("mvInterval", settings.interval);
+  setMVRestoreValue("mvEra", settings.era);
+  setMVRestoreValue("mvCountry", settings.country);
+  setMVRestoreValue("mvCharacterCount", settings.characterCount || "1");
+  setMVRestoreValue("mvLighting", settings.lighting);
+  setMVRestoreValue("mvCameraWork", settings.cameraWork);
+  setMVRestoreValue("mvMood", settings.mood);
+  setMVRestoreValue("mvLocationCustom", settings.locationCustom || settings.location || "");
+  setMVRestoreValue("mvActionCustom", settings.actionCustom || "");
+  setMVRestoreValue("mvCustomSettings", settings.customSettings || "");
+}
 
-  // 기본 설정
-  setV("mvEra", s.era);
-  setV("mvCountry", s.country);
-  setV("mvCharacterCount", s.characterCount || "1");
-  setV("mvLighting", s.lighting);
-  setV("mvCameraWork", s.cameraWork);
-  setV("mvMood", s.mood);
-  setV("mvLocationCustom", s.locationCustom || s.location || "");
-  setV("mvActionCustom", s.actionCustom || "");
-  setV("mvCustomSettings", s.customSettings || "");
-
-  // 태그 복구 (active 클래스 추가)
-  const locationTags = Array.isArray(s.locationTags)
-    ? s.locationTags
-    : Array.isArray(s.location)
-      ? s.location
+function restoreMVTagSelections(settings) {
+  const locationTags = Array.isArray(settings.locationTags)
+    ? settings.locationTags
+    : Array.isArray(settings.location)
+      ? settings.location
       : [];
   if (locationTags.length > 0) {
     document.querySelectorAll('#mvLocationTags .tag-btn').forEach(btn => {
       btn.classList.toggle('active', locationTags.includes(btn.dataset.value));
     });
   }
-  if (s.actionTags && Array.isArray(s.actionTags)) {
+  if (settings.actionTags && Array.isArray(settings.actionTags)) {
     document.querySelectorAll('#mvActionTags .tag-btn').forEach(btn => {
-      btn.classList.toggle('active', s.actionTags.includes(btn.dataset.value));
+      btn.classList.toggle('active', settings.actionTags.includes(btn.dataset.value));
     });
   }
+}
 
-  // 인물(캐릭터) 정보 복구
-  if (typeof window.updateCharacterInputs === "function") {
-    window.updateCharacterInputs(); // 먼저 입력 필드들을 생성
-    if (s.characters && Array.isArray(s.characters)) {
-      s.characters.forEach((c, idx) => {
-        const i = idx + 1;
-        setV(`mvCharacter${i}_gender`, c.gender);
-        setV(`mvCharacter${i}_age`, c.age);
-        setV(`mvCharacter${i}_race`, c.race);
-        setV(`mvCharacter${i}_appearance`, c.appearance);
-        setV(`mvCharacter${i}_artStyle`, c.artStyle || "photorealistic");
+function restoreMVCharacters(settings) {
+  if (typeof window.updateCharacterInputs !== "function") return;
 
-        // 캐릭터 시트 복구
-        const sheetEl = document.getElementById(`mvCharacter${i}_sheet`);
-        if (sheetEl && c.characterSheet) {
-          sheetEl.value = c.characterSheet;
-          // 시트 영역 표시
-          const sheetArea = document.getElementById(`mvCharacter${i}_sheetArea`);
-          if (sheetArea) sheetArea.style.display = "block";
-          const sheetToggle = document.getElementById(`mvCharacter${i}_sheetToggle`);
-          if (sheetToggle) sheetToggle.style.display = "inline-flex";
-          const sheetCopy = document.getElementById(`mvCharacter${i}_sheetCopy`);
-          if (sheetCopy) sheetCopy.style.display = "inline-flex";
-        }
-      });
+  window.updateCharacterInputs(); // 먼저 입력 필드들을 생성
+  if (!settings.characters || !Array.isArray(settings.characters)) return;
+
+  settings.characters.forEach((c, idx) => {
+    const i = idx + 1;
+    setMVRestoreValue(`mvCharacter${i}_gender`, c.gender);
+    setMVRestoreValue(`mvCharacter${i}_age`, c.age);
+    setMVRestoreValue(`mvCharacter${i}_race`, c.race);
+    setMVRestoreValue(`mvCharacter${i}_appearance`, c.appearance);
+    setMVRestoreValue(`mvCharacter${i}_artStyle`, c.artStyle || "photorealistic");
+
+    const sheetEl = document.getElementById(`mvCharacter${i}_sheet`);
+    if (sheetEl && c.characterSheet) {
+      sheetEl.value = c.characterSheet;
+      const sheetArea = document.getElementById(`mvCharacter${i}_sheetArea`);
+      if (sheetArea) sheetArea.style.display = "block";
+      const sheetToggle = document.getElementById(`mvCharacter${i}_sheetToggle`);
+      if (sheetToggle) sheetToggle.style.display = "inline-flex";
+      const sheetCopy = document.getElementById(`mvCharacter${i}_sheetCopy`);
+      if (sheetCopy) sheetCopy.style.display = "inline-flex";
     }
+  });
+}
+
+function getMVPromptValue(prompts, nestedKey, flatKey) {
+  if (prompts[nestedKey]) {
+    return prompts[nestedKey].en || prompts[nestedKey].ko || prompts[nestedKey][flatKey] || "";
   }
+  return prompts[flatKey] || "";
+}
 
-  // 상세 프롬프트 복구 (Results 섹션 및 Editor 섹션 동시 복구 - 하이브리드 구조 지원)
-  const p = mvData.prompts || {};
+function getMVPromptKoValue(prompts, nestedKey, flatKeyKo) {
+  if (prompts[nestedKey]) return prompts[nestedKey].ko || prompts[nestedKey][flatKeyKo] || "";
+  return prompts[flatKeyKo] || "";
+}
 
-  // 데이터 추출 헬퍼 (평면형과 계층형 모두 지원)
-  const getP = (obj, nestedKey, flatKey) => {
-    if (obj[nestedKey]) return obj[nestedKey].en || obj[nestedKey].ko || obj[nestedKey][flatKey] || "";
-    return obj[flatKey] || "";
-  };
-  const getPKo = (obj, nestedKey, flatKeyKo) => {
-    if (obj[nestedKey]) return obj[nestedKey].ko || obj[nestedKey][flatKeyKo] || "";
-    return obj[flatKeyKo] || "";
-  };
+function restoreMVPromptFields(prompts) {
+  const tEn = getMVPromptValue(prompts, 'thumbnail', 'thumbnailEn');
+  const tKo = getMVPromptKoValue(prompts, 'thumbnail', 'thumbnailKo');
+  setMVRestoreValue("mvThumbnailPromptEn", tEn);
+  setMVRestoreValue("mvThumbnailPromptKo", tKo);
+  if (document.getElementById("review_thumbnail_en")) setMVRestoreValue("review_thumbnail_en", tEn);
+  if (document.getElementById("review_thumbnail_ko")) setMVRestoreValue("review_thumbnail_ko", tKo);
 
-  // 썸네일
-  const tEn = getP(p, 'thumbnail', 'thumbnailEn');
-  const tKo = getPKo(p, 'thumbnail', 'thumbnailKo');
-  setV("mvThumbnailPromptEn", tEn);
-  setV("mvThumbnailPromptKo", tKo);
-  if (document.getElementById("review_thumbnail_en")) setV("review_thumbnail_en", tEn);
-  if (document.getElementById("review_thumbnail_ko")) setV("review_thumbnail_ko", tKo);
+  const bEn = getMVPromptValue(prompts, 'background', 'backgroundDetailEn');
+  const bKo = getMVPromptKoValue(prompts, 'background', 'backgroundDetailKo');
+  setMVRestoreValue("mvBackgroundDetailPromptEn", bEn);
+  setMVRestoreValue("mvBackgroundDetailPromptKo", bKo);
+  if (document.getElementById("review_background_en")) setMVRestoreValue("review_background_en", bEn);
+  if (document.getElementById("review_background_ko")) setMVRestoreValue("review_background_ko", bKo);
 
-  // 배경
-  const bEn = getP(p, 'background', 'backgroundDetailEn');
-  const bKo = getPKo(p, 'background', 'backgroundDetailKo');
-  setV("mvBackgroundDetailPromptEn", bEn);
-  setV("mvBackgroundDetailPromptKo", bKo);
-  if (document.getElementById("review_background_en")) setV("review_background_en", bEn);
-  if (document.getElementById("review_background_ko")) setV("review_background_ko", bKo);
+  const cEn = getMVPromptValue(prompts, 'character', 'characterDetailEn');
+  const cKo = getMVPromptKoValue(prompts, 'character', 'characterDetailKo');
+  setMVRestoreValue("mvCharacterDetailPromptEn", cEn);
+  setMVRestoreValue("mvCharacterDetailPromptKo", cKo);
+  if (document.getElementById("review_character_en")) setMVRestoreValue("review_character_en", cEn);
+  if (document.getElementById("review_character_ko")) setMVRestoreValue("review_character_ko", cKo);
 
-  // 인물
-  const cEn = getP(p, 'character', 'characterDetailEn');
-  const cKo = getPKo(p, 'character', 'characterDetailKo');
-  setV("mvCharacterDetailPromptEn", cEn);
-  setV("mvCharacterDetailPromptKo", cKo);
-  if (document.getElementById("review_character_en")) setV("review_character_en", cEn);
-  if (document.getElementById("review_character_ko")) setV("review_character_ko", cKo);
-
-  // 동적 렌더링 호출
   if (typeof window.renderMvPrompts === 'function') {
     window.renderMvPrompts();
   }
+}
 
-  // 결과 섹션 표시 여부 결정 및 중복 방지
+function restoreMVResultSections(mvData, prompts) {
   const resSec = document.getElementById("mvResultsSection");
   const overviewSec = document.getElementById("mvSceneOverviewSection");
   const scenes = Array.isArray(mvData.scenes) ? mvData.scenes : [];
-  const hasMvData = !!(p.thumbnail?.en || p.thumbnailEn || scenes.length > 0);
+  const hasMvData = !!(prompts.thumbnail?.en || prompts.thumbnailEn || scenes.length > 0);
 
   if (hasMvData) {
-    // 이미 생성을 완료한 상태면 결과 섹션만 보여줌 (중복 방지)
     if (resSec) {
-        resSec.classList.remove("hidden");
-        resSec.style.display = "block";
+      resSec.classList.remove("hidden");
+      resSec.style.display = "block";
     }
     if (overviewSec) {
-        overviewSec.classList.add("hidden");
-        overviewSec.style.display = "none";
+      overviewSec.classList.add("hidden");
+      overviewSec.style.display = "none";
     }
-    // 씬 데이터가 있는 경우 렌더링
     if (scenes.length > 0) {
       window.currentScenes = JSON.parse(JSON.stringify(scenes));
       if (typeof window.renderSceneOverview === "function") {
         window.renderSceneOverview(window.currentScenes);
       }
     }
-    // 정보 업데이트
     if (typeof window.updateMVImageCount === "function") window.updateMVImageCount();
-  } else {
-    // 생성이 완료되지 않았으면 편집 섹션만 활성화
-    if (overviewSec) {
-      overviewSec.classList.remove("hidden");
-      overviewSec.style.display = "block";
-    }
-    if (resSec) {
-      resSec.classList.add("hidden");
-      resSec.style.display = "none";
-    }
+    return;
   }
+
+  if (overviewSec) {
+    overviewSec.classList.remove("hidden");
+    overviewSec.style.display = "block";
+  }
+  if (resSec) {
+    resSec.classList.add("hidden");
+    resSec.style.display = "none";
+  }
+}
+
+function restoreMarketingMVStepData(projectData) {
+  if (!projectData.marketing) return;
+
+  window.isRestoringStepData = true; // 복원 중 자동 저장 방지
+
+  const marketing = projectData.marketing;
+  const mvData = getMarketingMVRestoreData(marketing);
+  const settings = mvData.settings || {};
+  const prompts = mvData.prompts || {};
+
+  restoreMarketingSummaryData(marketing);
+  restoreMarketingThumbnails(marketing);
+  restoreMVSettingsFields(settings);
+  restoreMVTagSelections(settings);
+  restoreMVCharacters(settings);
+  restoreMVPromptFields(prompts);
+  restoreMVResultSections(mvData, prompts);
 }
 
 window.restoreStepData = function (step) {

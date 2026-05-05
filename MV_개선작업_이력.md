@@ -1799,3 +1799,31 @@ MV smoke test suite: PASS (53 checks)
 npm run test:mv
 MV smoke test suite: PASS (53 checks)
 ```
+
+## 2026-05-06: MV 6단계 복원 내부 헬퍼 세분화
+
+### 작업 목적
+
+`restoreMarketingMVStepData(projectData)` 안에 다시 모여 있던 설정/프롬프트/씬 표시 복원 책임을 더 작은 함수로 나눠 다음 기능 고도화 작업의 변경 범위를 줄였습니다.
+
+### 변경 내용
+
+1. `app.js`
+   - 마케팅 요약 복원: `restoreMarketingSummaryData(marketing)`
+   - 썸네일 복원: `restoreMarketingThumbnails(marketing)`
+   - MV 데이터 선택: `getMarketingMVRestoreData(marketing)`
+   - 설정 필드 복원: `restoreMVSettingsFields(settings)`
+   - 태그 선택 복원: `restoreMVTagSelections(settings)`
+   - 캐릭터 복원: `restoreMVCharacters(settings)`
+   - 프롬프트 필드 복원: `restoreMVPromptFields(prompts)`
+   - 결과/씬 개요 섹션 복원: `restoreMVResultSections(mvData, prompts)`
+
+2. `tests/mv_restore_step6_smoke.js`
+   - 세분화된 헬퍼까지 포함해 복원 테스트가 실행되도록 코드 슬라이스 기준 조정
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (53 checks)
+```
