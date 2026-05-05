@@ -333,6 +333,39 @@ window.updateMVSceneTimelineFromEditor = function (scene, index) {
   return scene;
 };
 
+function getMVSceneRegenerationContext(scene, fallback = {}) {
+  const location = String(scene?.location || fallback.location || "").trim();
+  const emotion = String(scene?.emotion || "").trim();
+  const mood = String(scene?.mood || fallback.mood || "").trim();
+  const lighting = String(scene?.lighting || fallback.lighting || "").trim();
+  const cameraWork = String(
+    scene?.cameraWork || fallback.cameraWork || "",
+  ).trim();
+  const lyrics = String(scene?.lyrics || "").trim();
+
+  return {
+    location,
+    emotion,
+    mood,
+    lighting,
+    cameraWork,
+    lyrics,
+    promptLines: [
+      location ? `- 씬 장소: ${location}` : "",
+      emotion ? `- 씬 감정: ${emotion}` : "",
+      mood ? `- 씬 무드: ${mood}` : "",
+      lighting ? `- 씬 조명: ${lighting}` : "",
+      cameraWork ? `- 씬 카메라: ${cameraWork}` : "",
+      lyrics ? `- 씬 가사 구간: ${lyrics}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    promptParts: [location, emotion, mood, lighting, cameraWork]
+      .filter(Boolean)
+      .join(", "),
+  };
+}
+
 // --- UI 렌더링 함수: MV 썸네일/배경/인물 프롬프트 표시 ---
 window.renderMvThumbnailPromptsUI = function (prompts) {
   if (!prompts) return;
@@ -5445,6 +5478,9 @@ window.regenerateSceneOverviewPrompt = async function (sceneIndex) {
     }
 
     const scene = window.currentScenes[sceneIndex];
+    if (typeof window.updateMVSceneTimelineFromEditor === "function") {
+      window.updateMVSceneTimelineFromEditor(scene, sceneIndex);
+    }
     const finalLyrics =
       document.getElementById("finalLyrics")?.textContent ||
       document.getElementById("finalizedLyrics")?.value ||
@@ -5526,7 +5562,7 @@ window.regenerateSceneOverviewPrompt = async function (sceneIndex) {
 
       // 가사는 이미 1:1 사전 매핑되어 scene.scene에 저장되어 있음. 
       // 만약 없거나 "씬 N" 형태인 경우 fallback으로 시간비례 추출 사용 (예외 대비)
-      let sceneLyrics = scene.scene || "";
+      let sceneLyrics = scene.lyrics || scene.scene || "";
       if (!sceneLyrics || sceneLyrics.startsWith("씬 ")) {
         if (scene.time && cleanLyrics) {
           const timeMatch = scene.time.match(/(\d+):(\d+)-(\d+):(\d+)/);
@@ -5576,6 +5612,9 @@ ${stylePrompt || "감성적인 발라드"}
 - 분위기: ${mood || "감성적"}
 - 인물 정보: ${characterInfoStr}
 ${customSettings ? `- 추가: ${customSettings}` : ""}
+
+【씬별 편집 메타데이터】 (사용자가 직접 조정한 값이므로 MV 전체 설정보다 우선 반영)
+${getMVSceneRegenerationContext(scene, { location, mood, lighting, cameraWork }).promptLines || "- 없음"}
 
 【작업 요구사항】
 해당 씬의 비주얼을 **매우 상세하고 구체적으로** 영어 한 단락으로 묘사하세요 (최소 150단어 이상의 방대하고 정밀한 서술형 문장):
@@ -5662,7 +5701,17 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
         throw new Error(`API 오류: ${response.status} ${errData.error?.message || response.statusText}`);
       }
     } else {
-      const basicPrompt = `/* Scene ${sceneIndex + 1} */ ${scene.scene || "music scene"}, ${stylePrompt || "cinematic"}, ${location || "visual setting"}, ${lighting || "natural lighting"}, ${cameraWork || "medium shot"}, ${mood || "emotional mood"}, ultra high quality, 8k resolution, photorealistic, cinematic composition, 16:9 aspect ratio`;
+      const sceneContext = getMVSceneRegenerationContext(scene, {
+        location,
+        mood,
+        lighting,
+        cameraWork,
+      });
+      const sceneSeed = [scene.scene, scene.lyrics]
+        .filter(Boolean)
+        .filter((value, idx, arr) => arr.indexOf(value) === idx)
+        .join(", ");
+      const basicPrompt = `/* Scene ${sceneIndex + 1} */ ${sceneSeed || "music scene"}, ${stylePrompt || "cinematic"}, ${sceneContext.promptParts || location || "visual setting"}, ultra high quality, 8k resolution, photorealistic, cinematic composition, 16:9 aspect ratio`;
       const enEl = document.getElementById(`scene_overview_${sceneIndex}_en`);
       if (enEl) {
         enEl.value = basicPrompt;
@@ -6044,6 +6093,9 @@ window.regenerateScenePrompt = async function (sceneIndex) {
     }
 
     const scene = window.currentScenes[sceneIndex];
+    if (typeof window.updateMVSceneTimelineFromEditor === "function") {
+      window.updateMVSceneTimelineFromEditor(scene, sceneIndex);
+    }
     const finalLyrics =
       document.getElementById("finalLyrics")?.textContent ||
       document.getElementById("finalizedLyrics")?.value ||
@@ -6057,13 +6109,17 @@ window.regenerateScenePrompt = async function (sceneIndex) {
     const geminiKey = window.getGeminiApiKey();
     if (geminiKey && geminiKey.startsWith("AIza")) {
       const cleanLyrics = extractLyricsOnly(finalLyrics);
+      const sceneContext = getMVSceneRegenerationContext(scene);
       const prompt = `다음 씬 설명을 기반으로 **세밀하고 상세한** 통합 영어 프롬프트를 1개 생성하세요.
 
 【씬 설명 / 가사】
-"${scene.scene || cleanLyrics}"
+"${scene.lyrics || scene.scene || cleanLyrics}"
 
 【스타일】
 ${stylePrompt || "감성적인 발라드"}
+
+【씬별 편집 메타데이터】 (사용자가 직접 조정한 값이므로 반드시 우선 반영)
+${sceneContext.promptLines || "- 없음"}
 
 【작업 요구사항】
 해당 씬의 비주얼을 **매우 상세하고 구체적으로** 영어 한 단락으로 묘사하세요:
@@ -6106,7 +6162,12 @@ ${stylePrompt || "감성적인 발라드"}
         throw new Error(`API 오류: ${response.status} ${errData.error?.message || response.statusText}`);
       }
     } else {
-      const basicPrompt = `${scene.scene || "music scene"}, high quality, photorealistic, natural pose, detailed hands`;
+      const sceneContext = getMVSceneRegenerationContext(scene);
+      const sceneSeed = [scene.scene, scene.lyrics]
+        .filter(Boolean)
+        .filter((value, idx, arr) => arr.indexOf(value) === idx)
+        .join(", ");
+      const basicPrompt = `${sceneSeed || "music scene"}, ${sceneContext.promptParts || "cinematic visual setting"}, high quality, photorealistic, natural pose, detailed hands`;
       const sceneId = `scene_${sceneIndex}`;
       const enEl = document.getElementById(`${sceneId}_en`);
       if (enEl) {

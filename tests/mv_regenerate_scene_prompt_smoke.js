@@ -5,6 +5,7 @@ const alerts = [];
 const toasts = [];
 let fetchMode = "success";
 let syncCalls = [];
+let lastPrompt = "";
 const originalConsole = {
   error: console.error,
   log: console.log,
@@ -50,8 +51,9 @@ global.document = {
 global.alert = function alertStub(message) {
   alerts.push(message);
 };
-global.fetch = async function fetchStub(url) {
+global.fetch = async function fetchStub(url, options = {}) {
   assert.ok(url.includes("gemini-2.5-flash"));
+  lastPrompt = JSON.parse(options.body).contents[0].parts[0].text;
 
   if (fetchMode === "failure") {
     return {
@@ -87,6 +89,12 @@ global.extractLyricsOnly = function extractLyricsOnlyStub(text) {
 window.currentScenes = [
   {
     scene: "lonely street at night",
+    lyrics: "edited lyric line",
+    location: "sunrise rooftop",
+    emotion: "hopeful",
+    mood: "warm horizon",
+    lighting: "golden backlight",
+    cameraWork: "slow crane-up",
     prompt: "old scene prompt",
     promptKo: "기존 씬 프롬프트",
   },
@@ -103,6 +111,12 @@ window.showCopyIndicator = function showCopyIndicatorStub(message) {
   ["finalizedStylePrompt", "cinematic ballad"],
   ["scene_0_en", "old scene prompt"],
   ["scene_0_ko", "기존 씬 프롬프트"],
+  ["scene_location_0", "rainy alley"],
+  ["scene_emotion_0", "lonely"],
+  ["scene_mood_0", "quiet negative space"],
+  ["scene_lighting_0", "blue-hour side light"],
+  ["scene_camera_work_0", "slow dolly-in"],
+  ["scene_lyrics_0", "edited lyric from editor"],
   ["copyScenePromptBtn_0", ""],
 ].forEach(([id, value]) => addElement(id, value));
 
@@ -124,6 +138,14 @@ window.syncScenePromptTranslation = async function syncScenePromptTranslationStu
   await window.regenerateScenePrompt(0);
 
   assert.strictEqual(elements.get("scene_0_en").value, "new AI scene prompt");
+  assert.ok(lastPrompt.includes("씬별 편집 메타데이터"));
+  assert.ok(lastPrompt.includes("씬 장소: rainy alley"));
+  assert.ok(lastPrompt.includes("씬 감정: lonely"));
+  assert.ok(lastPrompt.includes("씬 조명: blue-hour side light"));
+  assert.ok(lastPrompt.includes("씬 카메라: slow dolly-in"));
+  assert.ok(lastPrompt.includes("edited lyric from editor"));
+  assert.strictEqual(window.currentScenes[0].location, "rainy alley");
+  assert.strictEqual(window.currentScenes[0].emotion, "lonely");
   assert.strictEqual(elements.get("scene_0_ko").value, "번역: new AI scene prompt");
   assert.deepStrictEqual(syncCalls, [{ sceneIndex: 0, sourceLang: "en" }]);
   assert.strictEqual(window.currentScenes[0].prompt, "new AI scene prompt");

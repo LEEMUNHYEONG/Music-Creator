@@ -6,6 +6,7 @@ const toasts = [];
 let fetchMode = "success";
 let saveCount = 0;
 let syncCalls = [];
+let lastPrompt = "";
 const originalConsole = {
   error: console.error,
   log: console.log,
@@ -31,8 +32,9 @@ global.document = {
 global.alert = function alertStub(message) {
   alerts.push(message);
 };
-global.fetch = async function fetchStub(url) {
+global.fetch = async function fetchStub(url, options = {}) {
   assert.ok(url.includes("gemini-2.5-flash"));
+  lastPrompt = JSON.parse(options.body).contents[0].parts[0].text;
 
   if (fetchMode === "failure") {
     return {
@@ -78,6 +80,12 @@ window.currentScenes = [
   {
     time: "00:00-00:10",
     scene: "lonely street at night",
+    lyrics: "edited lyric line",
+    location: "sunrise rooftop",
+    emotion: "hopeful",
+    mood: "warm horizon",
+    lighting: "golden backlight",
+    cameraWork: "slow crane-up",
     prompt: "old overview en",
     promptKo: "기존 개요 한글",
   },
@@ -114,6 +122,12 @@ window.saveCurrentProject = function saveCurrentProjectStub() {
   ["mvCharacter1_appearance", "black coat"],
   ["scene_overview_0_en", "old overview en"],
   ["scene_overview_0_ko", "기존 개요 한글"],
+  ["scene_location_0", "rainy alley"],
+  ["scene_emotion_0", "lonely"],
+  ["scene_mood_0", "quiet negative space"],
+  ["scene_lighting_0", "blue-hour side light"],
+  ["scene_camera_work_0", "slow dolly-in"],
+  ["scene_lyrics_0", "edited lyric from editor"],
 ].forEach(([id, value]) => addElement(id, value));
 
 require("../js/step6.js");
@@ -136,6 +150,14 @@ window.syncSceneOverviewPromptTranslation =
     elements.get("scene_overview_0_en").value,
     "/* Scene 1 */ new overview prompt en",
   );
+  assert.ok(lastPrompt.includes("씬별 편집 메타데이터"));
+  assert.ok(lastPrompt.includes("씬 장소: rainy alley"));
+  assert.ok(lastPrompt.includes("씬 감정: lonely"));
+  assert.ok(lastPrompt.includes("씬 조명: blue-hour side light"));
+  assert.ok(lastPrompt.includes("씬 카메라: slow dolly-in"));
+  assert.ok(lastPrompt.includes("edited lyric from editor"));
+  assert.strictEqual(window.currentScenes[0].location, "rainy alley");
+  assert.strictEqual(window.currentScenes[0].emotion, "lonely");
   assert.strictEqual(elements.get("scene_overview_0_ko").value, "새 개요 프롬프트");
   assert.strictEqual(
     window.currentScenes[0].prompt,

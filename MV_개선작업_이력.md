@@ -2071,6 +2071,39 @@ npm run test:mv
 MV smoke test suite: PASS (67 checks)
 ```
 
+## 2026-05-06: 편집된 씬 메타데이터의 재생성 프롬프트 우선 반영
+
+### 작업 목적
+
+사용자가 씬별 장소, 감정, 무드, 조명, 카메라, 가사 구간을 직접 수정한 뒤 재생성을 눌렀을 때, 기존 MV 전체 설정보다 씬별 편집값이 우선 반영되도록 개선했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `getMVSceneRegenerationContext(scene, fallback)` 추가
+   - 씬 개요 프롬프트 재생성 전에 편집 폼의 최신 값을 `currentScenes`에 반영
+   - 씬별 편집 메타데이터를 Gemini 요청 본문에 별도 섹션으로 추가
+   - API 키가 없는 기본 프롬프트 생성에서도 씬별 장소/감정/무드/조명/카메라를 우선 사용
+   - 씬 설명과 편집된 가사 구간을 함께 보존해 기본 프롬프트가 장면 맥락을 잃지 않도록 보강
+
+2. `tests/mv_regenerate_scene_overview_prompt_smoke.js`
+   - 씬 개요 재생성 요청 본문에 편집된 장소/감정/조명/카메라/가사 구간이 포함되는지 확인
+   - 재생성 직전 편집 폼 값이 `currentScenes`에 반영되는지 확인
+
+3. `tests/mv_regenerate_scene_prompt_smoke.js`
+   - 결과 화면 씬 프롬프트 재생성 요청에도 씬별 메타데이터가 포함되는지 확인
+   - API 키 없는 기본 재생성 흐름에서도 씬 설명과 편집 가사 구간이 함께 유지되는지 확인
+
+4. `MV_테스트_실행_가이드.md`
+   - 보호 범위에 편집된 씬별 메타데이터의 프롬프트 재생성 우선 반영 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (67 checks)
+```
+
 ## 2026-05-06: 씬별 장소/감정/조명 메타데이터 편집 UI 추가
 
 ### 작업 목적
