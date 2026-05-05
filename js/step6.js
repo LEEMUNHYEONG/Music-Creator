@@ -215,6 +215,22 @@ window.renderMVSceneTimelinePreview = function (scenesArg) {
   `;
 };
 
+window.refreshMVSceneTimelinePreview = function () {
+  const timelineEl =
+    typeof document.querySelector === "function"
+      ? document.querySelector(".mv-scene-timeline-preview")
+      : null;
+  if (
+    !timelineEl ||
+    typeof window.renderMVSceneTimelinePreview !== "function" ||
+    !Array.isArray(window.currentScenes)
+  ) {
+    return false;
+  }
+  timelineEl.outerHTML = window.renderMVSceneTimelinePreview(window.currentScenes);
+  return true;
+};
+
 window.focusMVSceneCard = function (sceneIndex) {
   const selectors = [
     `.mv-scene-overview-card[data-scene-index="${sceneIndex}"]`,
@@ -358,6 +374,19 @@ window.updateMVSceneTimelineFromEditor = function (scene, index) {
   updateMVSceneEditorNotice(index, notices);
 
   return scene;
+};
+
+window.updateMVSceneEditorPreview = function (sceneIndex) {
+  if (!window.currentScenes || !window.currentScenes[sceneIndex]) return;
+  if (typeof window.updateMVSceneTimelineFromEditor === "function") {
+    window.updateMVSceneTimelineFromEditor(
+      window.currentScenes[sceneIndex],
+      sceneIndex,
+    );
+  }
+  if (typeof window.refreshMVSceneTimelinePreview === "function") {
+    window.refreshMVSceneTimelinePreview();
+  }
 };
 
 function getMVSceneRegenerationContext(scene, fallback = {}) {
@@ -639,6 +668,31 @@ window.renderSceneOverview = function (scenesArg) {
   container.innerHTML = html;
 
   // 번역 미비 사항 보완 로직은 필요에 따라 별도 호출
+  if (typeof container.querySelectorAll === "function") {
+    const previewFields = container.querySelectorAll(
+      [
+        ".scene-time-start",
+        ".scene-time-end",
+        ".scene-lyrics",
+        ".scene-location",
+        ".scene-emotion",
+        ".scene-mood",
+        ".scene-lighting",
+        ".scene-camera-work",
+      ].join(","),
+    );
+    previewFields.forEach((field) => {
+      const syncTimelinePreview = (event) => {
+        const index = Number(event.target?.dataset?.index);
+        if (!Number.isInteger(index)) return;
+        if (typeof window.updateMVSceneEditorPreview === "function") {
+          window.updateMVSceneEditorPreview(index);
+        }
+      };
+      field.addEventListener("input", syncTimelinePreview);
+      field.addEventListener("change", syncTimelinePreview);
+    });
+  }
   
   // 영어 프롬프트 직접 수정 시 자동 번역 이벤트 추가 (Debounce 적용)
   const enTextareas = container.querySelectorAll('.scene-overview-en');

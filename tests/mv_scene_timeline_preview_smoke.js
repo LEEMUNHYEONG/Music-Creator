@@ -47,6 +47,27 @@ assert.ok(html.includes("lonely · rainy alley"));
 assert.ok(html.includes("window.focusMVSceneCard(1)"));
 assert.strictEqual(window.renderMVSceneTimelinePreview([]), "");
 
+let refreshedHtml = "";
+window.currentScenes = [
+  {
+    time: "0:20-0:28",
+    scene: "새벽 옥상에서 다시 노래한다",
+    emotion: "hopeful",
+    location: "sunrise rooftop",
+  },
+];
+elements.set(".mv-scene-timeline-preview", {
+  set outerHTML(value) {
+    refreshedHtml = value;
+  },
+});
+assert.strictEqual(window.refreshMVSceneTimelinePreview(), true);
+assert.ok(refreshedHtml.includes("0:20-0:28"));
+assert.ok(refreshedHtml.includes("hopeful · sunrise rooftop"));
+
+elements.delete(".mv-scene-timeline-preview");
+assert.strictEqual(window.refreshMVSceneTimelinePreview(), false);
+
 let scrolled = 0;
 elements.set('.mv-scene-overview-card[data-scene-index="1"]', {
   scrollIntoView(options) {
