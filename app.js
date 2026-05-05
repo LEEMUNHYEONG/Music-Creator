@@ -94,6 +94,7 @@ window.goToStep = function (step, saveBefore = false, skipValidation = false) {
 
       if (improvementCard && improvementLoading) {
         improvementLoading.style.display = "none";
+        improvementCard.classList.remove("hidden");
         improvementCard.style.display = "block";
       }
 
@@ -269,6 +270,7 @@ window.goToStep = function (step, saveBefore = false, skipValidation = false) {
 
           marketingLoading.style.display = "none";
           marketingResult.style.display = "block";
+          marketingResult.classList.remove("hidden");
           console.log("✅ 저장된 마케팅 자료 표시 완료");
         } else {
           // 저장된 자료가 없으면 자동 생성
@@ -322,12 +324,19 @@ window.goToStep = function (step, saveBefore = false, skipValidation = false) {
         if (analysisError) analysisError.style.display = "none";
         if (analysisResult) {
           analysisResult.style.display = "block";
+          analysisResult.classList.remove("hidden");
           console.log("✅ 3단계 분석 결과 영역 표시 완료");
         }
       } else {
-        if (analysisLoading) analysisLoading.style.display = "block";
+        // 데이터가 없어도 로딩을 보여주지 않고 결과 영역(분석 시작 UI)을 보여줌
+        // 사용자가 가사가 없는 상태임을 인지하고 2단계로 돌아가거나 할 수 있게 함
+        if (analysisLoading) analysisLoading.style.display = "none";
         if (analysisError) analysisError.style.display = "none";
-        if (analysisResult) analysisResult.style.display = "none";
+        if (analysisResult) {
+          analysisResult.style.display = "block";
+          analysisResult.classList.remove("hidden");
+          console.log("✅ 3단계 데이터 대기 중");
+        }
       }
     }
 
@@ -452,13 +461,17 @@ window.setReadOnlyMode = function (readonly) {
 // ═══════════════════════════════════════════════════════════════
 window.restoreStepData = function (step) {
   try {
+    window.isRestoringStepData = true;
+    
     // 수정 모드일 때는 복원하지 않음 (사용자가 수정 중인 데이터를 보존)
-    if (window.editMode) {
+    if (window.editMode && !window.isInitialLoading) {
       console.log(`⏭️ 수정 모드 활성화 중 - ${step}단계 데이터 복원 건너뜀`);
+      window.isRestoringStepData = false;
       return;
     }
 
     if (!window.currentProject || !window.currentProject.data) {
+      window.isRestoringStepData = false;
       return;
     }
 
@@ -480,11 +493,7 @@ window.restoreStepData = function (step) {
           const styleEl = document.getElementById("manualStylePrompt");
           if (styleEl) styleEl.value = projectData.manualStylePrompt;
         }
-        if (
-          projectData.step1Tags &&
-          typeof projectData.step1Tags === "object" &&
-          typeof window.setTagSelections === "function"
-        ) {
+        if (projectData.step1Tags && typeof projectData.step1Tags === "object" && typeof window.setTagSelections === "function") {
           const step1Map = {
             genre: "genreTags",
             mood: "moodTags",
@@ -496,14 +505,8 @@ window.restoreStepData = function (step) {
             region: "regionTags",
           };
           Object.keys(step1Map).forEach((key) => {
-            if (
-              projectData.step1Tags[key] &&
-              Array.isArray(projectData.step1Tags[key])
-            ) {
-              window.setTagSelections(
-                step1Map[key],
-                projectData.step1Tags[key],
-              );
+            if (projectData.step1Tags[key] && Array.isArray(projectData.step1Tags[key])) {
+              window.setTagSelections(step1Map[key], projectData.step1Tags[key]);
             }
           });
         }
@@ -521,9 +524,7 @@ window.restoreStepData = function (step) {
           if (sunoEl) {
             sunoEl.value = projectData.sunoLyrics;
             if (typeof window.autoResizeTextarea === "function") {
-              requestAnimationFrame(function () {
-                window.autoResizeTextarea(sunoEl);
-              });
+              requestAnimationFrame(() => window.autoResizeTextarea(sunoEl));
             }
           }
         }
@@ -531,11 +532,7 @@ window.restoreStepData = function (step) {
           const stylePromptEl = document.getElementById("stylePrompt");
           if (stylePromptEl) stylePromptEl.value = projectData.stylePrompt;
         }
-        if (
-          projectData.step2Tags &&
-          typeof projectData.step2Tags === "object" &&
-          typeof window.setTagSelections === "function"
-        ) {
+        if (projectData.step2Tags && typeof projectData.step2Tags === "object" && typeof window.setTagSelections === "function") {
           const step2Map = {
             audioFormat: "audioFormatTags",
             venue: "sunoVenueTags",
@@ -543,14 +540,8 @@ window.restoreStepData = function (step) {
             instruments: "instrumentTags",
           };
           Object.keys(step2Map).forEach((key) => {
-            if (
-              projectData.step2Tags[key] &&
-              Array.isArray(projectData.step2Tags[key])
-            ) {
-              window.setTagSelections(
-                step2Map[key],
-                projectData.step2Tags[key],
-              );
+            if (projectData.step2Tags[key] && Array.isArray(projectData.step2Tags[key])) {
+              window.setTagSelections(step2Map[key], projectData.step2Tags[key]);
             }
           });
         }
@@ -560,10 +551,7 @@ window.restoreStepData = function (step) {
           if (tempoSlider) tempoSlider.value = projectData.tempo;
           if (tempoValue) tempoValue.textContent = projectData.tempo;
         }
-        if (
-          projectData.vocalPartAssignments &&
-          typeof projectData.vocalPartAssignments === "object"
-        ) {
+        if (projectData.vocalPartAssignments && typeof projectData.vocalPartAssignments === "object") {
           window.vocalPartAssignments = projectData.vocalPartAssignments;
           if (typeof window.renderVocalPartAssignments === "function") {
             window.renderVocalPartAssignments();
@@ -573,121 +561,54 @@ window.restoreStepData = function (step) {
 
       case 3:
         // 3단계: AI 분석
-        // 분석 대상 데이터 복원
         if (projectData.sunoLyrics) {
-          const analysisTargetLyrics = document.getElementById(
-            "analysisTargetLyrics",
-          );
-          if (analysisTargetLyrics) {
-            analysisTargetLyrics.textContent = projectData.sunoLyrics;
-          }
+          const targetLyrics = document.getElementById("analysisTargetLyrics");
+          if (targetLyrics) targetLyrics.textContent = projectData.sunoLyrics;
         }
         if (projectData.stylePrompt) {
-          const analysisTargetStyle = document.getElementById(
-            "analysisTargetStyle",
-          );
-          if (analysisTargetStyle) {
-            analysisTargetStyle.textContent = projectData.stylePrompt;
-          }
+          const targetStyle = document.getElementById("analysisTargetStyle");
+          if (targetStyle) targetStyle.textContent = projectData.stylePrompt;
         }
-        // 분석 결과 표시 (scores/feedbacks/improvements/raw 중 하나라도 있으면 로딩 숨김)
+        
         const analysisData = projectData.analysis || {};
-        const hasAnalysisData =
-          analysisData.scores ||
-          analysisData.feedbacks ||
-          analysisData.improvements ||
-          analysisData.raw;
-        if (hasAnalysisData) {
+        if (analysisData.scores || analysisData.feedbacks || analysisData.raw) {
           const analysisResult = document.getElementById("analysisResult");
           const analysisLoading = document.getElementById("analysisLoading");
-          const analysisError = document.getElementById("analysisError");
-
           if (analysisResult && analysisLoading) {
             analysisLoading.style.display = "none";
-            if (analysisError) analysisError.style.display = "none";
             analysisResult.style.display = "block";
 
-            // 점수 표시
             if (analysisData.scores) {
-              const overallScore =
-                analysisData.scores.overall ||
-                analysisData.scores.overallScore ||
-                0;
-              const lyricsScore = analysisData.scores.lyrics || 0;
-              const styleScore = analysisData.scores.style || 0;
-              const structureScore = analysisData.scores.structure || 0;
-
-              const overallScoreEl = document.getElementById("overallScore");
-              const lyricsScoreEl = document.getElementById("lyricsScore");
-              const styleScoreEl = document.getElementById("styleScore");
-              const structureScoreEl =
-                document.getElementById("structureScore");
-
-              if (overallScoreEl) overallScoreEl.textContent = overallScore;
-              if (lyricsScoreEl) lyricsScoreEl.textContent = lyricsScore;
-              if (styleScoreEl) styleScoreEl.textContent = styleScore;
-              if (structureScoreEl)
-                structureScoreEl.textContent = structureScore;
+              const s = analysisData.scores;
+              const setScore = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = val || 0;
+              };
+              setScore("overallScore", s.overall || s.overallScore);
+              setScore("lyricsScore", s.lyrics);
+              setScore("styleScore", s.style);
+              setScore("structureScore", s.structure);
             }
 
-            // 피드백 표시
             const feedbacks = analysisData.feedbacks || [];
-            if (feedbacks.length > 0) {
-              const geminiAnalysisCard =
-                document.getElementById("geminiAnalysisCard");
-              const geminiAnalysisResult = document.getElementById(
-                "geminiAnalysisResult",
-              );
-              if (geminiAnalysisCard && geminiAnalysisResult) {
-                geminiAnalysisCard.style.display = "block";
-
-                let feedbackHtml = "";
-                feedbacks.forEach((feedback, index) => {
-                  const feedbackText =
-                    typeof feedback === "string"
-                      ? feedback
-                      : feedback.suggestion ||
-                        feedback.desc ||
-                        feedback.text ||
-                        JSON.stringify(feedback);
-                  feedbackHtml += `
-                                        <div style="margin-bottom: 15px; padding: 15px; background: var(--bg-input); border-radius: 8px; border-left: 4px solid var(--accent);">
-                                            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                                                <span style="font-size: 1.5rem;">${feedback.icon || "💡"}</span>
-                                                <h4 style="margin: 0; color: var(--text-primary);">${feedback.title || feedback.category || "피드백"}</h4>
-                                            </div>
-                                            <p style="margin: 0; color: var(--text-secondary); line-height: 1.6; font-size: 0.9rem;">${escapeHtml(feedbackText)}</p>
-                                        </div>
-                                    `;
+            const geminiResult = document.getElementById("geminiAnalysisResult");
+            const geminiCard = document.getElementById("geminiAnalysisCard");
+            if (geminiResult && geminiCard && (feedbacks.length > 0 || analysisData.raw)) {
+              geminiCard.style.display = "block";
+              if (feedbacks.length > 0) {
+                let html = "";
+                feedbacks.forEach(f => {
+                  html += `<div style="margin-bottom:15px;padding:15px;background:var(--bg-input);border-radius:8px;border-left:4px solid var(--accent);">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                      <span>${f.icon || "💡"}</span>
+                      <h4 style="margin:0;color:var(--text-primary);font-size:1rem;">${f.title || f.category || "피드백"}</h4>
+                    </div>
+                    <p style="margin:0;color:var(--text-secondary);line-height:1.6;font-size:0.9rem;">${escapeHtml(f.suggestion || f.desc || f.text || "")}</p>
+                  </div>`;
                 });
-                geminiAnalysisResult.innerHTML = feedbackHtml;
-              }
-            }
-
-            // 요약 표시
-            if (analysisData.summary) {
-              const summaryEl = document.getElementById("analysisSummary");
-              if (summaryEl) {
-                summaryEl.textContent = analysisData.summary;
-              }
-            }
-            // raw만 있는 경우 결과 영역에 표시
-            if (
-              analysisData.raw &&
-              !analysisData.scores &&
-              (!analysisData.feedbacks || analysisData.feedbacks.length === 0)
-            ) {
-              const geminiAnalysisCard =
-                document.getElementById("geminiAnalysisCard");
-              const geminiAnalysisResult = document.getElementById(
-                "geminiAnalysisResult",
-              );
-              if (geminiAnalysisCard && geminiAnalysisResult) {
-                geminiAnalysisCard.style.display = "block";
-                geminiAnalysisResult.innerHTML =
-                  '<div style="white-space: pre-wrap; color: var(--text-secondary); line-height: 1.8;">' +
-                  escapeHtml(analysisData.raw) +
-                  "</div>";
+                geminiResult.innerHTML = html;
+              } else if (analysisData.raw) {
+                geminiResult.innerHTML = `<div style="white-space:pre-wrap;color:var(--text-secondary);line-height:1.8;">${escapeHtml(analysisData.raw)}</div>`;
               }
             }
           }
@@ -695,326 +616,269 @@ window.restoreStepData = function (step) {
         break;
 
       case 4:
-        // 4단계: 최종 확정 (저장 시 finalizedLyrics/finalizedStyle 사용, 호환으로 finalLyrics/finalStyle도 지원)
-        const lyrics4 =
-          projectData.finalizedLyrics || projectData.finalLyrics || "";
-        if (lyrics4) {
-          const finalizedLyricsEl = document.getElementById("finalizedLyrics");
-          if (finalizedLyricsEl) finalizedLyricsEl.value = lyrics4;
+        // 4단계: 최종 확정
+        const fl4 = projectData.finalizedLyrics || projectData.finalLyrics || "";
+        const fs4 = projectData.finalizedStyle || projectData.finalStyle || "";
+        if (fl4) {
+          const el = document.getElementById("finalizedLyrics");
+          if (el) el.value = fl4;
         }
-        const style4 =
-          projectData.finalizedStyle || projectData.finalStyle || "";
-        if (style4) {
-          const finalizedStyleEl = document.getElementById("finalizedStyle");
-          if (finalizedStyleEl) finalizedStyleEl.value = style4;
+        if (fs4) {
+          const el = document.getElementById("finalizedStyle");
+          if (el) el.value = fs4;
         }
         break;
 
       case 5:
-        // 5단계: 최종 출력 (finalLyrics/finalStyle 우선, 없으면 finalizedLyrics/finalizedStyle 사용)
-        const finalLyrics5 =
-          projectData.finalLyrics || projectData.finalizedLyrics || "";
-        const finalStyle5 =
-          projectData.finalStyle || projectData.finalizedStyle || "";
-        if (finalLyrics5) {
-          const finalLyricsEl = document.getElementById("finalLyrics");
-          if (finalLyricsEl) finalLyricsEl.textContent = finalLyrics5;
-          const intermediateLyricsPreview = document.getElementById(
-            "intermediateLyricsPreview",
-          );
-          if (intermediateLyricsPreview)
-            intermediateLyricsPreview.textContent = finalLyrics5;
-        }
-        if (finalStyle5) {
-          const finalStyleEl = document.getElementById("finalStyle");
-          if (finalStyleEl) finalStyleEl.textContent = finalStyle5;
-          const intermediateStylePreview = document.getElementById(
-            "intermediateStylePreview",
-          );
-          if (intermediateStylePreview)
-            intermediateStylePreview.textContent = finalStyle5;
-        }
-        const title5 = window.currentProject?.title || projectData.title || "";
+        // 5단계: 최종 출력 & 평가
+        const evalData = projectData.evaluation || {};
+        const title5 = evalData.finalTitle || projectData.finalTitle || projectData.title || "";
+        const lyrics5 = evalData.finalLyrics || projectData.finalLyrics || projectData.finalizedLyrics || "";
+        const style5 = evalData.finalStyle || projectData.finalStyle || projectData.finalizedStyle || "";
+
         if (title5) {
-          const finalTitleTextEl = document.getElementById("finalTitleText");
-          if (finalTitleTextEl) finalTitleTextEl.textContent = title5;
+          const el = document.getElementById("finalTitleText");
+          if (el) el.textContent = title5;
         }
-        if (
-          projectData.beforeScore !== undefined ||
-          projectData.afterScore !== undefined
-        ) {
-          const before =
-            projectData.beforeScore !== undefined ? projectData.beforeScore : 0;
-          const after =
-            projectData.afterScore !== undefined
-              ? projectData.afterScore
-              : before;
-          if (typeof window.updateFinalEvaluationUI === "function") {
-            window.updateFinalEvaluationUI(
-              before,
-              after,
-              projectData.aiComment != null ? projectData.aiComment : undefined,
-            );
-          } else {
-            const beforeScoreEl = document.getElementById("beforeScore");
-            const afterScoreEl = document.getElementById("afterScore");
-            const aiCommentEl = document.getElementById("aiComment");
-            if (beforeScoreEl) beforeScoreEl.textContent = before;
-            if (afterScoreEl) afterScoreEl.textContent = after;
-            if (projectData.aiComment != null && aiCommentEl)
-              aiCommentEl.textContent = projectData.aiComment;
-          }
-        } else if (projectData.aiComment) {
-          const aiCommentEl = document.getElementById("aiComment");
-          if (aiCommentEl) aiCommentEl.textContent = projectData.aiComment;
+        if (lyrics5) {
+          const el = document.getElementById("finalLyrics");
+          if (el) el.innerHTML = lyrics5;
+        }
+        if (style5) {
+          const el = document.getElementById("finalStyle");
+          if (el) el.innerHTML = style5;
+        }
+
+        const bScore = evalData.beforeScore || projectData.beforeScore || "0";
+        const aScore = evalData.afterScore || projectData.afterScore || "0";
+        const comment = evalData.aiComment || projectData.aiComment || "";
+        const grade = evalData.finalGrade || projectData.finalGrade || "-";
+
+        if (typeof window.updateFinalEvaluationUI === "function") {
+          window.updateFinalEvaluationUI(bScore, aScore, comment);
+          const gEl = document.getElementById("finalGrade");
+          if (gEl && grade !== "-") gEl.textContent = grade;
+        } else {
+          const bEl = document.getElementById("beforeScore");
+          const aEl = document.getElementById("afterScore");
+          const cEl = document.getElementById("aiComment");
+          const gEl = document.getElementById("finalGrade");
+          if (bEl) bEl.textContent = bScore;
+          if (aEl) aEl.textContent = aScore;
+          if (cEl) cEl.textContent = comment;
+          if (gEl) gEl.textContent = grade;
         }
         break;
 
       case 6:
-        // 6단계: 마케팅 자료 (유튜브/틱톡/해시태그/썸네일 + MV 설정/썸네일·배경·인물 프롬프트/씬 개요)
+        // 6단계: 마케팅 & MV
         if (projectData.marketing) {
-          const marketing = projectData.marketing;
+          window.isRestoringStepData = true; // 복원 중 자동 저장 방지
+          
+          const m = projectData.marketing;
+          const mResult = document.getElementById("marketingResult");
+          if (mResult) {
+            mResult.classList.remove("hidden");
+            mResult.style.display = "block";
+          }
 
-          if (marketing.youtubeDesc) {
-            const youtubeDescEl = document.getElementById("youtubeDesc");
-            if (youtubeDescEl)
-              youtubeDescEl.textContent = marketing.youtubeDesc;
+          if (m.youtubeDesc) {
+            const el = document.getElementById("youtubeDesc");
+            if (el) el.textContent = m.youtubeDesc;
           }
-          if (marketing.tiktokDesc) {
-            const tiktokDescEl = document.getElementById("tiktokDesc");
-            if (tiktokDescEl) tiktokDescEl.textContent = marketing.tiktokDesc;
+          if (m.tiktokDesc) {
+            const el = document.getElementById("tiktokDesc");
+            if (el) el.textContent = m.tiktokDesc;
           }
-          if (marketing.hashtags) {
-            const hashtagsEl = document.getElementById("hashtagsContent");
-            if (hashtagsEl) hashtagsEl.textContent = marketing.hashtags;
+          if (m.hashtags) {
+            const el = document.getElementById("hashtagsContent");
+            if (el) el.textContent = m.hashtags;
           }
-          if (
-            marketing.thumbnails &&
-            Array.isArray(marketing.thumbnails) &&
-            marketing.thumbnails.length > 0
-          ) {
-            const thumbnailsGridEl = document.getElementById("thumbnailsGrid");
-            if (thumbnailsGridEl) {
-              let thumbnailsHtml = "";
-              marketing.thumbnails.forEach((thumb) => {
-                const thumbnailText =
-                  typeof thumb === "string"
-                    ? thumb
-                    : thumb.text || thumb.content || String(thumb);
-                thumbnailsHtml += `
-                                    <div class="thumbnail-item" style="padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s;" 
-                                         onclick="if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, '${escapeHtml(thumbnailText).replace(/'/g, "\\'")}', event); }">
-                                        <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">${escapeHtml(thumbnailText)}</div>
-                                        <button class="btn btn-small btn-success" onclick="event.stopPropagation(); if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, '${escapeHtml(thumbnailText).replace(/'/g, "\\'")}', event); }">
-                                            <i class="fas fa-copy"></i> 복사
-                                        </button>
-                                    </div>
-                                `;
+
+          // 썸네일 복구
+          const tGrid = document.getElementById("thumbnailsGrid");
+          if (tGrid) {
+            const thumbs = m.thumbnailsData || m.thumbnails || [];
+            if (thumbs.length > 0) {
+              let html = "";
+              thumbs.forEach(t => {
+                const img = typeof t === 'object' ? t.img : "";
+                const text = typeof t === 'object' ? t.text : t;
+                html += `<div class="thumbnail-card" style="background:var(--bg-card);border-radius:12px;border:1px solid var(--border);overflow:hidden;">
+                  ${img ? `<img src="${img}" style="width:100%;height:160px;object-fit:cover;">` : `<div style="width:100%;height:160px;background:var(--bg-input);display:flex;align-items:center;justify-content:center;"><i class="fas fa-image" style="font-size:2rem;color:var(--text-secondary);"></i></div>`}
+                  <div style="padding:12px;">
+                    <div style="font-weight:600;margin-bottom:8px;font-size:0.9rem;color:var(--text-primary);cursor:pointer;" onclick="copyToClipboard(null, '${text.replace(/'/g, "\\'")}', event)">${text}</div>
+                    <button class="btn btn-small btn-success" style="width:100%;" onclick="copyToClipboard(null, '${text.replace(/'/g, "\\'")}', event)">복사</button>
+                  </div>
+                </div>`;
               });
-              thumbnailsGridEl.innerHTML = thumbnailsHtml;
+              tGrid.innerHTML = html;
             }
           }
 
-          // MV 설정 복원 (시대, 국가, 장소 유형, 인물 수, 조명, 카메라, 분위기, 인물 정보)
-          if (marketing.mvSettings) {
-            const mvSettings = marketing.mvSettings;
-            const setVal = (id, val) => {
-              const el = document.getElementById(id);
-              if (el && val !== undefined && val !== "") el.value = val;
-            };
-            setVal("mvEra", mvSettings.era);
-            setVal("mvCountry", mvSettings.country);
-            setVal("mvCharacterCount", mvSettings.characterCount || "1");
-            setVal("mvCustomSettings", mvSettings.customSettings);
-            setVal("mvLighting", mvSettings.lighting);
-            setVal("mvCameraWork", mvSettings.cameraWork);
-            setVal("mvMood", mvSettings.mood);
-            const locationTagsContainer =
-              document.getElementById("mvLocationTags");
-            if (locationTagsContainer && Array.isArray(mvSettings.location)) {
-              locationTagsContainer
-                .querySelectorAll(".tag-btn")
-                .forEach((btn) => {
-                  const v = btn.getAttribute("data-value");
-                  btn.classList.toggle(
-                    "active",
-                    mvSettings.location.indexOf(v) !== -1,
-                  );
-                });
-            }
-            if (typeof window.updateCharacterInputs === "function")
-              window.updateCharacterInputs();
-            if (mvSettings.characters && Array.isArray(mvSettings.characters)) {
-              mvSettings.characters.forEach((char, idx) => {
+          // MV 설정 복구
+          const mvData =
+            typeof window.getMarketingMVData === "function"
+              ? window.getMarketingMVData(m)
+              : {
+                  settings: m.mvSettings || {},
+                  prompts: m.mvPrompts || {},
+                  scenes: m.mvScenes || [],
+                };
+          const s = mvData.settings || {};
+          const setV = (id, val) => {
+            const el = document.getElementById(id);
+            if (el && val !== undefined && val !== null) el.value = val;
+          };
+          
+          // 시간 및 재생 간격
+          setV("mvMinutes", s.minutes);
+          setV("mvSeconds", s.seconds);
+          setV("mvInterval", s.interval);
+
+          // 기본 설정
+          setV("mvEra", s.era);
+          setV("mvCountry", s.country);
+          setV("mvCharacterCount", s.characterCount || "1");
+          setV("mvLighting", s.lighting);
+          setV("mvCameraWork", s.cameraWork);
+          setV("mvMood", s.mood);
+          setV("mvLocationCustom", s.locationCustom || s.location || "");
+          setV("mvActionCustom", s.actionCustom || "");
+          setV("mvCustomSettings", s.customSettings || "");
+
+          // 태그 복구 (active 클래스 추가)
+          const locationTags = Array.isArray(s.locationTags)
+            ? s.locationTags
+            : Array.isArray(s.location)
+              ? s.location
+              : [];
+          if (locationTags.length > 0) {
+            document.querySelectorAll('#mvLocationTags .tag-btn').forEach(btn => {
+              btn.classList.toggle('active', locationTags.includes(btn.dataset.value));
+            });
+          }
+          if (s.actionTags && Array.isArray(s.actionTags)) {
+            document.querySelectorAll('#mvActionTags .tag-btn').forEach(btn => {
+              btn.classList.toggle('active', s.actionTags.includes(btn.dataset.value));
+            });
+          }
+
+          // 인물(캐릭터) 정보 복구
+          if (typeof window.updateCharacterInputs === "function") {
+            window.updateCharacterInputs(); // 먼저 입력 필드들을 생성
+            if (s.characters && Array.isArray(s.characters)) {
+              s.characters.forEach((c, idx) => {
                 const i = idx + 1;
-                setVal("mvCharacter" + i + "_gender", char.gender);
-                setVal("mvCharacter" + i + "_age", char.age);
-                setVal("mvCharacter" + i + "_race", char.race);
-                setVal("mvCharacter" + i + "_appearance", char.appearance);
+                setV(`mvCharacter${i}_gender`, c.gender);
+                setV(`mvCharacter${i}_age`, c.age);
+                setV(`mvCharacter${i}_race`, c.race);
+                setV(`mvCharacter${i}_appearance`, c.appearance);
+                setV(`mvCharacter${i}_artStyle`, c.artStyle || "photorealistic");
+                
+                // 캐릭터 시트 복구
+                const sheetEl = document.getElementById(`mvCharacter${i}_sheet`);
+                if (sheetEl && c.characterSheet) {
+                  sheetEl.value = c.characterSheet;
+                  // 시트 영역 표시
+                  const sheetArea = document.getElementById(`mvCharacter${i}_sheetArea`);
+                  if (sheetArea) sheetArea.style.display = "block";
+                  const sheetToggle = document.getElementById(`mvCharacter${i}_sheetToggle`);
+                  if (sheetToggle) sheetToggle.style.display = "inline-flex";
+                  const sheetCopy = document.getElementById(`mvCharacter${i}_sheetCopy`);
+                  if (sheetCopy) sheetCopy.style.display = "inline-flex";
+                }
               });
             }
-            if (typeof window.saveMVSettings === "function")
-              window.saveMVSettings();
           }
 
-          // 썸네일/배경/인물 프롬프트 복원
-          if (marketing.mvPrompts) {
-            const mp = marketing.mvPrompts;
-            const setPrompt = (id, val) => {
-              const el = document.getElementById(id);
-              if (el && val) el.value = val;
-            };
-            setPrompt("mvThumbnailPromptEn", mp.thumbnailEn);
-            setPrompt("mvThumbnailPromptKo", mp.thumbnailKo);
-            setPrompt("mvBackgroundDetailPromptEn", mp.backgroundDetailEn);
-            setPrompt("mvBackgroundDetailPromptKo", mp.backgroundDetailKo);
-            setPrompt("mvCharacterDetailPromptEn", mp.characterDetailEn);
-            setPrompt("mvCharacterDetailPromptKo", mp.characterDetailKo);
+          // 상세 프롬프트 복구 (Results 섹션 및 Editor 섹션 동시 복구 - 하이브리드 구조 지원)
+          const p = mvData.prompts || {};
+          
+          // 데이터 추출 헬퍼 (평면형과 계층형 모두 지원)
+          const getP = (obj, nestedKey, flatKey) => {
+            if (obj[nestedKey]) return obj[nestedKey].en || obj[nestedKey].ko || obj[nestedKey][flatKey] || "";
+            return obj[flatKey] || "";
+          };
+          const getPKo = (obj, nestedKey, flatKeyKo) => {
+            if (obj[nestedKey]) return obj[nestedKey].ko || obj[nestedKey][flatKeyKo] || "";
+            return obj[flatKeyKo] || "";
+          };
+
+          // 썸네일
+          const tEn = getP(p, 'thumbnail', 'thumbnailEn');
+          const tKo = getPKo(p, 'thumbnail', 'thumbnailKo');
+          setV("mvThumbnailPromptEn", tEn);
+          setV("mvThumbnailPromptKo", tKo);
+          if (document.getElementById("review_thumbnail_en")) setV("review_thumbnail_en", tEn);
+          if (document.getElementById("review_thumbnail_ko")) setV("review_thumbnail_ko", tKo);
+          
+          // 배경
+          const bEn = getP(p, 'background', 'backgroundDetailEn');
+          const bKo = getPKo(p, 'background', 'backgroundDetailKo');
+          setV("mvBackgroundDetailPromptEn", bEn);
+          setV("mvBackgroundDetailPromptKo", bKo);
+          if (document.getElementById("review_background_en")) setV("review_background_en", bEn);
+          if (document.getElementById("review_background_ko")) setV("review_background_ko", bKo);
+          
+          // 인물
+          const cEn = getP(p, 'character', 'characterDetailEn');
+          const cKo = getPKo(p, 'character', 'characterDetailKo');
+          setV("mvCharacterDetailPromptEn", cEn);
+          setV("mvCharacterDetailPromptKo", cKo);
+          if (document.getElementById("review_character_en")) setV("review_character_en", cEn);
+          if (document.getElementById("review_character_ko")) setV("review_character_ko", cKo);
+
+          // 동적 렌더링 호출
+          if (typeof window.renderMvPrompts === 'function') {
+            window.renderMvPrompts();
           }
 
-          // MV 씬 데이터 복원 및 씬 개요/결과 UI 렌더링 (중복 방지)
-          if (
-            marketing.mvScenes &&
-            Array.isArray(marketing.mvScenes) &&
-            marketing.mvScenes.length > 0
-          ) {
-            const mvSceneOverviewContainer = document.getElementById(
-              "mvSceneOverviewContainer",
-            );
-            const mvPromptsContainer =
-              document.getElementById("mvPromptsContainer");
-            const mvSceneOverviewSection = document.getElementById(
-              "mvSceneOverviewSection",
-            );
-            const mvResultsSection =
-              document.getElementById("mvResultsSection");
-
-            // 이미 렌더링되어 있으면 중복 렌더링 방지 (loadProject에서 이미 렌더링된 경우)
-            const alreadyRendered =
-              (mvSceneOverviewContainer &&
-                mvSceneOverviewContainer.innerHTML.trim()) ||
-              (window.currentScenes &&
-                window.currentScenes.length > 0 &&
-                mvPromptsContainer &&
-                mvPromptsContainer.children.length >=
-                  window.currentScenes.length);
-            if (alreadyRendered) {
-              if (mvSceneOverviewSection)
-                mvSceneOverviewSection.style.display = "block";
-              if (mvResultsSection) mvResultsSection.style.display = "block";
-              const totalImagesEl = document.getElementById("mvTotalImages");
-              if (
-                totalImagesEl &&
-                window.currentScenes &&
-                window.currentScenes.length > 0
-              )
-                totalImagesEl.textContent = window.currentScenes.length;
-            } else {
-              window.currentScenes = JSON.parse(
-                JSON.stringify(marketing.mvScenes),
-              );
-              if (mvSceneOverviewContainer) {
-                let html = `
-                                <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);">
-                                    <h3 style="margin: 0 0 10px 0; color: var(--text-primary); font-size: 1.1rem;">
-                                        <i class="fas fa-film"></i> 씬별 개요
-                                    </h3>
-                                    <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem;">각 씬의 배경, 인물, 장소 등을 확인하고 수정할 수 있습니다.</p>
-                                </div>
-                            `;
-                window.currentScenes.forEach((scene, index) => {
-                  const existingPrompt = (scene.prompt || "")
-                    .replace(/[가-힣]+/g, "")
-                    .trim();
-                  const existingPromptKo = scene.promptKo || "";
-                  html += `
-                                    <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);" data-scene-index="${index}">
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                                            <div style="display: flex; align-items: center; gap: 10px;">
-                                                <h4 style="margin: 0; color: var(--text-primary);">씬 ${index + 1}</h4>
-                                                <span style="color: var(--accent); font-weight: 600;">${scene.time || ""}</span>
-                                            </div>
-                                            <div style="display: flex; gap: 8px;">
-                                                <button class="btn btn-small btn-primary" onclick="regenerateSceneOverviewPrompt(${index})" style="padding: 6px 12px; font-size: 0.8rem;"><i class="fas fa-sync-alt"></i> 재생성</button>
-                                                <button class="btn btn-small btn-secondary" onclick="editSceneOverview(${index})" style="padding: 6px 12px; font-size: 0.8rem;"><i class="fas fa-edit"></i> 수정</button>
-                                                <button id="copySceneOverviewBtn_${index}" class="btn btn-small btn-success" onclick="copySceneOverviewPromptEn(${index}, event)" style="padding: 6px 12px; font-size: 0.8rem;"><i class="fas fa-copy"></i> 복사</button>
-                                            </div>
-                                        </div>
-                                        <div style="margin-bottom: 10px;">
-                                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">장면 설명:</label>
-                                            <textarea class="scene-description" data-index="${index}" data-scene-index="${index}" style="width: 100%; min-height: 80px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; resize: vertical;">${escapeHtml(scene.scene || "")}</textarea>
-                                        </div>
-                                        <div style="margin-bottom: 15px;">
-                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                                                <label style="color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">⛵ Midjourney Prompt (EN):</label>
-                                                <button id="copySceneOverviewEnBtn_${index}" class="btn btn-small btn-success" onclick="copySceneOverviewPromptEn(${index}, event)" title="영어 프롬프트 복사" style="padding: 4px 10px; font-size: 0.7rem;">
-                                                    <i class="fas fa-copy"></i> 복사
-                                                </button>
-                                            </div>
-                                            <textarea id="scene_overview_${index}_en" class="scene-prompt-en-overview" data-index="${index}" data-scene-index="${index}" style="width: 100%; min-height: 120px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; font-family: monospace; resize: vertical;">${escapeHtml(existingPrompt)}</textarea>
-                                        </div>
-                                        <div>
-                                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">⛵ Midjourney (한글):</label>
-                                            <textarea id="scene_overview_${index}_ko" class="scene-prompt-ko-overview" data-index="${index}" data-scene-index="${index}" style="width: 100%; min-height: 120px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; resize: vertical;">${escapeHtml(existingPromptKo)}</textarea>
-                                        </div>
-                                    </div>
-                                `;
-                });
-                if (mvSceneOverviewContainer)
-                  mvSceneOverviewContainer.innerHTML = html;
+          // 결과 섹션 표시 여부 결정 및 중복 방지
+          const resSec = document.getElementById("mvResultsSection");
+          const overviewSec = document.getElementById("mvSceneOverviewSection");
+          const scenes = Array.isArray(mvData.scenes) ? mvData.scenes : [];
+          const hasMvData = !!(p.thumbnail?.en || p.thumbnailEn || scenes.length > 0);
+          
+          if (hasMvData) {
+            // 이미 생성을 완료한 상태면 결과 섹션만 보여줌 (중복 방지)
+            if (resSec) {
+                resSec.classList.remove("hidden");
+                resSec.style.display = "block";
+            }
+            if (overviewSec) {
+                overviewSec.classList.add("hidden");
+                overviewSec.style.display = "none";
+            }
+            // 씬 데이터가 있는 경우 렌더링
+            if (scenes.length > 0) {
+              window.currentScenes = JSON.parse(JSON.stringify(scenes));
+              if (typeof window.renderSceneOverview === "function") {
+                window.renderSceneOverview(window.currentScenes);
               }
-              if (mvSceneOverviewSection)
-                mvSceneOverviewSection.style.display = "block";
-              if (mvResultsSection) mvResultsSection.style.display = "block";
-              if (mvPromptsContainer && window.currentScenes.length > 0) {
-                let resultHtml = "";
-                window.currentScenes.forEach((scene, index) => {
-                  const sceneId = "scene_" + index;
-                  const scenePromptEn = (scene.prompt || "")
-                    .replace(/\/\*\s*Scene\s+\d+\s*\*\/\s*/gi, "")
-                    .trim();
-                  const scenePromptKo = scene.promptKo || "";
-                  resultHtml += `
-                                        <div class="mv-prompt-item" style="margin-bottom: 25px; padding: 20px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border);">
-                                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                                                <h4 style="margin: 0; color: var(--text-primary); font-size: 1.1rem;">씬 ${index + 1}</h4>
-                                                <div style="display: flex; gap: 8px; align-items: center;">
-                                                    <span style="color: var(--accent); font-weight: 600; font-size: 0.9rem;">${scene.time || ""}</span>
-                                                    <button class="btn btn-small btn-primary" onclick="regenerateScenePrompt(${index})" style="padding: 4px 8px; font-size: 0.75rem;">재생성</button>
-                                                    <button class="btn btn-small btn-success" onclick="saveScenePrompt(${index})" style="padding: 4px 8px; font-size: 0.75rem;">저장</button>
-                                                </div>
-                                            </div>
-                                            <div style="margin-bottom: 15px; padding: 12px; background: var(--bg-input); border-radius: 6px;">
-                                                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">장면:</div>
-                                                <div style="color: var(--text-primary);">${escapeHtml(scene.scene || "")}</div>
-                                            </div>
-                                            <div style="margin-bottom: 10px;">
-                                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                                    <label style="font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">영어 프롬프트</label>
-                                                    <button id="copyScenePromptBtn_${index}" class="btn btn-small btn-success" onclick="copyScenePromptEn(${index}, event)" style="padding: 4px 10px; font-size: 0.75rem;"><i class="fas fa-copy"></i> 복사</button>
-                                                </div>
-                                                <textarea id="${sceneId}_en" class="scene-prompt-en" data-scene-index="${index}" style="width: 100%; min-height: 100px; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; font-family: monospace; font-size: 0.9rem; color: var(--text-primary); resize: vertical;">${escapeHtml(scenePromptEn)}</textarea>
-                                            </div>
-                                            <div>
-                                                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">한글 번역본</label>
-                                                <textarea id="${sceneId}_ko" class="scene-prompt-ko" data-scene-index="${index}" style="width: 100%; min-height: 100px; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; color: var(--text-primary); resize: vertical;">${escapeHtml(scenePromptKo)}</textarea>
-                                            </div>
-                                        </div>
-                                    `;
-                });
-                mvPromptsContainer.innerHTML = resultHtml;
-              }
-              const totalImagesEl = document.getElementById("mvTotalImages");
-              if (totalImagesEl)
-                totalImagesEl.textContent = window.currentScenes.length;
+            }
+            // 정보 업데이트
+            if (typeof window.updateMVImageCount === "function") window.updateMVImageCount();
+          } else {
+            // 생성이 완료되지 않았으면 편집 섹션만 활성화
+            if (overviewSec) {
+              overviewSec.classList.remove("hidden");
+              overviewSec.style.display = "block";
+            }
+            if (resSec) {
+              resSec.classList.add("hidden");
+              resSec.style.display = "none";
             }
           }
         }
         break;
     }
-
+    
+    // 데이터 복원 완료 후 플래그 해제
+    window.isRestoringStepData = false;
     console.log(`✅ ${step}단계 데이터 복원 완료`);
   } catch (error) {
+    window.isRestoringStepData = false;
     console.error("단계 데이터 복원 오류:", error);
   }
 };
@@ -1576,7 +1440,7 @@ window.startGeminiAnalysis = async function () {
     }
 
     // Gemini API 키 확인
-    const geminiKey = localStorage.getItem("gemini_api_key") || "";
+    const geminiKey = (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || "";
     if (!geminiKey || !geminiKey.startsWith("AIza")) {
       alert(
         '⚠️ Gemini API 키가 설정되지 않았습니다.\n\n"API 키" 버튼을 클릭하여 Gemini API 키를 설정해주세요.',
@@ -1671,65 +1535,173 @@ ${stylePrompt}
 
 **중요**: JSON 형식만 출력하고, 다른 설명이나 텍스트는 포함하지 마세요.`;
 
-    // Gemini API 호출
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+    let aiResponse = "";
+    try {
+      // Gemini API 호출
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
 
-    const response = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: analysisPrompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 4000,
+      // 60초 타임아웃 설정 (네트워크 지연으로 인한 무한 로딩 방지)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 60000);
+
+      const response = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: analysisPrompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 6000,
+            responseMimeType: "application/json",
+          },
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error?.message || `API 오류: ${response.status}`,
+        );
+      }
+
+      const data = await response.json();
+      aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    } catch (geminiError) {
+      console.warn("⚠️ Gemini 분석 실패, ChatGPT로 전환하여 재시도합니다:", geminiError.message);
+      const openaiKey = window.getOpenAIApiKey ? window.getOpenAIApiKey() : "";
+      if (!openaiKey) {
+        throw new Error(`Gemini 분석 실패 (${geminiError.message}) 후 ChatGPT 폴백을 시도했으나 OpenAI API 키가 없습니다.`);
+      }
+      
+      const chatGPTResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openaiKey}`,
         },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.error?.message || `API 오류: ${response.status}`,
-      );
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: "You are an AI songwriter that strictly responds with valid JSON matching the user's requested format." },
+            { role: "user", content: analysisPrompt },
+          ],
+          temperature: 0.7,
+          response_format: { type: "json_object" },
+        }),
+      });
+      
+      if (!chatGPTResponse.ok) {
+        const errorData = await chatGPTResponse.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `ChatGPT API 오류: ${chatGPTResponse.status}`);
+      }
+      
+      const chatGPTData = await chatGPTResponse.json();
+      aiResponse = chatGPTData.choices?.[0]?.message?.content || "";
     }
-
-    const data = await response.json();
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     if (!aiResponse.trim()) {
       throw new Error("Gemini API에서 응답을 받지 못했습니다.");
     }
 
-    // JSON 파싱 시도
+    // JSON 파싱 시도 (강건한 다단계 파싱)
     let analysisData;
     try {
-      // JSON 코드 블록 제거
+      // 1단계: 마크다운 코드 블록 제거
       let cleanedResponse = aiResponse.trim();
-      if (cleanedResponse.includes("```json")) {
-        cleanedResponse = cleanedResponse
-          .replace(/```json\n?/g, "")
-          .replace(/```\n?/g, "")
-          .trim();
-      } else if (cleanedResponse.includes("```")) {
-        cleanedResponse = cleanedResponse.replace(/```\n?/g, "").trim();
-      }
+      cleanedResponse = cleanedResponse
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
 
-      // JSON 추출
+      // 2단계: JSON 블록 전체 추출
       const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        analysisData = JSON.parse(jsonMatch[0]);
+        // 2-1) 표준 파싱 시도
+        try {
+          analysisData = JSON.parse(jsonMatch[0]);
+        } catch (e1) {
+          // 2-2) 후행 콤마 제거 후 재시도
+          const fixed = jsonMatch[0].replace(/,\s*([}\]])/g, '$1');
+          try {
+            analysisData = JSON.parse(fixed);
+            console.log('✅ 후행 콤마 제거 후 파싱 성공');
+          } catch (e2) {
+            // 2-3) 부분 추출 (feedbacks, improvements, scores 개별 추출)
+            console.warn('⚠️ 전체 JSON 파싱 실패 - 부분 추출 시도:', e2.message);
+            const partialData = {};
+
+            // scores 추출
+            try {
+              const sm = jsonMatch[0].match(/"scores"\s*:\s*(\{[^}]+\})/);
+              if (sm) partialData.scores = JSON.parse(sm[1].replace(/,\s*([}\]])/g, '$1'));
+            } catch (e) {}
+
+            // feedbacks 배열 추출 (각 객체를 개별 파싱)
+            try {
+              const fbBlock = jsonMatch[0].match(/"feedbacks"\s*:\s*\[([\s\S]*?)\]\s*,?\s*"improvements"/);
+              const fbSrc = fbBlock ? fbBlock[1] : jsonMatch[0];
+              const feedbacks = [];
+              const singleFb = /\{([^{}]*)"category"([^{}]*)\}/g;
+              let fm;
+              while ((fm = singleFb.exec(fbSrc)) !== null) {
+                try {
+                  const cleaned = fm[0].replace(/,\s*([}\]])/g, '$1');
+                  feedbacks.push(JSON.parse(cleaned));
+                } catch (e) {
+                  // 개별 객체 파싱 실패 시 suggestion 직접 추출
+                  const catM = fm[0].match(/"category"\s*:\s*"([^"]+)"/);
+                  const sugM = fm[0].match(/"suggestion"\s*:\s*"([^"]+)"/);
+                  if (catM || sugM) {
+                    feedbacks.push({
+                      category: catM ? catM[1] : '제안',
+                      suggestion: sugM ? sugM[1] : ''
+                    });
+                  }
+                }
+              }
+              if (feedbacks.length > 0) partialData.feedbacks = feedbacks;
+            } catch (e) {}
+
+            // improvements 배열 추출
+            try {
+              const im = jsonMatch[0].match(/"improvements"\s*:\s*\[([\s\S]*?)\]/);
+              if (im) {
+                const items = im[1].match(/"([^"]+)"/g);
+                if (items) partialData.improvements = items.map(s => s.replace(/^"|"$/g, ''));
+              }
+            } catch (e) {}
+
+            // summary 추출
+            try {
+              const sum = jsonMatch[0].match(/"summary"\s*:\s*"([^"]+)"/);
+              if (sum) partialData.summary = sum[1];
+            } catch (e) {}
+
+            if (partialData.feedbacks || partialData.improvements || partialData.scores) {
+              analysisData = partialData;
+              console.log('✅ 부분 추출 성공 - feedbacks:', (partialData.feedbacks || []).length, '개');
+            } else {
+              throw new Error('부분 추출도 실패: ' + e2.message);
+            }
+          }
+        }
       } else {
-        throw new Error("JSON 형식을 찾을 수 없습니다.");
+        throw new Error('JSON 형식을 찾을 수 없습니다.');
       }
     } catch (parseError) {
-      console.error("JSON 파싱 오류:", parseError);
-      console.error("AI 응답:", aiResponse);
-      // 파싱 실패 시 텍스트로 표시
+      console.error('JSON 파싱 최종 실패:', parseError);
+      console.error('AI 응답:', aiResponse);
       analysisData = {
         raw: aiResponse,
-        error: "JSON 파싱 실패",
+        error: 'JSON 파싱 실패',
       };
     }
 
@@ -1878,6 +1850,8 @@ ${stylePrompt}
     }
     window.currentProject.data.analysis = analysisData;
     window.currentProject.data.feedbacks = analysisData.feedbacks || [];
+    // 전역 백업 저장 (4단계에서 currentProject 참조 실패 시 사용)
+    window.__lastAnalysisData = analysisData;
     // 2단계 데이터도 있으면 유지 (다음 저장 시 포함되도록)
     if (
       !window.currentProject.data.sunoLyrics &&
@@ -1895,8 +1869,9 @@ ${stylePrompt}
     }
 
     console.log("✅ Gemini 분석 완료:", analysisData);
+    console.log("✅ 전역 백업 저장 완료 (window.__lastAnalysisData)");
 
-    // Step 4 제안 사항 목록 표시 (js/step4.js)
+    // Step 4 제안 사항 목록 미리 표시 (js/step4.js) - 4단계 이동 전에도 호출
     if (typeof window.displayImprovements === "function") {
       window.displayImprovements(analysisData);
     }
@@ -1907,11 +1882,10 @@ ${stylePrompt}
   } catch (error) {
     console.error("❌ Gemini 분석 오류:", error);
 
-    const geminiStatus = document.getElementById("geminiStatus");
-    const geminiAnalysisResult = document.getElementById(
-      "geminiAnalysisResult",
-    );
-    const startAnalysisBtn = document.getElementById("startAnalysisBtn");
+    let errorMessage = error.message;
+    if (error.name === "AbortError") {
+      errorMessage = "API 요청 시간이 초과되었습니다. (60초)";
+    }
 
     if (geminiStatus) {
       geminiStatus.textContent = "분석 실패";
@@ -1923,7 +1897,7 @@ ${stylePrompt}
                 <div style="padding: 20px; background: var(--bg-input); border-radius: 8px; text-align: center;">
                     <div style="font-size: 3rem; margin-bottom: 15px;">⚠️</div>
                     <h4 style="margin-bottom: 10px; color: var(--error);">분석 중 오류가 발생했습니다</h4>
-                    <p style="color: var(--text-secondary); margin-bottom: 15px;">${escapeHtml(error.message)}</p>
+                    <p style="color: var(--text-secondary); margin-bottom: 15px;">${escapeHtml(errorMessage)}</p>
                     <button class="btn btn-primary" onclick="if(typeof window.startGeminiAnalysis === 'function') { window.startGeminiAnalysis(); }">
                         <i class="fas fa-redo"></i> 다시 시도
                     </button>
@@ -1936,10 +1910,14 @@ ${stylePrompt}
       startAnalysisBtn.innerHTML = '<i class="fas fa-magic"></i> 분석 시작';
     }
 
+    // 전역 로딩 상태 명시적 해제
+    const analysisLoading = document.getElementById("analysisLoading");
+    if (analysisLoading) analysisLoading.style.display = "none";
+
     alert(
       "⚠️ Gemini 분석 중 오류가 발생했습니다.\n\n" +
         "원인: " +
-        error.message +
+        errorMessage +
         "\n\n" +
         "해결방법:\n" +
         "1. API 키가 올바른지 확인하세요\n" +
@@ -2029,21 +2007,25 @@ window.handleIntermediateAudioUpload = function (event) {
     window.intermediateAudioFile = file;
 
     // 업로드 영역 업데이트
-    const uploadArea = fileInput.closest(".audio-upload-area");
-    if (uploadArea) {
-      uploadArea.style.borderColor = "var(--success)";
-      uploadArea.style.backgroundColor = "var(--bg-card)";
-      uploadArea.innerHTML = `
-                <div style="font-size: 2rem; margin-bottom: 10px;">✅</div>
+    const innerUI = document.getElementById("intermediateAudioUploadUI");
+    if (innerUI) {
+      const uploadArea = innerUI.closest(".audio-upload-area");
+      if (uploadArea) {
+        uploadArea.style.borderColor = "var(--success)";
+        uploadArea.style.backgroundColor = "var(--bg-card)";
+      }
+      innerUI.innerHTML = `
+                <div style="font-size: 2rem; margin-bottom: 15px;">✅</div>
                 <div style="color: var(--text-primary); font-weight: 600; margin-bottom: 5px;">${escapeHtml(file.name)}</div>
                 <div style="font-size: 0.8rem; color: var(--text-secondary);">${(file.size / 1024 / 1024).toFixed(2)} MB</div>
-                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 5px; cursor: pointer; text-decoration: underline;" onclick="event.stopPropagation(); document.getElementById('intermediateAudioFileInput').value = ''; window.intermediateAudioFile = null; location.reload();">다른 파일 선택</div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 10px; cursor: pointer; text-decoration: underline;" onclick="event.stopPropagation(); if(typeof window.resetIntermediateAudioUpload === 'function') { window.resetIntermediateAudioUpload(); } else { location.reload(); }">다른 파일 선택</div>
             `;
     }
 
     // 분석 버튼 표시
     const analyzeBtn = document.getElementById("analyzeIntermediateAudioBtn");
     if (analyzeBtn) {
+      analyzeBtn.classList.remove("hidden");
       analyzeBtn.style.display = "block";
     }
 
@@ -2053,6 +2035,44 @@ window.handleIntermediateAudioUpload = function (event) {
   } catch (error) {
     console.error("❌ 음원 업로드 오류:", error);
     alert("⚠️ 음원 파일 업로드 중 오류가 발생했습니다.\n\n" + error.message);
+  }
+};
+
+/**
+ * Step 5 음원 업로드 영역 초기화 (다른 파일 선택 시)
+ */
+window.resetIntermediateAudioUpload = function () {
+  try {
+    const innerUI = document.getElementById("intermediateAudioUploadUI");
+    const fileInput = document.getElementById("intermediateAudioFileInput");
+
+    if (fileInput) {
+      fileInput.value = "";
+    }
+    window.intermediateAudioFile = null;
+
+    if (innerUI) {
+      const uploadArea = innerUI.closest(".audio-upload-area");
+      if (uploadArea) {
+        uploadArea.style.borderColor = "var(--border)";
+        uploadArea.style.backgroundColor = "var(--bg-input)";
+      }
+      innerUI.innerHTML = `
+                <div style="font-size: 2.5rem; margin-bottom: 15px; filter: drop-shadow(0 0 10px rgba(108, 92, 231, 0.3));">📤</div>
+                <div style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 5px;">클릭하여 음원 파일 업로드</div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary);">MP3, WAV, M4A (최대 20MB)</div>
+            `;
+    }
+
+    const analyzeBtn = document.getElementById("analyzeIntermediateAudioBtn");
+    if (analyzeBtn) {
+      analyzeBtn.style.display = "none";
+      analyzeBtn.classList.add("hidden");
+    }
+
+    console.log("✅ 음원 업로드 영역이 초기화되었습니다.");
+  } catch (error) {
+    console.error("❌ 업로드 초기화 중 오류:", error);
   }
 };
 
@@ -2075,18 +2095,20 @@ window.analyzeIntermediateAudio = async function () {
     // 버튼 비활성화 및 로딩 표시
     analyzeBtn.disabled = true;
     analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 분석 중...';
+    progressDiv.classList.remove("hidden");
     progressDiv.style.display = "block";
     progressDiv.innerHTML =
       '<div style="text-align: center; padding: 20px;"><div class="spinner" style="margin: 0 auto 20px;"></div><p>🎵 음원을 분석하고 가사를 추출하는 중...</p></div>';
 
     // Gemini API 키 확인
-    const geminiKey = localStorage.getItem("gemini_api_key") || "";
+    const geminiKey = (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || "";
     if (!geminiKey || !geminiKey.startsWith("AIza")) {
       alert(
         '⚠️ Gemini API 키가 설정되지 않았습니다.\n\n"API 키" 버튼을 클릭하여 Gemini API 키를 설정해주세요.',
       );
       analyzeBtn.disabled = false;
       analyzeBtn.innerHTML = "🔍 음원 분석 및 최종 가사 반영";
+      progressDiv.classList.add("hidden");
       progressDiv.style.display = "none";
       return;
     }
@@ -2194,81 +2216,139 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
 **중요**: 
 - JSON 형식만 출력하고, 다른 설명이나 텍스트는 포함하지 마세요.
 - "extractedLyrics"는 반드시 지시어가 포함된 "Suno 가사란에 복사할 내용" 형식으로 작성해주세요.
+- **중요**: 곡 제목은 별도 필드에서 관리하므로 가사 텍스트 내에 제목을 절대 포함하지 마세요. 가사와 지시어만 출력하세요.
 - 지침서의 가사 구조 규칙을 준수하여 작성해주세요.`;
 
-        // Gemini API 호출 (음원 파일 포함)
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+        let aiResponse = "";
+        try {
+          // Gemini API 호출 (음원 파일 포함)
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
 
-        const response = await fetch(geminiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  { text: prompt },
-                  {
-                    inlineData: {
-                      mimeType: file.type || "audio/mpeg",
-                      data: base64Audio,
+          const response = await fetch(geminiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: [
+                    { text: prompt },
+                    {
+                      inlineData: {
+                        mimeType: file.type || "audio/mpeg",
+                        data: base64Audio,
+                      },
                     },
-                  },
-                ],
+                  ],
+                },
+              ],
+              generationConfig: {
+                temperature: 0.7,
+                topK: 40,
+                topP: 0.95,
+                maxOutputTokens: 16000,
+                responseMimeType: "application/json",
               },
-            ],
-            generationConfig: {
-              temperature: 0.7,
-              topK: 40,
-              topP: 0.95,
-              maxOutputTokens: 4000,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(
+              errorData.error?.message || `API 오류: ${response.status}`,
+            );
+          }
+
+          const data = await response.json();
+          if (window.logApiUsage) window.logApiUsage("gemini");
+          aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        } catch (geminiError) {
+          console.warn("⚠️ Gemini 음원 분석 실패, ChatGPT로 전환하여 재시도합니다:", geminiError.message);
+          const openaiKey = window.getOpenAIApiKey ? window.getOpenAIApiKey() : "";
+          if (!openaiKey) {
+            throw new Error(`Gemini 분석 실패 (${geminiError.message}) 후 ChatGPT 폴백을 시도했으나 OpenAI API 키가 없습니다.`);
+          }
+
+          const chatGPTResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${openaiKey}`,
             },
-          }),
-        });
+            body: JSON.stringify({
+              model: "gpt-4o-mini",
+              messages: [
+                { role: "system", content: "You are an AI music analyzer. (Note: Audio file input not supported over text chat fallback, please rely on the provided text prompt details to formulate the evaluation)." },
+                { role: "user", content: prompt + "\n\n(Note: Audio data omitted in fallback)" },
+              ],
+              temperature: 0.7,
+              response_format: { type: "json_object" },
+            }),
+          });
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(
-            errorData.error?.message || `API 오류: ${response.status}`,
-          );
+          if (!chatGPTResponse.ok) {
+            const errorData = await chatGPTResponse.json().catch(() => ({}));
+            throw new Error(errorData.error?.message || `ChatGPT API 오류: ${chatGPTResponse.status}`);
+          }
+
+          const chatGPTData = await chatGPTResponse.json();
+          if (window.logApiUsage) window.logApiUsage("openai");
+          aiResponse = chatGPTData.choices?.[0]?.message?.content || "";
         }
-
-        const data = await response.json();
-        const aiResponse =
-          data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
         if (!aiResponse.trim()) {
           throw new Error("Gemini API에서 응답을 받지 못했습니다.");
         }
 
-        // JSON 파싱 시도
+        // JSON 파싱 시도 (강건한 다단계 파싱)
         let analysisData;
+        const extractJsonField = (key, src) => {
+          // key: "value" 패턴 추출 (잘린 JSON 대응)
+          const re = new RegExp('"' + key + '"\\s*:\\s*"([\\s\\S]*?)(?<!\\\\)"(?=\\s*[,}]|\\s*"[a-z])', 'i');
+          const m = src.match(re);
+          return m ? m[1].replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"') : null;
+        };
         try {
-          let cleanedResponse = aiResponse.trim();
-          if (cleanedResponse.includes("```json")) {
-            cleanedResponse = cleanedResponse
-              .replace(/```json\n?/g, "")
-              .replace(/```\n?/g, "")
-              .trim();
-          } else if (cleanedResponse.includes("```")) {
-            cleanedResponse = cleanedResponse.replace(/```\n?/g, "").trim();
-          }
+          let cleanedResponse = aiResponse.trim()
+            .replace(/^```json\s*/i, '')
+            .replace(/^```\s*/i, '')
+            .replace(/\s*```$/i, '')
+            .trim();
 
-          const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            analysisData = JSON.parse(jsonMatch[0]);
-          } else {
-            // JSON이 아닌 경우 텍스트로 처리
-            analysisData = {
-              extractedLyrics: aiResponse,
-              analysis: aiResponse,
-            };
+          // 1차 표준 파싱
+          try {
+            analysisData = JSON.parse(cleanedResponse);
+            console.log('✅ 음원 분석 JSON 파싱 성공');
+          } catch (e1) {
+            // 2차: 후행 콤마 제거
+            try {
+              analysisData = JSON.parse(cleanedResponse.replace(/,\s*([}\]])/g, '$1'));
+              console.log('✅ 후행 콤마 제거 후 파싱 성공');
+            } catch (e2) {
+              // 3차: 잘린 JSON에서 필드별 직접 추출
+              console.warn('⚠️ JSON 잘림 감지 - 필드 직접 추출:', e2.message);
+              const pd = {};
+              ['extractedLyrics','extractedLyricsPlain','differences','styleDifferences','analysis'].forEach(k => {
+                const v = extractJsonField(k, cleanedResponse);
+                if (v) pd[k] = v;
+              });
+              // suggestions 배열 추출
+              const sm = cleanedResponse.match(/"suggestions"\s*:\s*\[([\s\S]*?)\]/);
+              if (sm) {
+                const items = [];
+                const ir = /"((?:[^"\\]|\\.)*)"/g;
+                let im;
+                while ((im = ir.exec(sm[1])) !== null) {
+                  items.push(im[1].replace(/\\n/g, '\n').replace(/\\"/g, '"'));
+                }
+                if (items.length) pd.suggestions = items;
+              }
+              analysisData = Object.keys(pd).length > 0 ? pd : { _rawJson: aiResponse };
+              console.log('✅ 부분 추출 결과 키:', Object.keys(analysisData));
+            }
           }
         } catch (parseError) {
-          console.error("JSON 파싱 오류:", parseError);
-          analysisData = {
-            extractedLyrics: aiResponse,
-            analysis: aiResponse,
-          };
+          console.error('음원 분석 JSON 파싱 최종 실패:', parseError);
+          analysisData = { _rawJson: aiResponse };
         }
 
         // 분석 결과 표시
@@ -2276,28 +2356,37 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
         resultHtml +=
           '<h4 style="margin-bottom: 15px; color: var(--text-primary);">🎵 음원 분석 결과</h4>';
 
+        // _rawJson 폴백: 파싱 완전 실패 시
+        if (analysisData._rawJson && !analysisData.extractedLyrics) {
+          resultHtml += `
+            <div style="padding: 15px; background: var(--bg-input); border-radius: 8px; margin-bottom: 15px;">
+              <h5 style="color: var(--warning); margin-bottom: 10px;">⚠️ 응답 파싱 실패 - 원본 응답</h5>
+              <div style="white-space: pre-wrap; color: var(--text-secondary); font-family: monospace; font-size: 0.85rem; max-height: 300px; overflow-y: auto;">${escapeHtml(analysisData._rawJson.substring(0, 2000))}</div>
+            </div>`;
+        }
+
         // 추출된 가사 (지시어 포함) 표시
         if (analysisData.extractedLyrics) {
           resultHtml += `
-                        <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-input); border-radius: 8px;">
-                            <h5 style="margin-bottom: 10px; color: var(--accent);">📝 추출된 가사 (지시어 포함 - Suno 가사란 형식)</h5>
-                            <div style="white-space: pre-wrap; color: var(--text-secondary); line-height: 1.8; font-family: monospace; font-size: 0.9rem; background: var(--bg-card); padding: 15px; border-radius: 6px; border: 1px solid var(--border);">${escapeHtml(analysisData.extractedLyrics)}</div>
-                            <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary);">
-                                💡 이 가사는 "Suno 가사란에 복사할 내용" 형식으로 작성되었습니다. 지시어가 포함되어 있어 Suno에 바로 사용할 수 있습니다.
-                            </div>
-                        </div>
-                    `;
+            <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-input); border-radius: 8px;">
+              <h5 style="margin-bottom: 10px; color: var(--accent);">📝 추출된 가사 (지시어 포함 - Suno 가사란 형식)</h5>
+              <div style="white-space: pre-wrap; color: var(--text-secondary); line-height: 1.8; font-family: monospace; font-size: 0.9rem; background: var(--bg-card); padding: 15px; border-radius: 6px; border: 1px solid var(--border);">${escapeHtml(analysisData.extractedLyrics)}</div>
+              <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary);">
+                  💡 이 가사는 "Suno 가사란에 복사할 내용" 형식으로 작성되었습니다. 지시어가 포함되어 있어 Suno에 바로 사용할 수 있습니다.
+              </div>
+            </div>`;
         }
 
         // 추출된 가사 (순수 가사만) 표시
         if (analysisData.extractedLyricsPlain) {
           resultHtml += `
-                        <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-input); border-radius: 8px;">
-                            <h5 style="margin-bottom: 10px; color: var(--accent);">📝 추출된 가사 (순수 가사만)</h5>
-                            <div style="white-space: pre-wrap; color: var(--text-secondary); line-height: 1.8; font-family: monospace; font-size: 0.9rem;">${escapeHtml(analysisData.extractedLyricsPlain)}</div>
-                        </div>
-                    `;
+            <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-input); border-radius: 8px;">
+              <h5 style="margin-bottom: 10px; color: var(--accent);">📝 추출된 가사 (순수 가사만)</h5>
+              <div style="white-space: pre-wrap; color: var(--text-secondary); line-height: 1.8; font-family: monospace; font-size: 0.9rem;">${escapeHtml(analysisData.extractedLyricsPlain)}</div>
+            </div>`;
         }
+
+
 
         if (analysisData.matchesOriginal !== undefined) {
           resultHtml += `
@@ -2418,6 +2507,7 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
       alert("⚠️ 파일을 읽는 중 오류가 발생했습니다.");
       analyzeBtn.disabled = false;
       analyzeBtn.innerHTML = "🔍 음원 분석 및 최종 가사 반영";
+      progressDiv.classList.add("hidden");
       progressDiv.style.display = "none";
     };
 
@@ -2435,6 +2525,7 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
 
     const progressDiv = document.getElementById("intermediateVersionProgress");
     if (progressDiv) {
+      progressDiv.classList.add("hidden");
       progressDiv.style.display = "none";
     }
   }
@@ -2533,7 +2624,7 @@ window.generateFinalEvaluation = async function () {
     }
 
     // Gemini API 키 확인
-    const geminiKey = localStorage.getItem("gemini_api_key") || "";
+    const geminiKey = (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || "";
     if (!geminiKey || !geminiKey.startsWith("AIza")) {
       console.warn("⚠️ Gemini API 키가 없어 평가를 생성할 수 없습니다.");
       const def = Math.min(100, Math.max(0, parseInt(beforeScore, 10) || 0));
@@ -2606,63 +2697,115 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
 
 **중요**: JSON 형식만 출력하고, 다른 설명이나 텍스트는 포함하지 마세요.`;
 
-    // Gemini API 호출
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+    let aiResponse = "";
+    try {
+      // Gemini API 호출
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
 
-    const response = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: evaluationPrompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 2000,
+      const response = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: evaluationPrompt }] }],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 3000,
+            responseMimeType: "application/json",
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error?.message || `API 오류: ${response.status}`,
+        );
+      }
+
+      const data = await response.json();
+      if (window.logApiUsage) window.logApiUsage("gemini");
+      aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    } catch (geminiError) {
+      console.warn("⚠️ Gemini 최종 평가 실패, ChatGPT로 전환하여 재시도합니다:", geminiError.message);
+      const openaiKey = window.getOpenAIApiKey ? window.getOpenAIApiKey() : "";
+      if (!openaiKey) {
+        throw new Error(`Gemini 최종 평가 실패 (${geminiError.message}) 후 ChatGPT 폴백을 시도했으나 OpenAI API 키가 없습니다.`);
+      }
+
+      const chatGPTResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openaiKey}`,
         },
-      }),
-    });
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: "You are an AI songwriter evaluating lyrics quality." },
+            { role: "user", content: evaluationPrompt },
+          ],
+          temperature: 0.7,
+          response_format: { type: "json_object" },
+        }),
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.error?.message || `API 오류: ${response.status}`,
-      );
+      if (!chatGPTResponse.ok) {
+        const errorData = await chatGPTResponse.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `ChatGPT API 오류: ${chatGPTResponse.status}`);
+      }
+
+      const chatGPTData = await chatGPTResponse.json();
+      if (window.logApiUsage) window.logApiUsage("openai");
+      aiResponse = chatGPTData.choices?.[0]?.message?.content || "";
     }
-
-    const data = await response.json();
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     if (!aiResponse.trim()) {
       throw new Error("Gemini API에서 응답을 받지 못했습니다.");
     }
 
-    // JSON 파싱 시도
+    // JSON 파싱 시도 (강건한 다단계)
     let evaluationData;
     try {
-      let cleanedResponse = aiResponse.trim();
-      if (cleanedResponse.includes("```json")) {
-        cleanedResponse = cleanedResponse
-          .replace(/```json\n?/g, "")
-          .replace(/```\n?/g, "")
-          .trim();
-      } else if (cleanedResponse.includes("```")) {
-        cleanedResponse = cleanedResponse.replace(/```\n?/g, "").trim();
-      }
+      let cleanedResponse = aiResponse.trim()
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
 
-      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        evaluationData = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error("JSON 형식을 찾을 수 없습니다.");
+      // 1차: 표준 파싱
+      try {
+        evaluationData = JSON.parse(cleanedResponse);
+        console.log('✅ 평가 JSON 파싱 성공');
+      } catch (e1) {
+        // 2차: 후행 코마 제거 후 재시도
+        try {
+          evaluationData = JSON.parse(cleanedResponse.replace(/,\s*([}\]])/g, '$1'));
+          console.log('✅ 코마 제거 후 파싱 성공');
+        } catch (e2) {
+          // 3차: 정규식 직접 추출
+          console.warn('⚠️ 평가 JSON 부분 추출 시도:', e2.message);
+          const bsM = cleanedResponse.match(/"beforeScore"\s*:\s*(\d+)/);
+          const asM = cleanedResponse.match(/"afterScore"\s*:\s*(\d+)/);
+          const cmM = cleanedResponse.match(/"aiComment"\s*:\s*"([\s\S]*?)(?<!\\)"/);
+          evaluationData = {
+            beforeScore: bsM ? parseInt(bsM[1], 10) : (beforeScore || 70),
+            afterScore: asM ? parseInt(asM[1], 10) : null,
+            aiComment: cmM ? cmM[1].replace(/\\n/g, '\n') : '\ud30c싱 실패하여 기본값을 사용합니다.',
+          };
+          // afterScore 미추출 시: beforeScore보다 업그레이드된 것으로 추론
+          if (evaluationData.afterScore === null) {
+            evaluationData.afterScore = Math.min(100, (evaluationData.beforeScore || 70) + 5);
+          }
+        }
       }
     } catch (parseError) {
-      console.error("JSON 파싱 오류:", parseError);
-      // 파싱 실패 시 기본값 사용
+      console.error('JSON 파싱 최종 실패:', parseError);
       evaluationData = {
-        beforeScore: beforeScore || 0,
-        afterScore: beforeScore || 0,
-        aiComment: aiResponse.substring(0, 500) || "평가를 생성할 수 없습니다.",
+        beforeScore: beforeScore || 70,
+        afterScore: Math.min(100, (beforeScore || 70) + 5),
+        aiComment: '평가 생성 중 오류가 발생했습니다. 재시도해주세요.',
       };
     }
 
@@ -3010,12 +3153,16 @@ window.resetAll = function () {
         aiGeneratedResults.style.display = "none";
       }
 
+      // 로컬 스토리지의 마지막 프로젝트 ID 제거 (새로고침 시 자동 로드 방지)
+      localStorage.removeItem("lastProjectId");
+      localStorage.removeItem("lastRestoredProjectId");
+      
       // 1단계로 이동
       if (typeof window.goToStep === "function") {
         window.goToStep(1, false, true);
       }
 
-      console.log("✅ 전체 초기화 완료 → 1단계로 이동");
+      console.log("✅ 전체 초기화 완료 → 1단계로 이동 (임시 저장 데이터 제거)");
       alert("✅ 모든 내용이 초기화되었습니다. 새로운 프로젝트를 시작하세요!");
     } catch (error) {
       console.error("❌ 초기화 오류:", error);
@@ -3133,7 +3280,7 @@ window.generateStylePromptAI = async function () {
     stylePromptEl.disabled = true;
 
     // API 키 확인
-    const apiKey = localStorage.getItem("openai_api_key");
+    const apiKey = (typeof window.getOpenAIApiKey === "function" ? window.getOpenAIApiKey() : localStorage.getItem("openai_api_key"));
     if (!apiKey) {
       stylePromptEl.value = previousValue;
       stylePromptEl.disabled = false;
@@ -3606,7 +3753,7 @@ window.generateStylePromptTranslation = async function () {
 
   try {
     // OpenAI API 키 확인
-    const apiKey = localStorage.getItem("openai_api_key");
+    const apiKey = (typeof window.getOpenAIApiKey === "function" ? window.getOpenAIApiKey() : localStorage.getItem("openai_api_key"));
 
     if (!apiKey) {
       // API 키가 없으면 간단한 용어 사전 기반 번역
@@ -3867,14 +4014,14 @@ window.generateMarketingMaterials = async function () {
     marketingLoading.style.display = "block";
     marketingResult.style.display = "none";
 
-    // Gemini API 키 확인
-    const geminiKey = localStorage.getItem("gemini_api_key") || "";
+    // Gemini API 키 확인 (공용 키 포함)
+    const geminiKey = (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || "";
     if (!geminiKey || !geminiKey.startsWith("AIza")) {
       marketingLoading.innerHTML = `
                 <div style="text-align: center; padding: 40px;">
                     <div style="font-size: 3rem; margin-bottom: 15px;">⚠️</div>
                     <h4 style="margin-bottom: 10px; color: var(--error);">Gemini API 키가 필요합니다</h4>
-                    <p style="color: var(--text-secondary); margin-bottom: 20px;">마케팅 자료를 생성하려면 Gemini API 키를 설정해주세요.</p>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">마케팅 자료 작성을 위한 Gemini API 키가 설정되어 있지 않습니다.<br>본인의 API 키를 설정하거나 관리자에게 공용 키 설정을 요청해 주세요.</p>
                     <button class="btn btn-primary" onclick="if(typeof window.openAPISettings === 'function') { window.openAPISettings(); }">
                         <i class="fas fa-key"></i> API 키 설정
                     </button>
@@ -3946,32 +4093,68 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
 
 **중요**: JSON 형식만 출력하고, 다른 설명이나 텍스트는 포함하지 마세요.`;
 
-    // Gemini API 호출
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+    let aiResponse = "";
+    try {
+      // Gemini API 호출
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
 
-    const response = await fetch(geminiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: marketingPrompt }] }],
-        generationConfig: {
-          temperature: 0.8,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 3000,
+      const response = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: marketingPrompt }] }],
+          generationConfig: {
+            temperature: 0.8,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 3000,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error?.message || `API 오류: ${response.status}`,
+        );
+      }
+
+      const data = await response.json();
+      if (window.logApiUsage) window.logApiUsage("gemini");
+      aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    } catch (geminiError) {
+      console.warn("⚠️ Gemini 마케팅 생성 실패, ChatGPT로 전환하여 재시도합니다:", geminiError.message);
+      const openaiKey = window.getOpenAIApiKey ? window.getOpenAIApiKey() : "";
+      if (!openaiKey) {
+        throw new Error(`Gemini 마케팅 생성 실패 (${geminiError.message}) 후 ChatGPT 폴백을 시도했으나 OpenAI API 키가 없습니다.`);
+      }
+
+      const chatGPTResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openaiKey}`,
         },
-      }),
-    });
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: "You are an AI marketer creating promotional texts matching the requested JSON format." },
+            { role: "user", content: marketingPrompt },
+          ],
+          temperature: 0.8,
+          response_format: { type: "json_object" },
+        }),
+      });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.error?.message || `API 오류: ${response.status}`,
-      );
+      if (!chatGPTResponse.ok) {
+        const errorData = await chatGPTResponse.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `ChatGPT API 오류: ${chatGPTResponse.status}`);
+      }
+
+      const chatGPTData = await chatGPTResponse.json();
+      if (window.logApiUsage) window.logApiUsage("openai");
+      aiResponse = chatGPTData.choices?.[0]?.message?.content || "";
     }
-
-    const data = await response.json();
-    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     if (!aiResponse.trim()) {
       throw new Error("Gemini API에서 응답을 받지 못했습니다.");
@@ -4066,6 +4249,7 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
     // 로딩 숨기고 결과 표시
     marketingLoading.style.display = "none";
     marketingResult.style.display = "block";
+    marketingResult.classList.remove("hidden");
 
     // 프로젝트 데이터에 저장
     if (window.currentProject) {
@@ -4198,9 +4382,9 @@ window.saveSceneOverview = function () {
 // 저장 및 확정 통합 함수
 // [제거됨] window.saveAndConfirmMVPrompts는 이제 js/step6.js에서 전담 관리합니다.
 
-window.confirmSceneOverviewAndGenerate = async function () {
+window.confirmSceneOverviewAndGenerate = async function (isSilent = false) {
   if (!window.currentScenes || window.currentScenes.length === 0) {
-    alert("생성된 씬이 없습니다.");
+    if (!isSilent) alert("생성된 씬이 없습니다.");
     return;
   }
 
@@ -4211,10 +4395,24 @@ window.confirmSceneOverviewAndGenerate = async function () {
 
   if (mvSceneOverviewSection) {
     mvSceneOverviewSection.style.display = "none";
+    mvSceneOverviewSection.classList.add("hidden");
   }
+
+  // [수정] 초기 설정 섹션은 숨기지 않고 유지합니다. (사용자 요청: 재생성 버튼 유지)
+  // const mvSettingsSection = document.getElementById("mvSettingsSection");
+  // if (mvSettingsSection) {
+  //   mvSettingsSection.style.display = "none";
+  //   mvSettingsSection.classList.add("hidden");
+  // }
 
   if (mvResultsSection) {
     mvResultsSection.style.display = "block";
+    mvResultsSection.classList.remove("hidden");
+    
+    // 복원 중인 경우(silent) 화면 스크롤 생략
+    if (!isSilent) {
+      mvResultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 
     const totalImages = document.getElementById("mvTotalImages");
     if (totalImages) {
@@ -4322,7 +4520,9 @@ window.confirmSceneOverviewAndGenerate = async function () {
       });
     }
 
-    mvResultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (!isSilent) {
+      mvResultsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
   if (window.currentProject) {
@@ -4332,129 +4532,8 @@ window.confirmSceneOverviewAndGenerate = async function () {
     if (!window.currentProject.data.marketing) {
       window.currentProject.data.marketing = {};
     }
-    window.currentProject.data.marketing.mvPrompts = window.currentScenes;
+    window.currentProject.data.marketing.mvScenes = window.currentScenes;
   }
-};
-
-window.copyAllMVPrompts = function (event) {
-  if (!window.currentScenes || window.currentScenes.length === 0) {
-    alert("복사할 프롬프트가 없습니다.");
-    return;
-  }
-
-  let text = "";
-
-  // 통합/배경/인물 프롬프트 추가
-  const combinedKo = document.getElementById("mvCombinedPromptKo")?.value || "";
-  const combinedEn = document.getElementById("mvCombinedPromptEn")?.value || "";
-  const backgroundKo =
-    document.getElementById("mvBackgroundPromptKo")?.value || "";
-  const backgroundEn =
-    document.getElementById("mvBackgroundPromptEn")?.value || "";
-  const characterKo =
-    document.getElementById("mvCharacterPromptKo")?.value || "";
-  const characterEn =
-    document.getElementById("mvCharacterPromptEn")?.value || "";
-
-  // 썸네일/배경/인물 상세 프롬프트
-  const thumbnailKo =
-    document.getElementById("mvThumbnailPromptKo")?.value || "";
-  const thumbnailEn =
-    document.getElementById("mvThumbnailPromptEn")?.value || "";
-  const backgroundDetailKo =
-    document.getElementById("mvBackgroundDetailPromptKo")?.value || "";
-  const backgroundDetailEn =
-    document.getElementById("mvBackgroundDetailPromptEn")?.value || "";
-  const characterDetailKo =
-    document.getElementById("mvCharacterDetailPromptKo")?.value || "";
-  const characterDetailEn =
-    document.getElementById("mvCharacterDetailPromptEn")?.value || "";
-
-  if (
-    combinedKo ||
-    combinedEn ||
-    backgroundKo ||
-    backgroundEn ||
-    characterKo ||
-    characterEn ||
-    thumbnailKo ||
-    thumbnailEn ||
-    backgroundDetailKo ||
-    backgroundDetailEn ||
-    characterDetailKo ||
-    characterDetailEn
-  ) {
-    text += "=== MV 프롬프트 상세 ===\n\n";
-
-    if (thumbnailKo || thumbnailEn) {
-      text += "🎬 썸네일 이미지 프롬프트\n";
-      if (thumbnailKo) text += `[한글]\n${thumbnailKo}\n\n`;
-      if (thumbnailEn) text += `[영어]\n${thumbnailEn}\n\n`;
-    }
-
-    if (combinedKo || combinedEn) {
-      text += "📝 통합 프롬프트\n";
-      if (combinedKo) text += `[한글]\n${combinedKo}\n\n`;
-      if (combinedEn) text += `[영어]\n${combinedEn}\n\n`;
-    }
-
-    if (backgroundDetailKo || backgroundDetailEn) {
-      text += "🏞️ 배경 프롬프트 (상세)\n";
-      if (backgroundDetailKo) text += `[한글]\n${backgroundDetailKo}\n\n`;
-      if (backgroundDetailEn) text += `[영어]\n${backgroundDetailEn}\n\n`;
-    } else if (backgroundKo || backgroundEn) {
-      text += "🏞️ 배경 프롬프트\n";
-      if (backgroundKo) text += `[한글]\n${backgroundKo}\n\n`;
-      if (backgroundEn) text += `[영어]\n${backgroundEn}\n\n`;
-    }
-
-    if (characterDetailKo || characterDetailEn) {
-      text += "👤 인물 프롬프트 (상세)\n";
-      if (characterDetailKo) text += `[한글]\n${characterDetailKo}\n\n`;
-      if (characterDetailEn) text += `[영어]\n${characterDetailEn}\n\n`;
-    } else if (characterKo || characterEn) {
-      text += "👤 인물 프롬프트\n";
-      if (characterKo) text += `[한글]\n${characterKo}\n\n`;
-      if (characterEn) text += `[영어]\n${characterEn}\n\n`;
-    }
-
-    text += "=== 씬별 개별 프롬프트 ===\n\n";
-  }
-
-  window.currentScenes.forEach((scene, index) => {
-    const sceneId = `scene_${index}`;
-    const enEl = document.getElementById(`${sceneId}_en`);
-    const koEl = document.getElementById(`${sceneId}_ko`);
-
-    text += `씬 ${index + 1} (${scene.time})\n`;
-    text += `장면: ${scene.scene || ""}\n`;
-    if (enEl && enEl.value) {
-      text += `[영어 프롬프트]\n${enEl.value}\n\n`;
-    } else if (scene.prompt) {
-      text += `[영어 프롬프트]\n${scene.prompt}\n\n`;
-    }
-    if (koEl && koEl.value) {
-      text += `[한글 프롬프트]\n${koEl.value}\n\n`;
-    } else if (scene.promptKo) {
-      text += `[한글 프롬프트]\n${scene.promptKo}\n\n`;
-    }
-    text += "\n";
-  });
-
-  navigator.clipboard
-    .writeText(text)
-    .then(() => {
-      if (typeof window.showCopyIndicator === "function") {
-        window.showCopyIndicator(
-          "✅ 모든 MV 프롬프트가 클립보드에 복사되었습니다!",
-        );
-      } else {
-        alert("모든 MV 프롬프트가 클립보드에 복사되었습니다.");
-      }
-    })
-    .catch(() => {
-      alert("복사 중 오류가 발생했습니다.");
-    });
 };
 
 window.downloadMVPrompts = function () {
@@ -4527,318 +4606,6 @@ window.downloadMVPrompts = function () {
   URL.revokeObjectURL(url);
 };
 
-window.generateMVDetailPrompts = async function (
-  era,
-  country,
-  location,
-  characters,
-  customSettings,
-  lighting,
-  cameraWork,
-  mood,
-) {
-  try {
-    // AI 생성 실패 시 기본 방식으로 생성
-    if (!combinedEn || !backgroundEn || !characterEn) {
-      // 설정 정보를 기반으로 프롬프트 구성 요소 생성
-      const settingParts = [];
-      const settingPartsKo = [];
-
-      // 시대
-      if (era) {
-        const eraMap = {
-          modern: { en: "modern (2020s)", ko: "현대 (2020년대)" },
-          "2010s": { en: "2010s", ko: "2010년대" },
-          "2000s": { en: "2000s", ko: "2000년대" },
-          "1990s": { en: "1990s", ko: "1990년대" },
-          "1980s": { en: "1980s", ko: "1980년대" },
-          "1970s": { en: "1970s", ko: "1970년대" },
-          "1960s": { en: "1960s", ko: "1960년대" },
-          "1950s": { en: "1950s", ko: "1950년대" },
-          vintage: { en: "vintage (retro style)", ko: "빈티지 (복고풍)" },
-          future: { en: "futuristic", ko: "미래" },
-          timeless: {
-            en: "timeless (no specific era)",
-            ko: "시대 불명 (시대적 특성 없음)",
-          },
-        };
-        const eraInfo = eraMap[era] || { en: era, ko: era };
-        settingParts.push(eraInfo.en);
-        settingPartsKo.push(eraInfo.ko);
-      }
-
-      // 국가/지역
-      if (country) {
-        const countryMap = {
-          korea: { en: "Korea", ko: "한국" },
-          japan: { en: "Japan", ko: "일본" },
-          china: { en: "China", ko: "중국" },
-          usa: { en: "USA", ko: "미국" },
-          uk: { en: "UK", ko: "영국" },
-          france: { en: "France", ko: "프랑스" },
-          italy: { en: "Italy", ko: "이탈리아" },
-          spain: { en: "Spain", ko: "스페인" },
-          germany: { en: "Germany", ko: "독일" },
-          europe: { en: "Europe", ko: "유럽" },
-          asia: { en: "Asia", ko: "아시아" },
-          latin: { en: "Latin America", ko: "라틴 아메리카" },
-          "middle-east": { en: "Middle East", ko: "중동" },
-          africa: { en: "Africa", ko: "아프리카" },
-          generic: { en: "generic location", ko: "지역 불명 (일반적 배경)" },
-        };
-        const countryInfo = countryMap[country] || { en: country, ko: country };
-        settingParts.push(countryInfo.en);
-        settingPartsKo.push(countryInfo.ko);
-      }
-
-      // 장소 유형 (다중 선택 반영)
-      const locationVals =
-        typeof window.getMVLocationValues === "function"
-          ? window.getMVLocationValues()
-          : [];
-      if (locationVals.length > 0) {
-        locationVals.forEach((loc) => {
-          const info =
-            typeof MV_LOCATION_MAP !== "undefined" && MV_LOCATION_MAP[loc]
-              ? MV_LOCATION_MAP[loc]
-              : { en: loc, ko: loc };
-          settingParts.push(info.en);
-          settingPartsKo.push(info.ko);
-        });
-      }
-
-      // 인물 정보
-      let characterParts = [];
-      let characterPartsKo = [];
-      if (characters && characters.length > 0) {
-        characters.forEach((char, index) => {
-          if (char.gender) {
-            // 성별/나이 정보를 정확히 반영
-            const genderText = char.gender.trim();
-            characterParts.push(genderText);
-            characterPartsKo.push(genderText);
-          }
-          if (char.appearance) {
-            characterParts.push(char.appearance.trim());
-            characterPartsKo.push(char.appearance.trim());
-          }
-        });
-      }
-
-      // 통합 프롬프트 생성
-      let combinedKo = "";
-      let combinedEn = "";
-
-      if (settingPartsKo.length > 0) {
-        combinedKo += settingPartsKo.join(", ") + " 배경";
-      }
-      if (characterPartsKo.length > 0) {
-        if (combinedKo) combinedKo += ", ";
-        combinedKo += characterPartsKo.join(", ") + " 인물";
-      }
-      if (customSettings) {
-        if (combinedKo) combinedKo += ", ";
-        combinedKo += customSettings;
-      }
-
-      if (settingParts.length > 0) {
-        combinedEn += settingParts.join(", ") + " background";
-      }
-      if (characterParts.length > 0) {
-        if (combinedEn) combinedEn += ", ";
-        combinedEn += characterParts.join(", ") + " character";
-      }
-      if (customSettings) {
-        if (combinedEn) combinedEn += ", ";
-        combinedEn += customSettings;
-      }
-
-      // 조명 추가
-      if (lighting) {
-        const lightingMap = {
-          natural: { en: "natural lighting", ko: "자연광" },
-          soft: { en: "soft lighting", ko: "부드러운 조명" },
-          dramatic: { en: "dramatic lighting", ko: "드라마틱한 조명" },
-          warm: { en: "warm lighting", ko: "따뜻한 조명" },
-          cool: { en: "cool lighting", ko: "차가운 조명" },
-          neon: { en: "neon lighting", ko: "네온 조명" },
-          "golden-hour": { en: "golden hour lighting", ko: "골든 아워 조명" },
-          "blue-hour": { en: "blue hour lighting", ko: "블루 아워 조명" },
-          studio: { en: "studio lighting", ko: "스튜디오 조명" },
-          cinematic: { en: "cinematic lighting", ko: "시네마틱 조명" },
-        };
-        const lightingInfo = lightingMap[lighting] || {
-          en: lighting,
-          ko: lighting,
-        };
-        if (combinedEn) combinedEn += ", ";
-        combinedEn += lightingInfo.en;
-        if (combinedKo) combinedKo += ", ";
-        combinedKo += lightingInfo.ko;
-      }
-
-      // 카메라 워크 추가
-      if (cameraWork) {
-        const cameraMap = {
-          "close-up": { en: "close-up shot", ko: "클로즈업" },
-          "wide-shot": { en: "wide shot", ko: "와이드 샷" },
-          "medium-shot": { en: "medium shot", ko: "미디엄 샷" },
-          dolly: { en: "dolly shot", ko: "돌리 촬영" },
-          tracking: { en: "tracking shot", ko: "트래킹 촬영" },
-          pan: { en: "pan shot", ko: "팬 촬영" },
-          tilt: { en: "tilt shot", ko: "틸트 촬영" },
-          handheld: { en: "handheld camera", ko: "핸드헬드" },
-          "steady-cam": { en: "steady cam", ko: "스테디캠" },
-          drone: { en: "drone shot", ko: "드론 촬영" },
-        };
-        const cameraInfo = cameraMap[cameraWork] || {
-          en: cameraWork,
-          ko: cameraWork,
-        };
-        if (combinedEn) combinedEn += ", ";
-        combinedEn += cameraInfo.en;
-        if (combinedKo) combinedKo += ", ";
-        combinedKo += cameraInfo.ko;
-      }
-
-      // 분위기 추가
-      if (mood) {
-        const moodMap = {
-          romantic: { en: "romantic mood", ko: "로맨틱한 분위기" },
-          melancholic: { en: "melancholic mood", ko: "멜랑꼴릭한 분위기" },
-          energetic: { en: "energetic mood", ko: "에너제틱한 분위기" },
-          peaceful: { en: "peaceful mood", ko: "평화로운 분위기" },
-          mysterious: { en: "mysterious mood", ko: "신비로운 분위기" },
-          nostalgic: { en: "nostalgic mood", ko: "노스탤지어 분위기" },
-          dramatic: { en: "dramatic mood", ko: "드라마틱한 분위기" },
-          dreamy: { en: "dreamy mood", ko: "드리미한 분위기" },
-          intense: { en: "intense mood", ko: "강렬한 분위기" },
-          gentle: { en: "gentle mood", ko: "부드러운 분위기" },
-        };
-        const moodInfo = moodMap[mood] || { en: mood, ko: mood };
-        if (combinedEn) combinedEn += ", ";
-        combinedEn += moodInfo.en;
-        if (combinedKo) combinedKo += ", ";
-        combinedKo += moodInfo.ko;
-      }
-
-      combinedEn += ", high quality, photorealistic, detailed";
-
-      // 배경 프롬프트 생성
-      let backgroundKo = "";
-      let backgroundEn = "";
-
-      if (settingPartsKo.length > 0) {
-        backgroundKo = settingPartsKo.join(", ") + " 배경";
-      }
-      // 장소 유형은 이미 settingParts/settingPartsKo에 다중 선택으로 반영됨
-      if (customSettings) {
-        if (backgroundKo) backgroundKo += ", " + customSettings;
-        else backgroundKo = customSettings;
-        if (backgroundEn) backgroundEn += ", " + customSettings;
-        else backgroundEn = customSettings;
-      }
-      backgroundEn += ", high quality, photorealistic, detailed background";
-
-      // 인물 프롬프트 생성
-      let characterKo = "";
-      let characterEn = "";
-
-      if (characterPartsKo.length > 0) {
-        characterKo = characterPartsKo.join(", ") + " 인물";
-      }
-      if (characterParts.length > 0) {
-        characterEn = characterParts.join(", ") + " person";
-      }
-      if (customSettings) {
-        if (characterKo) characterKo += ", " + customSettings;
-        else characterKo = customSettings;
-        if (characterEn) characterEn += ", " + customSettings;
-        else characterEn = customSettings;
-      }
-      characterEn +=
-        ", high quality, photorealistic, natural pose, detailed hands";
-
-      // 한글 프롬프트 생성
-      if (!combinedKo && combinedEn) {
-        combinedKo =
-          (await translateEnglishToKoreanForScene("prompt", combinedEn)) || "";
-      }
-      if (!backgroundKo && backgroundEn) {
-        backgroundKo =
-          (await translateEnglishToKoreanForScene(
-            "background",
-            backgroundEn,
-          )) || "";
-      }
-      if (!characterKo && characterEn) {
-        characterKo =
-          (await translateEnglishToKoreanForScene("character", characterEn)) ||
-          "";
-      }
-    }
-
-    // UI에 표시
-    const combinedKoEl = document.getElementById("mvCombinedPromptKo");
-    const combinedEnEl = document.getElementById("mvCombinedPromptEn");
-    const backgroundKoEl = document.getElementById("mvBackgroundPromptKo");
-    const backgroundEnEl = document.getElementById("mvBackgroundPromptEn");
-    const characterKoEl = document.getElementById("mvCharacterPromptKo");
-    const characterEnEl = document.getElementById("mvCharacterPromptEn");
-
-    if (combinedKoEl)
-      combinedKoEl.value = combinedKo || "설정된 내용이 없습니다.";
-    if (combinedEnEl) {
-      if (combinedEn) {
-        combinedEnEl.value = combinedEn;
-      } else if (combinedKo) {
-        // 한글이 있으면 번역
-        const translated = await translateKoreanToEnglishForScene(
-          "prompt",
-          combinedKo,
-        );
-        combinedEnEl.value = translated || combinedKo;
-      } else {
-        combinedEnEl.value = "No settings configured.";
-      }
-    }
-
-    if (backgroundKoEl)
-      backgroundKoEl.value = backgroundKo || "설정된 내용이 없습니다.";
-    if (backgroundEnEl) {
-      if (backgroundEn) {
-        backgroundEnEl.value = backgroundEn;
-      } else if (backgroundKo) {
-        const translated = await translateKoreanToEnglishForScene(
-          "background",
-          backgroundKo,
-        );
-        backgroundEnEl.value = translated || backgroundKo;
-      } else {
-        backgroundEnEl.value = "No settings configured.";
-      }
-    }
-
-    if (characterKoEl)
-      characterKoEl.value = characterKo || "설정된 내용이 없습니다.";
-    if (characterEnEl) {
-      if (characterEn) {
-        characterEnEl.value = characterEn;
-      } else if (characterKo) {
-        const translated = await translateKoreanToEnglishForScene(
-          "character",
-          characterKo,
-        );
-        characterEnEl.value = translated || characterKo;
-      } else {
-        characterEnEl.value = "No settings configured.";
-      }
-    }
-  } catch (error) {
-    console.error("MV 상세 프롬프트 생성 오류:", error);
-  }
-};
-
 // 한글 프롬프트 수정 시 자동 영어 번역 (또는 그 반대)
 window.updateMVPromptTranslation = async function (type) {
   try {
@@ -4866,1624 +4633,8 @@ window.updateMVPromptTranslation = async function (type) {
   }
 };
 
-// 프롬프트 상호 번역 (영어↔한글)
-window.syncMVPromptTranslation = async function (type, sourceLang) {
-  try {
-    let koId, enId;
+// window.generateMVThumbnailPrompts 함수는 js/step6.js에서 선언 및 구현됩니다. (중복 방지)
 
-    // 타입에 따라 ID 결정
-    const typeMap = {
-      thumbnail: { ko: "mvThumbnailPromptKo", en: "mvThumbnailPromptEn" },
-      backgroundDetail: {
-        ko: "mvBackgroundDetailPromptKo",
-        en: "mvBackgroundDetailPromptEn",
-      },
-      characterDetail: {
-        ko: "mvCharacterDetailPromptKo",
-        en: "mvCharacterDetailPromptEn",
-      },
-      combined: { ko: "mvCombinedPromptKo", en: "mvCombinedPromptEn" },
-      background: { ko: "mvBackgroundPromptKo", en: "mvBackgroundPromptEn" },
-      character: { ko: "mvCharacterPromptKo", en: "mvCharacterPromptEn" },
-    };
-
-    const ids = typeMap[type];
-    if (!ids) return;
-
-    koId = ids.ko;
-    enId = ids.en;
-
-    const koEl = document.getElementById(koId);
-    const enEl = document.getElementById(enId);
-
-    if (!koEl || !enEl) return;
-
-    if (sourceLang === "en") {
-      // 영어를 수정했으면 한글로 번역
-      const enText = enEl.value.trim();
-      if (enText) {
-        const translated = await translateEnglishToKoreanForScene(
-          "prompt",
-          enText,
-        );
-        if (translated) {
-          koEl.value = translated;
-        }
-      } else {
-        koEl.value = "";
-      }
-    } else if (sourceLang === "ko") {
-      // 한글을 수정했으면 영어로 번역
-      const koText = koEl.value.trim();
-      if (koText) {
-        const translated = await translateKoreanToEnglishForScene(koText);
-        if (translated) {
-          enEl.value = translated;
-        }
-      } else {
-        enEl.value = "";
-      }
-    }
-  } catch (error) {
-    console.error("프롬프트 상호 번역 오류:", error);
-  }
-};
-
-// 씬별 개요 섹션 프롬프트 상호 번역
-window.syncSceneOverviewPromptTranslation = async function (
-  sceneIndex,
-  sourceLang,
-) {
-  try {
-    const enEl = document.getElementById(`scene_overview_${sceneIndex}_en`);
-    const koEl = document.getElementById(`scene_overview_${sceneIndex}_ko`);
-
-    if (!enEl || !koEl) {
-      console.warn(`씬 ${sceneIndex}의 프롬프트 요소를 찾을 수 없습니다.`);
-      return;
-    }
-
-    // 번역 중 플래그로 무한 루프 방지
-    if (
-      enEl.dataset.translating === "true" ||
-      koEl.dataset.translating === "true"
-    ) {
-      return;
-    }
-
-    if (sourceLang === "en") {
-      // 영어를 수정했으면 한글로 번역
-      let enText = enEl.value.trim();
-
-      // 영어 프롬프트에서 한글 제거
-      const koreanPattern = /[가-힣]+/g;
-      if (koreanPattern.test(enText)) {
-        enText = enText.replace(koreanPattern, "").trim();
-        enText = enText.replace(/\s+/g, " ").trim();
-        enEl.value = enText;
-      }
-
-      if (enText) {
-        enEl.dataset.translating = "true";
-        try {
-          const translated = await translateEnglishToKoreanForScene(
-            "prompt",
-            enText,
-          );
-          if (translated && koEl) {
-            koEl.value = translated;
-            // window.currentScenes도 업데이트
-            if (window.currentScenes && window.currentScenes[sceneIndex]) {
-              window.currentScenes[sceneIndex].prompt = enText;
-              window.currentScenes[sceneIndex].promptKo = translated;
-            }
-          }
-        } catch (error) {
-          console.error("영어→한글 번역 오류:", error);
-        } finally {
-          enEl.dataset.translating = "false";
-        }
-      } else {
-        koEl.value = "";
-      }
-    } else if (sourceLang === "ko") {
-      // 한글을 수정했으면 영어로 번역
-      let koText = koEl.value.trim();
-
-      // 한글 프롬프트에서 영어 제거 (한글만 유지)
-      const englishPattern = /[a-zA-Z]+(?:\s+[a-zA-Z]+)*/g;
-      if (englishPattern.test(koText)) {
-        // 영어 단어들을 제거하되, 한글과 섞인 경우는 유지
-        // 단순히 영어만 있는 경우만 제거
-        const words = koText.split(/\s+/);
-        const koreanWords = words.filter((word) => /[가-힣]/.test(word));
-        if (koreanWords.length > 0) {
-          koText = koreanWords.join(" ");
-        }
-        koEl.value = koText;
-      }
-
-      if (koText) {
-        koEl.dataset.translating = "true";
-        try {
-          const translated = await translateKoreanToEnglishForScene(
-            "prompt",
-            koText,
-          );
-          if (translated && enEl) {
-            // 번역된 영어에서 한글 제거
-            let cleanTranslated = translated.replace(/[가-힣]+/g, "").trim();
-            cleanTranslated = cleanTranslated.replace(/\s+/g, " ").trim();
-            enEl.value = cleanTranslated;
-            // window.currentScenes도 업데이트
-            if (window.currentScenes && window.currentScenes[sceneIndex]) {
-              window.currentScenes[sceneIndex].prompt = cleanTranslated;
-              window.currentScenes[sceneIndex].promptKo = koText;
-            }
-          }
-        } catch (error) {
-          console.error("한글→영어 번역 오류:", error);
-        } finally {
-          koEl.dataset.translating = "false";
-        }
-      } else {
-        enEl.value = "";
-      }
-    }
-  } catch (error) {
-    console.error("씬 개요 프롬프트 상호 번역 오류:", error);
-  }
-};
-
-// 씬별 프롬프트 상호 번역 (결과 섹션용)
-window.syncScenePromptTranslation = async function (sceneIndex, sourceLang) {
-  try {
-    const sceneId = `scene_${sceneIndex}`;
-    const enEl = document.getElementById(`${sceneId}_en`);
-    const koEl = document.getElementById(`${sceneId}_ko`);
-
-    if (!enEl || !koEl) return;
-
-    if (sourceLang === "en") {
-      // 영어를 수정했으면 한글로 번역
-      const enText = enEl.value.trim();
-      if (enText) {
-        const translated = await translateEnglishToKoreanForScene(
-          "prompt",
-          enText,
-        );
-        if (translated) {
-          koEl.value = translated;
-          // window.currentScenes도 업데이트
-          if (window.currentScenes && window.currentScenes[sceneIndex]) {
-            window.currentScenes[sceneIndex].prompt = enText;
-            window.currentScenes[sceneIndex].promptKo = translated;
-          }
-        }
-      } else {
-        koEl.value = "";
-      }
-    } else if (sourceLang === "ko") {
-      // 한글을 수정했으면 영어로 번역
-      const koText = koEl.value.trim();
-      if (koText) {
-        const translated = await translateKoreanToEnglishForScene(koText);
-        if (translated) {
-          enEl.value = translated;
-          // window.currentScenes도 업데이트
-          if (window.currentScenes && window.currentScenes[sceneIndex]) {
-            window.currentScenes[sceneIndex].prompt = translated;
-            window.currentScenes[sceneIndex].promptKo = koText;
-          }
-        }
-      } else {
-        enEl.value = "";
-      }
-    }
-  } catch (error) {
-    console.error("씬 프롬프트 상호 번역 오류:", error);
-  }
-};
-
-window.generateMVThumbnailPrompts = async function (
-  era,
-  country,
-  location,
-  characters,
-  customSettings,
-  lighting,
-  cameraWork,
-  mood,
-) {
-  try {
-    // ─── 변수 선언 (ReferenceError 방지) ───
-    let thumbnailEn = "";
-    let thumbnailKo = "";
-    let backgroundEn = "";
-    let backgroundKo = "";
-    let characterEn = "";
-    let characterKo = "";
-
-    // 캐릭터 정보 문자열 생성
-    const characterInfo =
-      Array.isArray(characters) && characters.length > 0
-        ? characters
-            .map((c, i) => `Character ${i + 1}: ${c.gender} ${c.appearance}`)
-            .join(", ")
-        : "";
-
-    // AI 생성 실패 시 또는 데이터가 없을 시 기본 방식으로 생성
-    if (true) {
-      // 항상 초기값을 설정하도록 변경
-      console.log("📝 기본 방식으로 프롬프트 생성...");
-
-      // 설정 정보를 기반으로 프롬프트 구성
-      const settingParts = [];
-
-      if (era) {
-        const eraMap = {
-          modern: "modern (2020s)",
-          "2010s": "2010s",
-          "2000s": "2000s",
-          "1990s": "1990s",
-          vintage: "vintage (retro style)",
-          future: "futuristic",
-          timeless: "timeless",
-        };
-        settingParts.push(eraMap[era] || era);
-      }
-
-      if (country) {
-        const countryMap = {
-          korea: "Korea",
-          japan: "Japan",
-          usa: "USA",
-          uk: "UK",
-        };
-        settingParts.push(countryMap[country] || country);
-      }
-
-      const locationVals =
-        typeof window.getMVLocationValues === "function"
-          ? window.getMVLocationValues()
-          : [];
-      if (locationVals.length > 0) {
-        locationVals.forEach((loc) => {
-          const en =
-            typeof MV_LOCATION_MAP !== "undefined" && MV_LOCATION_MAP[loc]
-              ? MV_LOCATION_MAP[loc].en
-              : loc;
-          settingParts.push(en);
-        });
-      }
-
-      if (lighting) {
-        const lightingMap = {
-          natural: "natural lighting",
-          soft: "soft lighting",
-          dramatic: "dramatic lighting",
-          warm: "warm lighting",
-          cool: "cool lighting",
-          neon: "neon lighting",
-          cinematic: "cinematic lighting",
-        };
-        settingParts.push(lightingMap[lighting] || lighting);
-      }
-
-      if (cameraWork) {
-        const cameraMap = {
-          "close-up": "close-up shot",
-          "wide-shot": "wide shot",
-          "medium-shot": "medium shot",
-        };
-        settingParts.push(cameraMap[cameraWork] || cameraWork);
-      }
-
-      if (mood) {
-        const moodMap = {
-          romantic: "romantic mood",
-          melancholic: "melancholic mood",
-          energetic: "energetic mood",
-          peaceful: "peaceful mood",
-        };
-        settingParts.push(moodMap[mood] || mood);
-      }
-
-      // 썸네일 프롬프트
-      if (!thumbnailEn) {
-        thumbnailEn = [characterInfo, ...settingParts, customSettings]
-          .filter((s) => s && s.trim())
-          .join(", ");
-        thumbnailEn +=
-          ", ultra high quality, 8k resolution, photorealistic, cinematic composition, 16:9 aspect ratio, representative thumbnail image";
-      }
-
-      // 배경 프롬프트
-      if (!backgroundEn) {
-        backgroundEn = [...settingParts, customSettings]
-          .filter((s) => s && s.trim())
-          .join(", ");
-        backgroundEn +=
-          ", background-focused composition, ultra high quality, 8k resolution, photorealistic, detailed background";
-      }
-
-      // 인물 프롬프트
-      if (!characterEn) {
-        characterEn = [characterInfo, ...settingParts, customSettings]
-          .filter((s) => s && s.trim())
-          .join(", ");
-        characterEn +=
-          ", character-focused composition, ultra high quality, 8k resolution, photorealistic, natural pose, detailed hands, detailed facial features";
-      }
-    }
-
-    // 한글 프롬프트가 없으면 영어에서 번역
-    if (!thumbnailKo && thumbnailEn) {
-      thumbnailKo =
-        (await translateEnglishToKoreanForScene("thumbnail", thumbnailEn)) ||
-        "";
-    }
-    if (!backgroundKo && backgroundEn) {
-      backgroundKo =
-        (await translateEnglishToKoreanForScene("background", backgroundEn)) ||
-        "";
-    }
-    if (!characterKo && characterEn) {
-      characterKo =
-        (await translateEnglishToKoreanForScene("character", characterEn)) ||
-        "";
-    }
-
-    // ========== UI에 표시 ==========
-    console.log("🎨 썸네일/배경/인물 프롬프트 UI 업데이트 시작...");
-
-    const thumbnailEnEl = document.getElementById("mvThumbnailPromptEn");
-    const thumbnailKoEl = document.getElementById("mvThumbnailPromptKo");
-    const backgroundDetailEnEl = document.getElementById(
-      "mvBackgroundDetailPromptEn",
-    );
-    const backgroundDetailKoEl = document.getElementById(
-      "mvBackgroundDetailPromptKo",
-    );
-    const characterDetailEnEl = document.getElementById(
-      "mvCharacterDetailPromptEn",
-    );
-    const characterDetailKoEl = document.getElementById(
-      "mvCharacterDetailPromptKo",
-    );
-
-    // 썸네일 프롬프트 UI 업데이트
-    if (thumbnailEnEl) {
-      thumbnailEnEl.value = thumbnailEn || "설정된 내용이 없습니다.";
-      console.log(
-        "✅ 썸네일 영어 프롬프트 UI 업데이트:",
-        thumbnailEn.substring(0, 50) + "...",
-      );
-    }
-    if (thumbnailKoEl) {
-      thumbnailKoEl.value = thumbnailKo || "설정된 내용이 없습니다.";
-    }
-
-    // 배경 프롬프트 UI 업데이트
-    if (backgroundDetailEnEl) {
-      backgroundDetailEnEl.value = backgroundEn || "설정된 내용이 없습니다.";
-      console.log(
-        "✅ 배경 영어 프롬프트 UI 업데이트:",
-        backgroundEn.substring(0, 50) + "...",
-      );
-    }
-    if (backgroundDetailKoEl) {
-      backgroundDetailKoEl.value = backgroundKo || "설정된 내용이 없습니다.";
-    }
-
-    // 인물 프롬프트 UI 업데이트
-    if (characterDetailEnEl) {
-      characterDetailEnEl.value = characterEn || "설정된 내용이 없습니다.";
-      console.log(
-        "✅ 인물 영어 프롬프트 UI 업데이트:",
-        characterEn.substring(0, 50) + "...",
-      );
-    }
-    if (characterDetailKoEl) {
-      characterDetailKoEl.value = characterKo || "설정된 내용이 없습니다.";
-    }
-
-    console.log("✅ 썸네일/배경/인물 프롬프트 생성 및 UI 업데이트 완료!");
-
-    // 반환값 추가
-    return {
-      thumbnailEn,
-      thumbnailKo,
-      backgroundEn,
-      backgroundKo,
-      characterEn,
-      characterKo,
-    };
-  } catch (error) {
-    console.error("썸네일 프롬프트 생성 오류:", error);
-    return {
-      thumbnailEn: "",
-      thumbnailKo: "",
-      backgroundEn: "",
-      backgroundKo: "",
-      characterEn: "",
-      characterKo: "",
-    };
-  }
-};
-
-// 프롬프트 재생성
-window.regenerateMVPrompt = async function (type) {
-  try {
-    const era = document.getElementById("mvEra")?.value || "";
-    const country = document.getElementById("mvCountry")?.value || "";
-    const location = document.getElementById("mvLocation")?.value || "";
-    const characterCount =
-      document.getElementById("mvCharacterCount")?.value || "1";
-    const customSettings =
-      document.getElementById("mvCustomSettings")?.value || "";
-    const lighting = document.getElementById("mvLighting")?.value || "";
-    const cameraWork = document.getElementById("mvCameraWork")?.value || "";
-    const mood = document.getElementById("mvMood")?.value || "";
-
-    const characters = [];
-    for (let i = 1; i <= parseInt(characterCount); i++) {
-      const gender =
-        document.getElementById(`mvCharacter${i}_gender`)?.value || "";
-      const appearance =
-        document.getElementById(`mvCharacter${i}_appearance`)?.value || "";
-      if (gender || appearance) {
-        characters.push({ gender, appearance });
-      }
-    }
-
-    if (type === "thumbnail" || type === "background" || type === "character") {
-      await generateMVThumbnailPrompts(
-        era,
-        country,
-        location,
-        characters,
-        customSettings,
-        lighting,
-        cameraWork,
-        mood,
-      );
-    }
-
-    if (typeof window.showCopyIndicator === "function") {
-      window.showCopyIndicator(`✅ ${type} 프롬프트가 재생성되었습니다!`);
-    }
-
-    // 재생성 시 해당 타입의 복사 버튼을 "복사"로 복원 (메인 섹션 + 씬 개요 섹션)
-    const btnIdMap = {
-      thumbnail: "copyMVThumbnailBtn",
-      background: "copyMVBackgroundBtn",
-      character: "copyMVCharacterBtn",
-    };
-    const mainBtn = document.getElementById(btnIdMap[type]);
-    if (mainBtn) {
-      mainBtn.innerHTML =
-        mainBtn.dataset.originalHTML || '<i class="fas fa-copy"></i> 복사';
-      mainBtn.disabled = false;
-      mainBtn.classList.remove("copied");
-    }
-    const overviewBtn = document.querySelector(
-      '.copy-mv-overview-btn[data-type="' + type + '"]',
-    );
-    if (overviewBtn) {
-      overviewBtn.innerHTML =
-        overviewBtn.dataset.originalHTML || '<i class="fas fa-copy"></i> 복사';
-      overviewBtn.disabled = false;
-      overviewBtn.classList.remove("copied");
-    }
-  } catch (error) {
-    console.error("프롬프트 재생성 오류:", error);
-    alert("프롬프트 재생성 중 오류가 발생했습니다:\n\n" + error.message);
-  }
-};
-
-// 씬별 개요 섹션 프롬프트 재생성
-window.regenerateSceneOverviewPrompt = async function (sceneIndex) {
-  try {
-    if (!window.currentScenes || !window.currentScenes[sceneIndex]) {
-      alert("재생성할 씬이 없습니다.");
-      return;
-    }
-
-    const scene = window.currentScenes[sceneIndex];
-    const finalLyrics =
-      document.getElementById("finalLyrics")?.textContent ||
-      document.getElementById("finalizedLyrics")?.value ||
-      document.getElementById("sunoLyrics")?.value ||
-      "";
-    const stylePrompt =
-      document.getElementById("finalizedStylePrompt")?.value ||
-      document.getElementById("stylePrompt")?.value ||
-      "";
-
-    // MV 시간 설정 가져오기 (가사 추출용)
-    const minutes = parseInt(document.getElementById("mvMinutes")?.value || 3);
-    const seconds = parseInt(document.getElementById("mvSeconds")?.value || 30);
-    const totalSeconds = minutes * 60 + seconds;
-
-    // MV 설정 가져오기
-    const era = document.getElementById("mvEra")?.value || "";
-    const country = document.getElementById("mvCountry")?.value || "";
-    const location =
-      typeof window.getMVLocationEnString === "function"
-        ? window.getMVLocationEnString()
-        : document.getElementById("mvLocation")?.value || "";
-    const characterCount =
-      document.getElementById("mvCharacterCount")?.value || "1";
-    const customSettings =
-      document.getElementById("mvCustomSettings")?.value || "";
-    const lighting = document.getElementById("mvLighting")?.value || "";
-    const cameraWork = document.getElementById("mvCameraWork")?.value || "";
-    const mood = document.getElementById("mvMood")?.value || "";
-
-    // 인물 정보 수집 (성별, 나이, 인종, 외모/스타일)
-    const characters = [];
-    for (let i = 1; i <= parseInt(characterCount); i++) {
-      const gender =
-        document.getElementById(`mvCharacter${i}_gender`)?.value || "";
-      const age = document.getElementById(`mvCharacter${i}_age`)?.value || "";
-      const race = document.getElementById(`mvCharacter${i}_race`)?.value || "";
-      const appearance =
-        document.getElementById(`mvCharacter${i}_appearance`)?.value || "";
-      if (gender || age || race || appearance) {
-        characters.push({ gender, age, race, appearance });
-      }
-    }
-
-    // Gemini API를 사용하여 상세한 씬 프롬프트 재생성
-    const geminiKey = localStorage.getItem("gemini_api_key") || "";
-    if (geminiKey && geminiKey.startsWith("AIza")) {
-      const cleanLyrics = extractLyricsOnly(finalLyrics);
-
-      // 한글 선택사항을 영어로 변환하는 맵
-      const eraMap = {
-        현대: "modern",
-        modern: "modern",
-        과거: "historical",
-        historical: "historical",
-        미래: "futuristic",
-        futuristic: "futuristic",
-        복고: "retro",
-        retro: "retro",
-      };
-      const countryMap = {
-        한국: "Korea",
-        korea: "Korea",
-        일본: "Japan",
-        japan: "Japan",
-        미국: "USA",
-        usa: "USA",
-        영국: "UK",
-        uk: "UK",
-      };
-      const moodMap = {
-        로맨틱: "romantic",
-        romantic: "romantic",
-        우울한: "melancholic",
-        melancholic: "melancholic",
-        에너지틱: "energetic",
-        energetic: "energetic",
-        평화로운: "peaceful",
-        peaceful: "peaceful",
-        신비로운: "mysterious",
-        mysterious: "mysterious",
-        향수적인: "nostalgic",
-        nostalgic: "nostalgic",
-        드라마틱: "dramatic",
-        dramatic: "dramatic",
-        몽환적인: "dreamy",
-        dreamy: "dreamy",
-        강렬한: "intense",
-        intense: "intense",
-        부드러운: "gentle",
-        gentle: "gentle",
-        감성적: "emotional",
-        emotional: "emotional",
-      };
-      const lightingMap = {
-        자연광: "natural lighting",
-        natural: "natural lighting",
-        부드러운: "soft lighting",
-        soft: "soft lighting",
-        드라마틱: "dramatic lighting",
-        dramatic: "dramatic lighting",
-        따뜻한: "warm lighting",
-        warm: "warm lighting",
-        차가운: "cool lighting",
-        cool: "cool lighting",
-        네온: "neon lighting",
-        neon: "neon lighting",
-        골든아워: "golden hour lighting",
-        "golden-hour": "golden hour lighting",
-        블루아워: "blue hour lighting",
-        "blue-hour": "blue hour lighting",
-        스튜디오: "studio lighting",
-        studio: "studio lighting",
-        시네마틱: "cinematic lighting",
-        cinematic: "cinematic lighting",
-      };
-      const cameraMap = {
-        클로즈업: "close-up shot",
-        "close-up": "close-up shot",
-        와이드샷: "wide shot",
-        "wide-shot": "wide shot",
-        미디엄샷: "medium shot",
-        "medium-shot": "medium shot",
-        돌리: "dolly shot",
-        dolly: "dolly shot",
-        트래킹: "tracking shot",
-        tracking: "tracking shot",
-        팬: "pan shot",
-        pan: "pan shot",
-        틸트: "tilt shot",
-        tilt: "tilt shot",
-        핸드헬드: "handheld camera",
-        handheld: "handheld camera",
-        스테디캠: "steady cam",
-        "steady-cam": "steady cam",
-        드론: "drone shot",
-        drone: "drone shot",
-      };
-
-      // 영어로 변환
-      const eraEn = eraMap[era] || era || "modern";
-      const countryEn = countryMap[country] || country || "Korea";
-      const moodEn = moodMap[mood] || mood || "";
-      const lightingEn = lightingMap[lighting] || lighting || "";
-      const cameraEn = cameraMap[cameraWork] || cameraWork || "";
-
-      // 해당 씬의 가사 추출 (시간 기반)
-      let sceneLyrics = "";
-      if (scene.time && cleanLyrics) {
-        const timeMatch = scene.time.match(/(\d+):(\d+)-(\d+):(\d+)/);
-        if (timeMatch) {
-          const startMin = parseInt(timeMatch[1]);
-          const startSec = parseInt(timeMatch[2]);
-          const startTotal = startMin * 60 + startSec;
-          const endMin = parseInt(timeMatch[3]);
-          const endSec = parseInt(timeMatch[4]);
-          const endTotal = endMin * 60 + endSec;
-
-          // 가사를 시간에 맞춰 추출 (대략적인 추정)
-          const lyricsLines = cleanLyrics.split("\n").filter((l) => l.trim());
-          const estimatedLinesPerMinute =
-            lyricsLines.length / (totalSeconds / 60);
-          const startLine = Math.floor(
-            (startTotal / 60) * estimatedLinesPerMinute,
-          );
-          const endLine = Math.ceil((endTotal / 60) * estimatedLinesPerMinute);
-          sceneLyrics = lyricsLines
-            .slice(startLine, endLine + 1)
-            .join(" ")
-            .trim();
-        }
-      }
-      if (!sceneLyrics && scene.scene) {
-        sceneLyrics = scene.scene;
-      }
-
-      // 인물 정보 문자열 생성
-      let characterInfoStr = "";
-      if (characters.length > 0) {
-        const genderMap = {
-          male: "남성",
-          female: "여성",
-          "non-binary": "논바이너리",
-        };
-        const ageMap = {
-          child: "어린이",
-          teen: "청소년",
-          "20s": "20대",
-          "30s": "30대",
-          "40s": "40대",
-          "50s": "50대",
-          elder: "장년",
-        };
-        const raceMap = {
-          asian: "아시아인",
-          caucasian: "백인",
-          african: "아프리카인",
-          hispanic: "히스패닉/라틴계",
-          "middle-eastern": "중동인",
-          mixed: "혼혈",
-        };
-
-        characterInfoStr = characters
-          .map((c, idx) => {
-            const parts = [];
-            if (c.gender) parts.push(genderMap[c.gender] || c.gender);
-            if (c.age) parts.push(ageMap[c.age] || c.age);
-            if (c.race) parts.push(raceMap[c.race] || c.race);
-            if (c.appearance) parts.push(c.appearance);
-            return parts.length > 0
-              ? `인물${idx + 1}: ${parts.join(", ")}`
-              : "";
-          })
-          .filter((s) => s.trim())
-          .join("; ");
-      }
-
-      const prompt = `다음 정보를 기반으로 Midjourney용 **매우 상세하고 자연스러운 고화질 실사진** 영어 프롬프트와 한글 프롬프트를 각각 생성해주세요.
-
-【가사 내용】 (가장 중요 - 반드시 프롬프트의 핵심이 되어야 합니다!)
-${sceneLyrics ? `"${sceneLyrics}"` : `"${scene.scene || "없음"}"`}
-
-【전체 가사 맥락】 (참고용 - 전체 가사의 흐름과 감정을 이해하세요)
-${cleanLyrics.substring(0, 500)}${cleanLyrics.length > 500 ? "..." : ""}
-
-【씬 정보】
-- **장면 설명 (반드시 반영)**: "${scene.scene || "없음"}" - 이 장면 설명의 내용을 프롬프트에 구체적으로 포함하세요
-- 시간: ${scene.time || "없음"}
-
-【스타일】
-${stylePrompt || "감성적인 발라드"}
-
-【MV 프롬프트 상세 설정】 (가사 내용과 장면 설명을 우선하되 자연스럽게 융합)
-${eraEn ? `- 시대: ${eraEn} era` : ""}
-${countryEn ? `- 국가: ${countryEn}` : ""}
-${location ? `- 기본 장소: ${location}` : ""}
-${lightingEn ? `- 조명: ${lightingEn}` : ""}
-${cameraEn ? `- 카메라: ${cameraEn}` : ""}
-${moodEn ? `- 분위기: ${moodEn} mood` : ""}
-${characterInfoStr ? `- 인물: ${characterInfoStr}` : ""}
-${customSettings ? `- 추가: ${customSettings}` : ""}
-
-【작업 요구사항】
-1. **가사 내용과 장면 설명을 중심으로** 매우 구체적이고 상세한 영어 프롬프트와 한글 프롬프트를 각각 작성 (60단어 이상)
-2. **가사에서 묘사되는 장면, 감정, 상황을 구체적으로 포함**하세요
-3. **장면 설명("${scene.scene}")의 내용을 반드시 프롬프트에 구체적으로 반영**하세요 - 장면 설명이 프롬프트의 핵심 요소가 되어야 합니다
-4. 가사의 감정과 분위기를 시각적으로 표현하는 묘사 포함
-5. 위의 MV 프롬프트 상세 설정(시대, 국가, 조명, 카메라, 분위기, 인물 등)을 **가사 내용과 장면 설명과 자연스럽게 융합** (가사 내용과 장면 설명이 우선)
-6. **인물 상세 정보 반드시 포함** (성별, 나이, 인종, 외모/스타일) - MV 설정의 인물 정보(${characterInfoStr || "없음"})를 반영하여 일관되게 묘사
-   - **나이와 인종 정보는 반드시 포함되어야 합니다** - 예: "30-year-old Asian male" (영어), "30대 아시아인 남성" (한글)
-   - MV 설정에 나이와 인종이 있으면 반드시 프롬프트에 포함하세요
-7. 배경, 인물, 조명, 카메라 워크를 모두 포함한 완성된 프롬프트
-8. 영어 프롬프트는 한글 없이 **순수 영어만** 작성
-9. 한글 프롬프트는 자연스러운 한글로 작성
-10. **미드저니 고화질 실사진 키워드 필수 포함**: "ultra high quality, 8k resolution, photorealistic, cinematic lighting, natural pose, detailed hands, detailed facial features, professional photography, sharp focus, depth of field, color grading, cinematic composition" (영어) / "초고화질, 8k 해상도, 사진처럼 사실적, 시네마틱 조명, 자연스러운 포즈, 상세한 손과 얼굴 특징, 전문 사진, 선명한 초점, 깊이감, 색감 보정, 영화적 구도" (한글)
-11. **프롬프트만 출력** (설명이나 주석 없이 순수 프롬프트만)
-
-**출력 형식 (순수 JSON만):**
-\`\`\`json
-{
-  "promptEn": "완성된 영어 프롬프트 (60단어 이상, 가사 내용과 장면 설명 반영, MV 설정 융합, 고화질 실사진 키워드 포함)",
-  "promptKo": "완성된 한글 프롬프트 (60단어 이상, 가사 내용과 장면 설명 반영, MV 설정 융합, 고화질 실사진 키워드 포함)"
-}
-\`\`\`
-
-**예시 (나이와 인종 정보 포함):**
-{
-  "promptEn": "a dimly lit pawn shop interior showcasing rows of dusty jewelry under harsh fluorescent lights, a 30-year-old Asian male with neat hairstyle sadly looks at a ring in a glass case, remembering a past promise, his face etched with regret and longing, bitter emotion, somber and regretful mood, harsh fluorescent lighting with deep shadows, close-up shot slowly panning up to the man's face, USA, modern era, intense emotional atmosphere, cinematic lighting, wide-shot composition, ultra high quality, 8k resolution, photorealistic, cinematic lighting, natural pose, detailed hands and facial features, professional photography, sharp focus, depth of field, color grading",
-  "promptKo": "어두운 전당포 내부, 형광등 아래 먼지 쌓인 보석들이 줄지어 진열되어 있고, 30대 아시아인 남성(단정한 헤어스타일)이 유리 케이스 안의 반지를 슬프게 바라보며 과거의 약속을 기억하고 있다, 그의 얼굴에는 후회와 그리움이 새겨져 있다, 쓴 감정, 우울하고 후회스러운 분위기, 깊은 그림자와 함께 거친 형광등, 반지에 클로즈업한 후 남성의 얼굴로 팬업, 미국, 현대 시대, 강렬한 감정적 분위기, 시네마틱 조명, 와이드샷 구도, 초고화질, 8k 해상도, 사진처럼 사실적, 시네마틱 조명, 자연스러운 포즈, 상세한 손과 얼굴 특징, 전문 사진, 선명한 초점, 깊이감, 색감 보정"
-}
-
-**중요:**
-- MV 설정의 인물 정보(${characterInfoStr || "없음"})에 나이와 인종이 포함되어 있으면, 반드시 프롬프트에 포함하세요
-- 나이 정보: "30-year-old", "20s", "30대", "20대" 등
-- 인종 정보: "Asian", "Caucasian", "African", "아시아인", "백인", "아프리카인" 등
-
-**지금 바로 JSON을 생성하세요:**`;
-
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
-      const response = await fetch(geminiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.8,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1000,
-          },
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const aiResponse =
-          data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-        console.log(
-          "🤖 씬 프롬프트 재생성 AI 응답 수신:",
-          aiResponse.substring(0, 300) + "...",
-        );
-
-        // JSON 추출
-        let jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-        let newPromptEn = "";
-        let newPromptKo = "";
-
-        if (jsonMatch) {
-          try {
-            const aiPrompts = JSON.parse(jsonMatch[0]);
-            newPromptEn = aiPrompts.promptEn || "";
-            newPromptKo = aiPrompts.promptKo || "";
-          } catch (parseError) {
-            console.warn(
-              "⚠️ JSON 파싱 실패, 텍스트에서 추출 시도:",
-              parseError,
-            );
-            // JSON 파싱 실패 시 텍스트에서 직접 추출
-            newPromptEn = aiResponse.trim();
-          }
-        } else {
-          // JSON이 없으면 전체 응답을 영어 프롬프트로 사용
-          newPromptEn = aiResponse.trim();
-        }
-
-        // JSON 코드 블록이나 마크다운 제거
-        newPromptEn = newPromptEn
-          .replace(/```json\s*/gi, "")
-          .replace(/```\s*/g, "")
-          .trim();
-        newPromptEn = newPromptEn.replace(/^["']|["']$/g, "").trim(); // 따옴표 제거
-        newPromptKo = newPromptKo
-          .replace(/```json\s*/gi, "")
-          .replace(/```\s*/g, "")
-          .trim();
-        newPromptKo = newPromptKo.replace(/^["']|["']$/g, "").trim(); // 따옴표 제거
-
-        // 영어 프롬프트에서 한글 완전 제거
-        newPromptEn = newPromptEn.replace(/[가-힣]+/g, "").trim();
-
-        // 불필요한 공백 및 특수문자 정리
-        newPromptEn = newPromptEn.replace(/\s+/g, " ").trim();
-        newPromptEn = newPromptEn.replace(/,\s*,+/g, ", "); // 연속 쉼표
-        newPromptEn = newPromptEn.replace(/\.\s*\.+/g, "."); // 연속 마침표
-
-        if (newPromptEn && newPromptEn.length > 20) {
-          // 마지막 정리
-          if (!newPromptEn.endsWith(".")) {
-            newPromptEn += ".";
-          }
-
-          const enEl = document.getElementById(
-            `scene_overview_${sceneIndex}_en`,
-          );
-          const koEl = document.getElementById(
-            `scene_overview_${sceneIndex}_ko`,
-          );
-
-          if (enEl) {
-            // 씬 번호 주석이 없으면 추가
-            if (!newPromptEn.includes("/* Scene")) {
-              newPromptEn = `/* Scene ${sceneIndex + 1} */ ${newPromptEn}`;
-            }
-            enEl.value = newPromptEn;
-          }
-
-          // 한글 프롬프트 설정
-          if (koEl) {
-            if (newPromptKo && newPromptKo.length > 20) {
-              koEl.value = newPromptKo;
-            } else {
-              // 한글 프롬프트가 없으면 영어에서 번역
-              await syncSceneOverviewPromptTranslation(sceneIndex, "en");
-            }
-          }
-
-          // currentScenes 업데이트
-          if (window.currentScenes && window.currentScenes[sceneIndex]) {
-            window.currentScenes[sceneIndex].prompt = newPromptEn;
-            if (newPromptKo) {
-              window.currentScenes[sceneIndex].promptKo = newPromptKo;
-            }
-          }
-
-          if (typeof window.showCopyIndicator === "function") {
-            window.showCopyIndicator(
-              `✅ 씬 ${sceneIndex + 1} 프롬프트가 재생성되었습니다!`,
-            );
-          } else {
-            alert(`✅ 씬 ${sceneIndex + 1} 프롬프트가 재생성되었습니다!`);
-          }
-          // 재생성 시 해당 씬의 복사 버튼을 "복사"로 복원
-          const overviewCopyBtn = document.getElementById(
-            `copySceneOverviewBtn_${sceneIndex}`,
-          );
-          if (overviewCopyBtn) {
-            overviewCopyBtn.innerHTML =
-              overviewCopyBtn.dataset.originalHTML ||
-              '<i class="fas fa-copy"></i> 복사';
-            overviewCopyBtn.disabled = false;
-            overviewCopyBtn.classList.remove("copied");
-          }
-        } else {
-          console.warn("⚠️ AI가 생성한 프롬프트가 너무 짧거나 비어있습니다.");
-          alert("프롬프트 생성에 실패했습니다. 다시 시도해주세요.");
-        }
-      }
-    } else {
-      // AI 없으면 기본 상세 프롬프트 생성
-      let promptParts = [];
-
-      // 유효한 값만 추가하는 헬퍼 함수
-      const addIfValid = (value) => {
-        if (value && typeof value === "string" && value.trim()) {
-          const trimmed = value.trim();
-          if (trimmed && trimmed !== "," && trimmed !== ".") {
-            promptParts.push(trimmed);
-          }
-        }
-      };
-
-      if (characters.length > 0) {
-        if (characters.length === 1) {
-          promptParts.push("one person");
-        } else if (characters.length === 2) {
-          promptParts.push("two people");
-        } else {
-          promptParts.push("multiple people");
-        }
-        characters.forEach((char) => {
-          if (char.gender) addIfValid(char.gender);
-          if (char.appearance) addIfValid(char.appearance);
-        });
-      } else {
-        promptParts.push(
-          characterCount === "1"
-            ? "one person"
-            : characterCount === "2"
-              ? "two people"
-              : "multiple people",
-        );
-      }
-
-      if (scene.location) {
-        // location에서 한글 제거
-        const locationEn = scene.location.replace(/[가-힣]+/g, "").trim();
-        if (locationEn) addIfValid(locationEn);
-      }
-      if (country && country.trim()) {
-        const countryMap = {
-          한국: "Korea",
-          korea: "Korea",
-          Korea: "Korea",
-          일본: "Japan",
-          japan: "Japan",
-          Japan: "Japan",
-          미국: "USA",
-          usa: "USA",
-          USA: "USA",
-          영국: "UK",
-          uk: "UK",
-          UK: "UK",
-        };
-        const countryValue = countryMap[country] || country;
-        if (
-          countryValue &&
-          countryValue.trim() &&
-          !/[가-힣]/.test(countryValue)
-        ) {
-          promptParts.push(countryValue.trim());
-        }
-      }
-      if (era && era.trim()) {
-        const eraMap = {
-          현대: "modern",
-          modern: "modern",
-          Modern: "modern",
-          과거: "historical",
-          historical: "historical",
-          Historical: "historical",
-          미래: "futuristic",
-          futuristic: "futuristic",
-          Futuristic: "futuristic",
-          복고: "retro",
-          retro: "retro",
-          Retro: "retro",
-        };
-        const eraValue = eraMap[era] || era;
-        if (eraValue && eraValue.trim() && !/[가-힣]/.test(eraValue)) {
-          promptParts.push(eraValue.trim() + " era");
-        }
-      }
-      if (mood && mood.trim()) {
-        const moodMap = {
-          로맨틱: "romantic mood",
-          romantic: "romantic mood",
-          우울한: "melancholic mood",
-          melancholic: "melancholic mood",
-          에너지틱: "energetic mood",
-          energetic: "energetic mood",
-          평화로운: "peaceful mood",
-          peaceful: "peaceful mood",
-          신비로운: "mysterious mood",
-          mysterious: "mysterious mood",
-          향수적인: "nostalgic mood",
-          nostalgic: "nostalgic mood",
-          드라마틱: "dramatic mood",
-          dramatic: "dramatic mood",
-          몽환적인: "dreamy mood",
-          dreamy: "dreamy mood",
-          강렬한: "intense mood",
-          intense: "intense mood",
-          부드러운: "gentle mood",
-          gentle: "gentle mood",
-          감성적: "emotional mood",
-          emotional: "emotional mood",
-        };
-        const moodValue = moodMap[mood] || mood + " mood";
-        if (moodValue && moodValue.trim() && !/[가-힣]/.test(moodValue)) {
-          promptParts.push(moodValue.trim());
-        }
-      }
-      if (lighting && lighting.trim()) {
-        const lightingMap = {
-          자연광: "natural lighting",
-          natural: "natural lighting",
-          부드러운: "soft lighting",
-          soft: "soft lighting",
-          드라마틱: "dramatic lighting",
-          dramatic: "dramatic lighting",
-          따뜻한: "warm lighting",
-          warm: "warm lighting",
-          차가운: "cool lighting",
-          cool: "cool lighting",
-          네온: "neon lighting",
-          neon: "neon lighting",
-          골든아워: "golden hour lighting",
-          "golden-hour": "golden hour lighting",
-          블루아워: "blue hour lighting",
-          "blue-hour": "blue hour lighting",
-          스튜디오: "studio lighting",
-          studio: "studio lighting",
-          시네마틱: "cinematic lighting",
-          cinematic: "cinematic lighting",
-        };
-        const lightingValue = lightingMap[lighting] || lighting;
-        if (
-          lightingValue &&
-          lightingValue.trim() &&
-          !/[가-힣]/.test(lightingValue)
-        ) {
-          promptParts.push(lightingValue.trim());
-        }
-      }
-      if (cameraWork && cameraWork.trim()) {
-        const cameraMap = {
-          클로즈업: "close-up shot",
-          "close-up": "close-up shot",
-          와이드샷: "wide shot",
-          "wide-shot": "wide shot",
-          미디엄샷: "medium shot",
-          "medium-shot": "medium shot",
-          돌리: "dolly shot",
-          dolly: "dolly shot",
-          트래킹: "tracking shot",
-          tracking: "tracking shot",
-          팬: "pan shot",
-          pan: "pan shot",
-          틸트: "tilt shot",
-          tilt: "tilt shot",
-          핸드헬드: "handheld camera",
-          handheld: "handheld camera",
-          스테디캠: "steady cam",
-          "steady-cam": "steady cam",
-          드론: "drone shot",
-          drone: "drone shot",
-        };
-        const cameraValue = cameraMap[cameraWork] || cameraWork;
-        if (cameraValue && cameraValue.trim() && !/[가-힣]/.test(cameraValue)) {
-          promptParts.push(cameraValue.trim());
-        }
-      }
-
-      promptParts.push(
-        "ultra high quality",
-        "8k resolution",
-        "photorealistic",
-        "cinematic lighting",
-        "natural pose",
-        "detailed hands",
-        "detailed facial features",
-        "sharp focus",
-        "professional photography",
-        "depth of field",
-        "color grading",
-        "cinematic composition",
-      );
-
-      if (customSettings) {
-        // 커스텀 설정에서 한글 제거
-        const customEn = customSettings.replace(/[가-힣]+/g, "").trim();
-        if (customEn) addIfValid(customEn);
-      }
-
-      // 빈 값 제거 및 정리
-      promptParts = promptParts.filter((part) => {
-        if (!part || !part.trim() || part.trim() === "," || part.trim() === ".")
-          return false;
-        // 한글이 포함된 항목 제거
-        if (/[가-힣]/.test(part)) return false;
-        return true;
-      });
-
-      let basicPrompt = promptParts.join(", ") + ".";
-
-      // 한글 완전 제거 (혹시 남아있는 경우)
-      basicPrompt = basicPrompt.replace(/[가-힣]+/g, "").trim();
-
-      // 연속된 쉼표 제거
-      basicPrompt = basicPrompt.replace(/,\s*,+/g, ", ").trim();
-      // 쉼표 다음 마침표 제거
-      basicPrompt = basicPrompt.replace(/,\s*\./g, ".").trim();
-      // 연속된 마침표 제거
-      basicPrompt = basicPrompt.replace(/\.+/g, ".").trim();
-      // 불필요한 공백 정리
-      basicPrompt = basicPrompt.replace(/\s+/g, " ").trim();
-      const enEl = document.getElementById(`scene_overview_${sceneIndex}_en`);
-      if (enEl) {
-        enEl.value = basicPrompt;
-        await syncSceneOverviewPromptTranslation(sceneIndex, "en");
-      }
-      // 재생성 시 해당 씬의 복사 버튼을 "복사"로 복원
-      const overviewCopyBtn = document.getElementById(
-        `copySceneOverviewBtn_${sceneIndex}`,
-      );
-      if (overviewCopyBtn) {
-        overviewCopyBtn.innerHTML =
-          overviewCopyBtn.dataset.originalHTML ||
-          '<i class="fas fa-copy"></i> 복사';
-        overviewCopyBtn.disabled = false;
-        overviewCopyBtn.classList.remove("copied");
-      }
-    }
-  } catch (error) {
-    console.error("씬 개요 프롬프트 재생성 오류:", error);
-    alert("씬 프롬프트 재생성 중 오류가 발생했습니다:\n\n" + error.message);
-  }
-};
-
-// 씬 수정 (편집 모드 토글)
-window.editSceneOverview = function (sceneIndex) {
-  const sceneDiv = document
-    .querySelector(`[data-scene-index="${sceneIndex}"]`)
-    ?.closest('div[style*="margin-bottom: 20px"]');
-  if (!sceneDiv) {
-    alert("씬을 찾을 수 없습니다.");
-    return;
-  }
-
-  const descriptionEl = sceneDiv.querySelector(".scene-description");
-  const enEl = document.getElementById(`scene_overview_${sceneIndex}_en`);
-  const koEl = document.getElementById(`scene_overview_${sceneIndex}_ko`);
-
-  if (descriptionEl && enEl && koEl) {
-    // 편집 가능 상태로 만들기 (이미 편집 가능하지만 포커스)
-    descriptionEl.focus();
-    descriptionEl.scrollIntoView({ behavior: "smooth", block: "center" });
-
-    if (typeof window.showCopyIndicator === "function") {
-      window.showCopyIndicator(`✏️ 씬 ${sceneIndex + 1} 편집 모드`);
-    }
-  }
-};
-
-// 씬 프롬프트 복사
-window.copySceneOverviewPrompt = async function (sceneIndex) {
-  try {
-    if (!window.currentScenes || !window.currentScenes[sceneIndex]) {
-      alert("복사할 씬이 없습니다.");
-      return;
-    }
-
-    const scene = window.currentScenes[sceneIndex];
-    const enEl = document.getElementById(`scene_overview_${sceneIndex}_en`);
-    const koEl = document.getElementById(`scene_overview_${sceneIndex}_ko`);
-    const descriptionEl = document.querySelector(
-      `.scene-description[data-index="${sceneIndex}"]`,
-    );
-
-    let text = `씬 ${sceneIndex + 1} (${scene.time})\n\n`;
-    text += `장면 설명:\n${descriptionEl?.value || scene.scene || ""}\n\n`;
-    text += `영어 프롬프트:\n${enEl?.value || scene.prompt || ""}\n\n`;
-    text += `한글 프롬프트:\n${koEl?.value || scene.promptKo || ""}`;
-
-    await navigator.clipboard.writeText(text);
-
-    if (typeof window.showCopyIndicator === "function") {
-      window.showCopyIndicator(
-        `✅ 씬 ${sceneIndex + 1} 프롬프트가 클립보드에 복사되었습니다!`,
-      );
-    } else {
-      alert(`✅ 씬 ${sceneIndex + 1} 프롬프트가 클립보드에 복사되었습니다!`);
-    }
-  } catch (error) {
-    console.error("프롬프트 복사 오류:", error);
-    alert("프롬프트 복사 중 오류가 발생했습니다:\n\n" + error.message);
-  }
-};
-
-// 씬별 개요 섹션의 영어 프롬프트만 복사 (Midjourney용)
-window.copySceneOverviewPromptEn = async function (sceneIndex, event) {
-  try {
-    const enEl = document.getElementById(`scene_overview_${sceneIndex}_en`);
-    if (!enEl || !enEl.value.trim()) {
-      alert("복사할 영어 프롬프트가 없습니다.");
-      return;
-    }
-
-    // 기존 주석 제거 후 [Scene N of Total] 형식으로 씬 번호 추가
-    let promptText = enEl.value.trim();
-
-    // 기존 주석 제거 (/* Scene N */, [Scene N], // 등)
-    promptText = promptText
-      .replace(/\/\*\s*Scene\s+\d+\s*(of\s+\d+)?\s*\*\/\s*/gi, "")
-      .trim();
-    promptText = promptText
-      .replace(/\[\s*Scene\s+\d+\s*(of\s+\d+)?\s*\]\s*/gi, "")
-      .trim();
-    promptText = promptText.replace(/\/\/.*$/gm, "").trim(); // 단일 라인 주석
-    promptText = promptText.replace(/\/\*[\s\S]*?\*\//g, "").trim(); // 다중 라인 주석
-
-    // 총 씬 개수 확인
-    const totalScenes = window.currentScenes ? window.currentScenes.length : 0;
-    const sceneNumber = sceneIndex + 1;
-
-    // [Scene N of Total] 형식으로 씬 번호 추가
-    const sceneLabel =
-      totalScenes > 0
-        ? `[Scene ${sceneNumber} of ${totalScenes}]`
-        : `[Scene ${sceneNumber}]`;
-    promptText = `${sceneLabel}\n${promptText}`;
-
-    await navigator.clipboard.writeText(promptText);
-
-    // 복사 버튼 찾기 및 텍스트 변경
-    let copyButton = null;
-    if (event && event.target) {
-      copyButton = event.target.closest("button");
-    }
-    if (!copyButton) {
-      // 이벤트가 없으면 ID로 찾기
-      const buttonId = `copySceneOverviewBtn_${sceneIndex}`;
-      copyButton = document.getElementById(buttonId);
-    }
-
-    if (copyButton) {
-      // 원래 HTML을 data 속성에 저장 (최종 확정 시 복원용)
-      if (!copyButton.dataset.originalHTML) {
-        copyButton.dataset.originalHTML = copyButton.innerHTML;
-      }
-      copyButton.innerHTML = '<i class="fas fa-check"></i> 복사됨';
-      copyButton.disabled = true;
-      // 복사 상태 표시를 위한 클래스 추가
-      copyButton.classList.add("copied");
-    }
-
-    if (typeof window.showCopyIndicator === "function") {
-      window.showCopyIndicator(
-        `✅ 씬 ${sceneIndex + 1} 영어 프롬프트가 클립보드에 복사되었습니다! (Midjourney용)`,
-      );
-    } else {
-      alert(
-        `✅ 씬 ${sceneIndex + 1} 영어 프롬프트가 클립보드에 복사되었습니다!`,
-      );
-    }
-  } catch (error) {
-    console.error("영어 프롬프트 복사 오류:", error);
-    alert("영어 프롬프트 복사 중 오류가 발생했습니다:\n\n" + error.message);
-  }
-};
-
-// 씬별 개별 프롬프트 섹션의 영어 프롬프트만 복사 (Midjourney용)
-window.copyScenePromptEn = async function (sceneIndex, event) {
-  try {
-    const enEl = document.getElementById(`scene_${sceneIndex}_en`);
-    if (!enEl || !enEl.value.trim()) {
-      alert("복사할 영어 프롬프트가 없습니다.");
-      return;
-    }
-
-    // 기존 주석 제거 후 [Scene N of Total] 형식으로 씬 번호 추가
-    let promptText = enEl.value.trim();
-
-    // 기존 주석 제거 (/* Scene N */, [Scene N], // 등)
-    promptText = promptText
-      .replace(/\/\*\s*Scene\s+\d+\s*(of\s+\d+)?\s*\*\/\s*/gi, "")
-      .trim();
-    promptText = promptText
-      .replace(/\[\s*Scene\s+\d+\s*(of\s+\d+)?\s*\]\s*/gi, "")
-      .trim();
-    promptText = promptText.replace(/\/\/.*$/gm, "").trim(); // 단일 라인 주석
-    promptText = promptText.replace(/\/\*[\s\S]*?\*\//g, "").trim(); // 다중 라인 주석
-
-    // 총 씬 개수 확인
-    const totalScenes = window.currentScenes ? window.currentScenes.length : 0;
-    const sceneNumber = sceneIndex + 1;
-
-    // [Scene N of Total] 형식으로 씬 번호 추가
-    const sceneLabel =
-      totalScenes > 0
-        ? `[Scene ${sceneNumber} of ${totalScenes}]`
-        : `[Scene ${sceneNumber}]`;
-    promptText = `${sceneLabel}\n${promptText}`;
-
-    await navigator.clipboard.writeText(promptText);
-
-    // 복사 버튼 찾기 및 텍스트 변경
-    let copyButton = null;
-    if (event && event.target) {
-      copyButton = event.target.closest("button");
-    }
-    if (!copyButton) {
-      // 이벤트가 없으면 ID로 찾기
-      const buttonId = `copyScenePromptBtn_${sceneIndex}`;
-      copyButton = document.getElementById(buttonId);
-    }
-
-    if (copyButton) {
-      // 원래 HTML을 data 속성에 저장 (최종 확정 시 복원용)
-      if (!copyButton.dataset.originalHTML) {
-        copyButton.dataset.originalHTML = copyButton.innerHTML;
-      }
-      copyButton.innerHTML = '<i class="fas fa-check"></i> 복사됨';
-      copyButton.disabled = true;
-      // 복사 상태 표시를 위한 클래스 추가
-      copyButton.classList.add("copied");
-    }
-
-    if (typeof window.showCopyIndicator === "function") {
-      window.showCopyIndicator(
-        `✅ 씬 ${sceneIndex + 1} 영어 프롬프트가 클립보드에 복사되었습니다! (Midjourney용)`,
-      );
-    } else {
-      alert(
-        `✅ 씬 ${sceneIndex + 1} 영어 프롬프트가 클립보드에 복사되었습니다!`,
-      );
-    }
-  } catch (error) {
-    console.error("영어 프롬프트 복사 오류:", error);
-    alert("영어 프롬프트 복사 중 오류가 발생했습니다:\n\n" + error.message);
-  }
-};
-
-// 썸네일/배경/인물 프롬프트의 영어 프롬프트만 복사 (Midjourney용) — 복사 후 "복사됨" 표시, 재생성 버튼 클릭 시에만 복원
-window.copyMVPromptEn = async function (type, event) {
-  try {
-    const typeMap = {
-      thumbnail: {
-        en: "mvThumbnailPromptEn",
-        name: "썸네일",
-        btnId: "copyMVThumbnailBtn",
-      },
-      background: {
-        en: "mvBackgroundDetailPromptEn",
-        name: "배경",
-        btnId: "copyMVBackgroundBtn",
-      },
-      character: {
-        en: "mvCharacterDetailPromptEn",
-        name: "인물",
-        btnId: "copyMVCharacterBtn",
-      },
-    };
-
-    const typeInfo = typeMap[type];
-    if (!typeInfo) {
-      alert("알 수 없는 프롬프트 타입입니다.");
-      return;
-    }
-
-    const enEl = document.getElementById(typeInfo.en);
-    if (!enEl || !enEl.value.trim()) {
-      alert(`${typeInfo.name} 영어 프롬프트가 없습니다.`);
-      return;
-    }
-
-    const promptText = enEl.value.trim();
-    await navigator.clipboard.writeText(promptText);
-
-    let copyButton = null;
-    if (event && event.target) {
-      copyButton = event.target.closest("button");
-    }
-    if (!copyButton) {
-      copyButton = document.getElementById(typeInfo.btnId);
-    }
-
-    if (copyButton) {
-      if (!copyButton.dataset.originalHTML) {
-        copyButton.dataset.originalHTML = copyButton.innerHTML;
-      }
-      copyButton.innerHTML = '<i class="fas fa-check"></i> 복사됨';
-      copyButton.disabled = true;
-      copyButton.classList.add("copied");
-    }
-
-    if (typeof window.showCopyIndicator === "function") {
-      window.showCopyIndicator(
-        `✅ ${typeInfo.name} 영어 프롬프트가 클립보드에 복사되었습니다! (Midjourney용)`,
-      );
-    } else {
-      alert(`✅ ${typeInfo.name} 영어 프롬프트가 클립보드에 복사되었습니다!`);
-    }
-  } catch (error) {
-    console.error("영어 프롬프트 복사 오류:", error);
-    alert("영어 프롬프트 복사 중 오류가 발생했습니다:\n\n" + error.message);
-  }
-};
-
-// 썸네일/배경/인물 프롬프트 수정 — 해당 영어 텍스트영역에 포커스
-window.focusMVPromptTextarea = function (type) {
-  const typeMap = {
-    thumbnail: "mvThumbnailPromptEn",
-    background: "mvBackgroundDetailPromptEn",
-    character: "mvCharacterDetailPromptEn",
-  };
-  const id = typeMap[type];
-  if (!id) return;
-  const el = document.getElementById(id);
-  if (el) {
-    el.focus();
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-  }
-};
-
-// 씬 개요 섹션 내 썸네일/배경/인물 overview 텍스트영역 포커스
-window.focusMVPromptOverviewTextarea = function (type) {
-  const typeMap = {
-    thumbnail: "mv_thumbnail_en_overview",
-    background: "mv_background_en_overview",
-    character: "mv_character_en_overview",
-  };
-  const id = typeMap[type];
-  if (!id) return;
-  const el = document.getElementById(id);
-  if (el) {
-    el.focus();
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-  }
-};
-
-// 씬 개요 섹션 내 썸네일/배경/인물 영어 프롬프트 복사 — 복사 후 "복사됨" 표시, 재생성 버튼 클릭 시에만 복원
-window.copyMVPromptEnOverview = async function (type, event) {
-  try {
-    const typeMap = {
-      thumbnail: { en: "mv_thumbnail_en_overview", name: "썸네일" },
-      background: { en: "mv_background_en_overview", name: "배경" },
-      character: { en: "mv_character_en_overview", name: "인물" },
-    };
-    const typeInfo = typeMap[type];
-    if (!typeInfo) return;
-    const enEl = document.getElementById(typeInfo.en);
-    if (!enEl || !enEl.value.trim()) {
-      alert(typeInfo.name + " 영어 프롬프트가 없습니다.");
-      return;
-    }
-    await navigator.clipboard.writeText(enEl.value.trim());
-    var copyButton =
-      event && event.target
-        ? event.target.closest("button")
-        : document.querySelector(
-            '.copy-mv-overview-btn[data-type="' + type + '"]',
-          );
-    if (copyButton) {
-      if (!copyButton.dataset.originalHTML)
-        copyButton.dataset.originalHTML = copyButton.innerHTML;
-      copyButton.innerHTML = '<i class="fas fa-check"></i> 복사됨';
-      copyButton.disabled = true;
-      copyButton.classList.add("copied");
-    }
-    if (typeof window.showCopyIndicator === "function") {
-      window.showCopyIndicator(
-        "✅ " + typeInfo.name + " 영어 프롬프트가 클립보드에 복사되었습니다!",
-      );
-    }
-  } catch (err) {
-    console.error("영어 프롬프트 복사 오류:", err);
-    alert("영어 프롬프트 복사 중 오류가 발생했습니다.");
-  }
-};
-
-// 씬 프롬프트 재생성 (결과 섹션용)
-window.regenerateScenePrompt = async function (sceneIndex) {
-  try {
-    if (!window.currentScenes || !window.currentScenes[sceneIndex]) {
-      alert("재생성할 씬이 없습니다.");
-      return;
-    }
-
-    const scene = window.currentScenes[sceneIndex];
-    const finalLyrics =
-      document.getElementById("finalLyrics")?.textContent ||
-      document.getElementById("finalizedLyrics")?.value ||
-      document.getElementById("sunoLyrics")?.value ||
-      "";
-    const stylePrompt =
-      document.getElementById("finalizedStylePrompt")?.value ||
-      document.getElementById("stylePrompt")?.value ||
-      "";
-
-    // Gemini API를 사용하여 씬 프롬프트 재생성
-    const geminiKey = localStorage.getItem("gemini_api_key") || "";
-    if (geminiKey && geminiKey.startsWith("AIza")) {
-      const cleanLyrics = extractLyricsOnly(finalLyrics);
-      const prompt = `다음 가사와 스타일 프롬프트를 기반으로 MV 씬 프롬프트를 생성해주세요.
-
-가사:
-${scene.scene || cleanLyrics}
-
-스타일 프롬프트: ${stylePrompt || "없음"}
-
-요구사항:
-1. Midjourney 이미지 생성용 영어 프롬프트 작성
-2. 고화질, 실사진 스타일
-3. 자연스러운 포즈, 상세한 손가락
-4. 배경 중심 구성
-
-프롬프트만 출력하세요 (설명 없이):`;
-
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
-      const response = await fetch(geminiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.8,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 500,
-          },
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const aiResponse =
-          data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        const newPrompt = aiResponse.trim();
-
-        if (newPrompt) {
-          const sceneId = `scene_${sceneIndex}`;
-          const enEl = document.getElementById(`${sceneId}_en`);
-          if (enEl) {
-            enEl.value = newPrompt;
-            // 한글 자동 번역
-            await syncScenePromptTranslation(sceneIndex, "en");
-          }
-        }
-      }
-    } else {
-      // AI 없으면 기본 프롬프트 생성
-      const basicPrompt = `${scene.scene || "music scene"}, high quality, photorealistic, natural pose, detailed hands`;
-      const sceneId = `scene_${sceneIndex}`;
-      const enEl = document.getElementById(`${sceneId}_en`);
-      if (enEl) {
-        enEl.value = basicPrompt;
-        await syncScenePromptTranslation(sceneIndex, "en");
-      }
-    }
-
-    if (typeof window.showCopyIndicator === "function") {
-      window.showCopyIndicator(
-        `✅ 씬 ${sceneIndex + 1} 프롬프트가 재생성되었습니다!`,
-      );
-    }
-
-    // 재생성 시 해당 씬의 복사 버튼을 "복사"로 복원
-    const sceneCopyBtn = document.getElementById(
-      `copyScenePromptBtn_${sceneIndex}`,
-    );
-    if (sceneCopyBtn) {
-      sceneCopyBtn.innerHTML =
-        sceneCopyBtn.dataset.originalHTML || '<i class="fas fa-copy"></i> 복사';
-      sceneCopyBtn.disabled = false;
-      sceneCopyBtn.classList.remove("copied");
-    }
-  } catch (error) {
-    console.error("씬 프롬프트 재생성 오류:", error);
-    alert("씬 프롬프트 재생성 중 오류가 발생했습니다:\n\n" + error.message);
-  }
-};
 
 // 프롬프트 저장
 window.saveMVPrompt = function (type) {
@@ -6525,47 +4676,6 @@ window.saveMVPrompt = function (type) {
   } catch (error) {
     console.error("프롬프트 저장 오류:", error);
     alert("프롬프트 저장 중 오류가 발생했습니다.");
-  }
-};
-
-// 씬 프롬프트 저장
-window.saveScenePrompt = function (sceneIndex) {
-  try {
-    if (!window.currentScenes || !window.currentScenes[sceneIndex]) {
-      alert("저장할 씬이 없습니다.");
-      return;
-    }
-
-    const sceneId = `scene_${sceneIndex}`;
-    const enEl = document.getElementById(`${sceneId}_en`);
-    const koEl = document.getElementById(`${sceneId}_ko`);
-
-    if (enEl && koEl) {
-      window.currentScenes[sceneIndex].prompt = enEl.value;
-      window.currentScenes[sceneIndex].promptKo = koEl.value;
-
-      // 프로젝트에 저장
-      if (window.currentProject) {
-        if (!window.currentProject.data) {
-          window.currentProject.data = {};
-        }
-        if (!window.currentProject.data.marketing) {
-          window.currentProject.data.marketing = {};
-        }
-        window.currentProject.data.marketing.mvPrompts = window.currentScenes;
-      }
-
-      if (typeof window.showCopyIndicator === "function") {
-        window.showCopyIndicator(
-          `✅ 씬 ${sceneIndex + 1} 프롬프트가 저장되었습니다!`,
-        );
-      } else {
-        alert(`씬 ${sceneIndex + 1} 프롬프트가 저장되었습니다.`);
-      }
-    }
-  } catch (error) {
-    console.error("씬 프롬프트 저장 오류:", error);
-    alert("씬 프롬프트 저장 중 오류가 발생했습니다.");
   }
 };
 
@@ -6650,49 +4760,6 @@ window.switchLyricsMode = function (mode) {
   } catch (error) {
     console.error("❌ 모드 전환 오류:", error);
     alert("모드 전환 중 오류가 발생했습니다:\n\n" + error.message);
-  }
-};
-
-// 태그 버튼 클릭 이벤트 초기화 함수
-window.initializeTagButtons = function () {
-  try {
-    // 모든 태그 컨테이너에 이벤트 위임
-    const tagContainers = document.querySelectorAll(".tag-container");
-
-    tagContainers.forEach((container) => {
-      // 기존 이벤트 리스너 제거 (중복 방지)
-      const newContainer = container.cloneNode(true);
-      container.parentNode.replaceChild(newContainer, container);
-
-      // 새 컨테이너에 이벤트 리스너 추가
-      newContainer.addEventListener("click", function (e) {
-        const tagBtn = e.target.closest(".tag-btn");
-        if (tagBtn && !tagBtn.classList.contains("custom-tag-btn")) {
-          e.preventDefault();
-          e.stopPropagation();
-
-          // active 클래스 토글
-          tagBtn.classList.toggle("active");
-
-          // 6단계 장소 유형 선택 시 설정 저장
-          if (
-            newContainer.id === "mvLocationTags" &&
-            typeof window.saveMVSettings === "function"
-          ) {
-            window.saveMVSettings();
-          }
-
-          // 선택된 태그 값 로그 (디버깅용)
-          const tagValue = tagBtn.getAttribute("data-value");
-          const isActive = tagBtn.classList.contains("active");
-          console.log(`🏷️ 태그 ${isActive ? "선택" : "해제"}: ${tagValue}`);
-        }
-      });
-    });
-
-    console.log("✅ 태그 버튼 이벤트 리스너 초기화 완료");
-  } catch (error) {
-    console.error("❌ 태그 버튼 초기화 오류:", error);
   }
 };
 
@@ -6889,14 +4956,6 @@ window.pickBestLocationForScene = function (
   if (bestLoc && bestScore > 0) return bestLoc;
   return selected[sceneIndex % selected.length];
 };
-window.getMVLocationValues = function () {
-  const container = document.getElementById("mvLocationTags");
-  if (!container) return [];
-  const activeTags = container.querySelectorAll(".tag-btn.active");
-  return Array.from(activeTags)
-    .map((btn) => btn.getAttribute("data-value"))
-    .filter((v) => !!v);
-};
 
 window.getMVLocationEnString = function () {
   const vals = window.getMVLocationValues();
@@ -6949,7 +5008,11 @@ window.saveMVSettings = function () {
     const race = document.getElementById(`mvCharacter${i}_race`)?.value || "";
     const appearance =
       document.getElementById(`mvCharacter${i}_appearance`)?.value || "";
-    characters.push({ gender, age, race, appearance });
+    const artStyle =
+      document.getElementById(`mvCharacter${i}_artStyle`)?.value || "photorealistic";
+    const characterSheet =
+      document.getElementById(`mvCharacter${i}_sheet`)?.value || "";
+    characters.push({ gender, age, race, appearance, artStyle, characterSheet });
   }
 
   const settings = {
@@ -6989,6 +5052,12 @@ window.saveMVSettings = function () {
 
 window.loadMVSettings = function () {
   try {
+    // 프로젝트가 이미 로드된 상태면 전역 설정을 불러와서 덮어쓰지 않음 (복원된 데이터 보존)
+    if (window.currentProject && window.currentProject.data) {
+      console.log("ℹ️ 프로젝트 데이터가 존재하여 전역 설정 로드를 건너뜁니다.");
+      return;
+    }
+    
     const saved = localStorage.getItem("mvSettings");
     if (saved) {
       const settings = JSON.parse(saved);
@@ -7049,6 +5118,20 @@ window.loadMVSettings = function () {
           if (document.getElementById(`mvCharacter${i}_appearance`))
             document.getElementById(`mvCharacter${i}_appearance`).value =
               char.appearance || "";
+          if (char.artStyle && document.getElementById(`mvCharacter${i}_artStyle`))
+            document.getElementById(`mvCharacter${i}_artStyle`).value =
+              char.artStyle;
+          // 캐릭터 시트 복원
+          if (char.characterSheet && document.getElementById(`mvCharacter${i}_sheet`)) {
+            document.getElementById(`mvCharacter${i}_sheet`).value =
+              char.characterSheet;
+            const sheetArea = document.getElementById(`mvCharacter${i}_sheetArea`);
+            if (sheetArea) sheetArea.style.display = "block";
+            const sheetToggle = document.getElementById(`mvCharacter${i}_sheetToggle`);
+            if (sheetToggle) sheetToggle.style.display = "inline-flex";
+            const sheetCopy = document.getElementById(`mvCharacter${i}_sheetCopy`);
+            if (sheetCopy) sheetCopy.style.display = "inline-flex";
+          }
         });
       }
     }
@@ -7073,15 +5156,16 @@ window.updateCharacterInputs = function () {
   const count = parseInt(characterCount);
   const backups = [];
   for (let i = 1; i <= 10; i++) {
-    // 최대 10명까지 가정
     const gender = document.getElementById(`mvCharacter${i}_gender`)?.value;
     const age = document.getElementById(`mvCharacter${i}_age`)?.value;
     const race = document.getElementById(`mvCharacter${i}_race`)?.value;
     const appearance = document.getElementById(
       `mvCharacter${i}_appearance`,
     )?.value;
+    const artStyle = document.getElementById(`mvCharacter${i}_artStyle`)?.value;
+    const charSheet = document.getElementById(`mvCharacter${i}_sheet`)?.value;
     if (gender !== undefined) {
-      backups[i] = { gender, age, race, appearance };
+      backups[i] = { gender, age, race, appearance, artStyle, characterSheet: charSheet };
     }
   }
 
@@ -7127,8 +5211,59 @@ window.updateCharacterInputs = function () {
                     </div>
                     <div class="form-group">
                         <label style="display: block; margin-bottom: 5px; font-size: 0.85rem; color: var(--text-secondary);">외모/스타일</label>
-                        <input type="text" id="mvCharacter${i}_appearance" oninput="window.saveMVSettings()" placeholder="예: 단정한 헤어스타일, 키가 큰, 마른 체형" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-input); color: var(--text-primary);">
+                        <input type="text" id="mvCharacter${i}_appearance" oninput="window.saveMVSettings()" placeholder="예: 검은 단발, 차가운 느낌, 키 170cm, 마른 체형" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-input); color: var(--text-primary);">
                     </div>
+                </div>
+                <!-- Art Style 선택 -->
+                <div style="margin-top: 10px;">
+                    <label style="display: block; margin-bottom: 5px; font-size: 0.85rem; color: var(--text-secondary);">🎨 Art Style</label>
+                    <select id="mvCharacter${i}_artStyle" onchange="window.saveMVSettings()" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-input); color: var(--text-primary);">
+                        <option value="photorealistic">포토리얼리스틱 (실사)</option>
+                        <option value="cinematic-photography">시네마틱 포토그래피</option>
+                        <option value="anime">애니메이션 (아니메)</option>
+                        <option value="3d-render">3D 렌더링</option>
+                        <option value="digital-art">디지털 아트</option>
+                        <option value="watercolor">수채화</option>
+                        <option value="oil-painting">유화</option>
+                        <option value="concept-art">컨셉 아트</option>
+                        <option value="comic-book">코믹북 스타일</option>
+                        <option value="pixel-art">픽셀 아트</option>
+                        <option value="fashion-illustration">패션 일러스트</option>
+                        <option value="hyperrealistic">하이퍼리얼리스틱</option>
+                    </select>
+                </div>
+                <!-- 캐릭터 시트 생성 버튼 -->
+                <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
+                    <button type="button" class="btn btn-primary" id="mvCharacter${i}_sheetBtn"
+                        onclick="window.generateCharacterSheet(${i})"
+                        style="padding: 8px 16px; font-size: 0.85rem; border-radius: 6px; display: flex; align-items: center; gap: 6px;">
+                        <span>🎨</span> <span>캐릭터 시트 생성</span>
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="mvCharacter${i}_sheetToggle"
+                        onclick="window.toggleCharacterSheet(${i})"
+                        style="padding: 8px 12px; font-size: 0.8rem; border-radius: 6px; display: none;">
+                        📋 시트 보기/숨기기
+                    </button>
+                    <button type="button" class="btn btn-success" id="mvCharacter${i}_sheetCopy"
+                        onclick="window.copyCharacterSheet(${i}, event)"
+                        style="padding: 8px 12px; font-size: 0.8rem; border-radius: 6px; display: none;">
+                        📋 시트 복사
+                    </button>
+                </div>
+                <!-- 캐릭터 시트 생성 진행 표시 -->
+                <div id="mvCharacter${i}_sheetLoading" style="display: none; margin-top: 10px; padding: 10px; background: var(--bg-input); border-radius: 6px; text-align: center; color: var(--text-secondary); font-size: 0.85rem;">
+                    ⏳ AI가 캐릭터 시트를 생성하는 중... (고정 요소 보존, 변형 요소 보완)
+                </div>
+                <!-- 캐릭터 시트 미리보기/편집 영역 -->
+                <div id="mvCharacter${i}_sheetArea" style="display: none; margin-top: 10px;">
+                    <label style="display: block; margin-bottom: 5px; font-size: 0.85rem; color: var(--text-secondary);">
+                        📝 캐릭터 시트 (편집 가능 — 이 내용이 인물/썸네일/씬 프롬프트에 반영됩니다)
+                    </label>
+                    <textarea id="mvCharacter${i}_sheet"
+                        onchange="window.saveMVSettings()"
+                        placeholder="캐릭터 시트가 여기에 생성됩니다..."
+                        style="width: 100%; min-height: 300px; padding: 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-input); color: var(--text-primary); font-family: 'Courier New', monospace; font-size: 0.8rem; resize: vertical; line-height: 1.5; white-space: pre-wrap;"
+                    ></textarea>
                 </div>
             </div>
         `;
@@ -7149,11 +5284,620 @@ window.updateCharacterInputs = function () {
       if (document.getElementById(`mvCharacter${i}_appearance`))
         document.getElementById(`mvCharacter${i}_appearance`).value =
           backups[i].appearance;
+      if (backups[i].artStyle && document.getElementById(`mvCharacter${i}_artStyle`))
+        document.getElementById(`mvCharacter${i}_artStyle`).value =
+          backups[i].artStyle;
+      // 캐릭터 시트 복원
+      if (backups[i].characterSheet && document.getElementById(`mvCharacter${i}_sheet`)) {
+        document.getElementById(`mvCharacter${i}_sheet`).value = backups[i].characterSheet;
+        document.getElementById(`mvCharacter${i}_sheetArea`).style.display = "block";
+        document.getElementById(`mvCharacter${i}_sheetToggle`).style.display = "inline-flex";
+        document.getElementById(`mvCharacter${i}_sheetCopy`).style.display = "inline-flex";
+      }
     }
   }
 };
 
-// 페이지 로드 시 MV 설정 로드
+// ═══════════════════════════════════════════════════════════════
+// 캐릭터 시트 생성/관리 함수들
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * AI를 사용하여 완전한 캐릭터 시트 프롬프트를 생성합니다.
+ * 사용자가 입력한 고정 요소는 절대 변경하지 않고,
+ * 변형 가능 요소를 보완하여 완전한 스펙을 생성합니다.
+ * @param {number} charIndex - 인물 인덱스 (1-based)
+ */
+window.generateCharacterSheet = async function (charIndex) {
+  const btn = document.getElementById(`mvCharacter${charIndex}_sheetBtn`);
+  const loadingEl = document.getElementById(`mvCharacter${charIndex}_sheetLoading`);
+  const sheetArea = document.getElementById(`mvCharacter${charIndex}_sheetArea`);
+  const sheetEl = document.getElementById(`mvCharacter${charIndex}_sheet`);
+  const toggleBtn = document.getElementById(`mvCharacter${charIndex}_sheetToggle`);
+  const copyBtn = document.getElementById(`mvCharacter${charIndex}_sheetCopy`);
+
+  // 입력값 수집
+  const gender = document.getElementById(`mvCharacter${charIndex}_gender`)?.value || "";
+  const age = document.getElementById(`mvCharacter${charIndex}_age`)?.value || "";
+  const race = document.getElementById(`mvCharacter${charIndex}_race`)?.value || "";
+  const appearance = document.getElementById(`mvCharacter${charIndex}_appearance`)?.value || "";
+  const artStyle = document.getElementById(`mvCharacter${charIndex}_artStyle`)?.value || "photorealistic";
+
+  if (!gender && !age && !race && !appearance) {
+    alert("인물 정보를 최소 1개 이상 입력해주세요.\n(성별, 나이, 인종, 외모/스타일 중 하나)");
+    return;
+  }
+
+  // Gemini API 키 확인
+  const geminiKey = window.getGeminiApiKey();
+  if (!geminiKey || !geminiKey.startsWith("AIza")) {
+    alert("Gemini API 키가 설정되지 않았습니다.\n설정 > API 키에서 Gemini API 키를 입력해주세요.");
+    return;
+  }
+
+  // UI 상태 전환: 로딩
+  if (btn) btn.disabled = true;
+  if (loadingEl) loadingEl.style.display = "block";
+
+  try {
+    // 성별/나이/인종 매핑
+    const genderMap = { male: "Male", female: "Female", "non-binary": "Non-binary" };
+    const ageMap = {
+      child: "Child (under 10)", teen: "Teenager (10-19)",
+      "20s": "Young adult (early to late 20s)", "30s": "Adult (30s)",
+      "40s": "Adult (40s)", "50s": "Mature adult (50s)", elder: "Elder (60+)"
+    };
+    // 인종 매핑 — 미드저니가 인식하는 구체적 신체 특징 키워드 포함
+    const raceMap = {
+      asian: "East Asian",
+      caucasian: "Caucasian/White",
+      african: "African/Black",
+      hispanic: "Hispanic/Latino",
+      "middle-eastern": "Middle Eastern",
+      mixed: "Mixed ethnicity"
+    };
+    // 미드저니 전용 인종 강제 키워드 맵 (OVERALL COMPOSITION 상단에 삽입용)
+    const genderSuffix = gender === "male" ? "man" : gender === "female" ? "woman" : "person";
+    const raceMJMap = {
+      asian: `East Asian ${genderSuffix}, Korean/Japanese/Chinese facial features, monolid or slightly hooded almond-shaped eyes, flat nasal bridge, high cheekbones, light to medium tan skin tone typical of East Asia, straight black hair`,
+      caucasian: `Caucasian ${genderSuffix}, White European facial features, round to oval eyes, defined nasal bridge, fair to light skin tone`,
+      african: `African/Black ${genderSuffix}, Sub-Saharan African facial features, full lips, broad nasal bridge, dark brown skin tone, tightly coiled dark hair`,
+      hispanic: `Hispanic/Latino ${genderSuffix}, Latin American facial features, warm olive to tan skin tone, dark brown eyes and hair`,
+      "middle-eastern": `Middle Eastern ${genderSuffix}, Arab/Persian facial features, strong brow ridge, prominent nose, olive to tan skin tone, dark hair`,
+      mixed: `Mixed ethnicity ${genderSuffix}, blended facial features from multiple ethnic backgrounds`
+    };
+    const artStyleMap = {
+      photorealistic: "photorealistic photography style",
+      "cinematic-photography": "cinematic photography style, dramatic film-like quality",
+      anime: "anime/Japanese animation style",
+      "3d-render": "3D rendered, Pixar-quality CG style",
+      "digital-art": "digital art illustration style",
+      watercolor: "watercolor painting style",
+      "oil-painting": "classical oil painting style",
+      "concept-art": "conceptual art style, entertainment design",
+      "comic-book": "comic book / graphic novel style",
+      "pixel-art": "pixel art / retro game style",
+      "fashion-illustration": "fashion illustration style",
+      hyperrealistic: "hyperrealistic, ultra-detailed photographic style"
+    };
+
+    // 고정 요소 목록 생성
+    const fixedTraits = [];
+    if (gender) fixedTraits.push(`Gender: ${genderMap[gender] || gender}`);
+    if (age) fixedTraits.push(`Age: ${ageMap[age] || age}`);
+    if (race) fixedTraits.push(`Ethnicity: ${raceMap[race] || race} — MANDATORY, do not change to any other ethnicity`);
+    if (appearance) fixedTraits.push(`User-described traits: "${appearance}"`);
+
+    const artStyleEn = artStyleMap[artStyle] || artStyle;
+    // 미드저니 인종 강제 키워드 (선택된 인종 또는 원문 그대로)
+    const raceMJKeywords = race ? (raceMJMap[race] || (raceMap[race] || race)) : "";
+    // 인종 강제 규칙 블록
+    const ethnicityEnforcement = race ? `
+⚠️ ETHNICITY ENFORCEMENT (MANDATORY — DO NOT IGNORE):
+- The character's ethnicity is: ${raceMap[race] || race}
+- Midjourney-specific descriptors to include: ${raceMJKeywords}
+- FORBIDDEN: rendering the character as any other ethnicity (e.g., do NOT render as Caucasian/White, African/Black, or any non-${raceMap[race] || race} appearance)
+- Every view and headshot MUST clearly show ${raceMap[race] || race} facial features
+` : "";
+
+    // MV 프롬프트 상세 설정 수집 (시대, 국가, 조명 등)
+    const mvEra = document.getElementById("mvEra")?.value || "";
+    const mvCountry = document.getElementById("mvCountry")?.value || "";
+    const mvLocation = typeof window.getMVLocationEnString === "function" ? window.getMVLocationEnString() : document.getElementById("mvLocation")?.value || "";
+    const mvLighting = document.getElementById("mvLighting")?.value || "";
+    const mvCameraWork = document.getElementById("mvCameraWork")?.value || "";
+    const mvMood = document.getElementById("mvMood")?.value || "";
+    const mvCustomSettings = document.getElementById("mvCustomSettings")?.value || "";
+    const mvCharacterCount = document.getElementById("mvCharacterCount")?.value || "1";
+
+    const mvContextParts = [];
+    if (mvEra) mvContextParts.push(`Era: ${mvEra}`);
+    if (mvCountry) mvContextParts.push(`Country/Region: ${mvCountry}`);
+    if (mvLocation) mvContextParts.push(`Location: ${mvLocation}`);
+    if (mvLighting) mvContextParts.push(`Lighting: ${mvLighting}`);
+    if (mvCameraWork) mvContextParts.push(`Camera Work: ${mvCameraWork}`);
+    if (mvMood) mvContextParts.push(`Mood/Atmosphere: ${mvMood}`);
+    if (mvCharacterCount) mvContextParts.push(`Total Characters in MV: ${mvCharacterCount} (Design this character to fit well in a group of ${mvCharacterCount})`);
+    if (mvCustomSettings) mvContextParts.push(`Additional Settings: "${mvCustomSettings}"`);
+    
+    const mvContextStr = mvContextParts.length > 0 ? mvContextParts.join(" | ") : "Not specified";
+
+    // 최종 가사 (수노용) 정보 수집
+    const finalLyricsEl = document.getElementById("finalLyrics");
+    const finalLyrics = finalLyricsEl ? finalLyricsEl.innerText.trim() : "";
+
+    // 실사 계열 스타일 여부 판별 (만화/애니 방지 규칙 적용 대상)
+    const photoRealisticStyles = ["photorealistic", "cinematic-photography", "hyperrealistic"];
+    const isPhotoRealistic = photoRealisticStyles.includes(artStyle);
+
+    // 실사 스타일 강제 규칙 블록
+    const photoRealismRule = isPhotoRealistic
+      ? `⚠️ ABSOLUTE PHOTO-REALISM ENFORCEMENT (HIGHEST PRIORITY — OVERRIDES ALL OTHER STYLE DECISIONS):
+- This character MUST be rendered as a REAL HUMAN PHOTOGRAPH, NOT illustration, cartoon, anime, manga, 3D animation, or any drawn/painted style.
+- REQUIRED: ultra-photorealistic, shot on high-end DSLR/mirrorless camera, visible skin pores, subsurface skin scattering, natural hair strands, real fabric texture, lens bokeh, 8K RAW photo quality.
+- FORBIDDEN: anime, manga, cartoon, illustration, cel-shading, flat color, stylized, toon, animated, drawn, painted, digital art, 3D render.
+- Skin: natural imperfections, pores, subtle veins — NOT airbrushed, plastic, or smooth.
+- Eyes: iris detail, natural moisture/catchlights, realistic proportions — NOT oversized anime-style eyes.
+`
+      : "";
+
+    // 가사 기반 인물 분석 블록
+    const lyricsAnalysisBlock = finalLyrics
+      ? `MANDATORY LYRICS-BASED CHARACTER ANALYSIS:
+Analyze the song lyrics below and determine:
+- CORE EMOTION (e.g., longing, heartbreak, euphoria, nostalgia, melancholy)
+- CHARACTER'S NARRATIVE ROLE (who is this person? what are they experiencing?)
+- IMPLIED RELATIONSHIP (lover, lost connection, self-reflection, stranger)
+- AESTHETIC ATMOSPHERE (e.g., rainy city night, empty room, neon-lit alley)
+
+Reflect ALL of the above into the design:
+- FACIAL EXPRESSION: convey the song's core emotion (NOT a blank neutral face)
+- CLOTHING & COLOR PALETTE: match the song's era, mood, and atmosphere
+- HAIR & MAKEUP: reinforce the emotional state
+- BODY LANGUAGE: subtle cues to the character's inner world
+- PROPS/ACCESSORIES: hint at the song's story
+
+SONG LYRICS:
+"""
+${finalLyrics}
+"""`
+      : "";
+
+    // AI 프롬프트 구성 (실사 강제 + 가사 분석 강화)
+
+    const prompt = `You are a professional character designer${isPhotoRealistic ? " and portrait photographer" : ""}. Generate a COMPLETE, highly detailed character design sheet. The output will be used as a prompt for an AI image generator.
+
+${photoRealismRule}
+${ethnicityEnforcement}
+**CRITICAL RULES (OBEY IN THIS EXACT PRIORITY ORDER):**
+1. ${isPhotoRealistic ? "⚠️ PHOTO-REALISM FIRST: See the ABSOLUTE PHOTO-REALISM ENFORCEMENT block above. NO cartoons, NO anime, NO illustration — ONLY real human photography quality at 8K or higher." : `Art Style: ${artStyleEn} — All details must faithfully reflect this style.`}
+2. CORE CHARACTERISTICS (USER INPUTS - ABSOLUTE MANDATORY): ${fixedTraits.join("; ")} 
+   -> You MUST strictly follow these traits. They are the core identity of the character. Do not change or alter them under any circumstances.
+3. Art Style Technical Spec: ${artStyleEn}${isPhotoRealistic ? ", 8K ultra-resolution, RAW photo quality, professional studio lighting" : ""}
+4. MV PRODUCTION CONTEXT: The character must naturally fit the following music video settings: ${mvContextStr}.
+${lyricsAnalysisBlock ? `5. ${lyricsAnalysisBlock}\n6. VARIABLE ELEMENTS: Fill in ALL remaining details not specified by the user, guided by the lyrics analysis above.` : "5. VARIABLE ELEMENTS: Fill in ALL remaining details that the user did NOT specify."}
+
+**INPUT INTERPRETATION RULES:**
+- Explicit Traits (physical descriptions like hair color, height, body type): keep EXACTLY as stated
+- Implicit Traits (mood, personality, aura like "cold feeling", "mysterious"): Do NOT write these abstractly. Convert them into PHYSICAL/VISUAL elements (e.g., "cold feeling" → sharp angular jawline, cool-toned eye color, minimal makeup, sleek straight hair)
+- If explicit and implicit traits conflict, explicit traits ALWAYS take priority
+
+**OUTPUT RULES:**
+- Every spec must be defined with Position, Size, Shape, Material, and State where applicable
+- NO vague or abstract expressions allowed - everything must be concrete and physical
+- Character must stand in a natural, upright A-pose (no dramatic poses)
+- Arms relaxed at sides unless holding a prop
+- Fill in EVERY field in the template - leave nothing empty
+- THE VERY FIRST SECTION you output MUST be a labeled Midjourney prompt block. It must look exactly like this:
+  
+  MIDJOURNEY PROMPT (COPY THIS):
+  ${'```'}
+  [single-line prompt following the rules below]
+  ${'```'}
+
+- Rules for the simple Midjourney prompt:
+  * Start with: "character sheet, turnaround, full body, [ethnicity] [gender], [age],"
+  * Add layout: "4 body views (front, 3/4, side, back) and 3 close-up headshots on right,"
+  * Add style: ${isPhotoRealistic ? "ultra photographic, 8K resolution, high detail," : artStyleEn + ","}
+  * End with: "neutral grey background"
+  * CRITICAL: Do NOT include "--ar" or any other parameters. Keep it under 150 characters if possible.
+  * Keep it in a single line inside the code block.
+
+**OUTPUT THE COMPLETE CHARACTER SHEET BELOW. Use ONLY the following template structure. Do NOT add or remove any sections:**
+
+MIDJOURNEY PROMPT (COPY THIS):
+${'```'}
+(Generate the simplified single-line prompt here)
+${'```'}
+
+**[OVERALL COMPOSITION - FIXED LAYOUT]**
+${raceMJKeywords ? raceMJKeywords + "," : ""} ${genderMap[gender] || "character"}, character reference sheet, character turnaround, split view, 4 full body views arranged horizontally (front, 3/4 angle, profile, back), 3 vertical close-up headshot portraits on the right side showing different expressions, ${artStyleEn}${isPhotoRealistic ? ", 8K resolution, real photograph, professional lighting, visible skin texture, natural hair strands, absolutely no cartoon elements" : ", high-quality, 4K resolution"}, neutral grey studio background, wide aspect ratio, symmetrical layout.
+
+[SECTION 1 - FULL BODY 1]
+- Full body view, 3/4 angle
+
+[SECTION 2 - FULL BODY 2]
+- Full body view, opposite 3/4 angle
+
+[SECTION 3 - FULL BODY 3]
+- Full body view, from behind (back view)
+
+[SECTION 4 - HEADSHOTS AND EXPRESSIONS]
+- Multiple close-up portrait headshots
+- Showing different facial angles (front view, side profile) and subtle expressions
+
+[GLOBAL LAYOUT RULES]
+- Character turnaround sheet format
+- All views aligned on the same neutral backdrop
+- Consistent character proportions and design across all angles
+- Professional concept art layout with clean spacing
+
+**[CHARACTER SPECIFICATION - FULL DEFINITION]**
+
+[Identity]
+- Gender: (fill based on fixed elements)
+- Age: (fill based on fixed elements)
+- Ethnicity: (fill based on fixed elements)
+
+[Body]
+- Height:
+- Proportion:
+- Build:
+- Shoulder width:
+- Waist:
+- Hip:
+- Posture:
+
+[Pose]
+- A-pose
+- Arms:
+- Elbows:
+- Hands:
+- Legs:
+- Weight distribution:
+
+[Face]
+- Shape:
+- Jaw:
+- Chin:
+- Eyes:
+- Eye color:
+- Eye size:
+- Brows:
+- Nose:
+- Lips:
+- Skin:
+- Expression:
+
+[Makeup]
+- Base:
+- Blush:
+- Eyeshadow:
+- Eyeliner:
+- Mascara:
+- Lips:
+
+[Hair]
+- Length:
+- Part:
+- Structure:
+- Strand thickness:
+- Layering:
+- Volume:
+- Flow:
+- Color:
+- Surface:
+- State:
+
+[Outfit] Top:
+- Type:
+- Length:
+- Fit:
+- Neckline:
+- Sleeve:
+- Fabric:
+- Wrinkles:
+
+Skirt:
+- Type:
+- Waist position:
+- Length:
+- Shape:
+- Structure:
+- Pleats:
+- Fabric:
+- Movement:
+
+[Footwear]
+- Type:
+- Heel height:
+- Sole thickness:
+- Shape:
+- Coverage:
+- Material:
+- Color:
+- Fit:
+- State:
+
+[Accessories / Wear Position] Earrings:
+- Type:
+- Length:
+- Material:
+- Position:
+- Movement:
+
+Necklace:
+- Type:
+- Lengths:
+- Position:
+- Material:
+
+Rings:
+- Count:
+- Placement:
+- Material:
+
+Bracelet:
+- Wrist:
+- Fit:
+- Material:
+
+[Props]
+- (specify if any, based on character concept)
+
+**[TECHNICAL SPECIFICATIONS]**
+
+[Lighting]
+- Key:
+- Fill:
+- Rim:
+- Shadow:
+${isPhotoRealistic ? "- Camera: (specify lens focal length, f-stop, ISO, shutter speed for realistic photography look)\n- Resolution: 8K minimum, ultra-sharp detail, no AI-generation artifacts" : ""}
+
+[Rendering Style]
+- (specify based on art style: ${artStyleEn}${isPhotoRealistic ? " — STRICTLY photo-realistic, zero tolerance for any illustration, cartoon, or anime rendering" : ""})
+
+[Color Control]
+- (specify color palette and grading${isPhotoRealistic ? " — natural color grading consistent with professional studio photography; no painterly, watercolor, or heavy filter effects" : ""})
+
+[Consistency Rules]
+- (specify rules to maintain visual consistency across all sections)
+
+[Final Constraint]
+- (specify any final rendering constraints)
+${isPhotoRealistic ? `
+[⚠️ ANTI-CARTOON ABSOLUTE CONSTRAINT]
+- EXPLICITLY FORBIDDEN: anime-style eyes, manga features, cel-shading, flat color fills, illustration outlines, toon rendering, stylized proportions, cartoon skin smoothness.
+- The character MUST be INDISTINGUISHABLE from a real photograph of a real human being.
+- Minimum output quality: 8K, ultra-sharp, visible real-world detail in every element.` : ""}
+
+**IMPORTANT: Output ONLY the completed character sheet. No explanations, no commentary, no markdown code blocks. Just the character sheet text.**`;
+
+    let aiResponse = "";
+    try {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+      const response = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.75,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 8192,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gemini API 오류: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      if (window.logApiUsage) window.logApiUsage("gemini");
+      aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    } catch (geminiError) {
+      console.warn("⚠️ Gemini 캐릭터 시트 생성 실패, ChatGPT로 전환하여 재시도합니다:", geminiError.message);
+      const openaiKey = window.getOpenAIApiKey ? window.getOpenAIApiKey() : "";
+      if (!openaiKey) {
+        throw new Error(`Gemini 캐릭터 시트 생성 실패 (${geminiError.message}) 후 ChatGPT 폴백을 시도했으나 OpenAI API 키가 없습니다.`);
+      }
+
+      const chatGPTResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: "You are an AI character concept artist." },
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.75,
+        }),
+      });
+
+      if (!chatGPTResponse.ok) {
+        const errorData = await chatGPTResponse.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `ChatGPT API 오류: ${chatGPTResponse.status}`);
+      }
+
+      const chatGPTData = await chatGPTResponse.json();
+      if (window.logApiUsage) window.logApiUsage("openai");
+      aiResponse = chatGPTData.choices?.[0]?.message?.content || "";
+    }
+
+    if (!aiResponse.trim()) {
+      throw new Error("AI 응답이 비어있습니다.");
+    }
+
+    // 마크다운 코드 블록 제거 (있는 경우)
+    let cleanSheet = aiResponse.trim();
+    if (cleanSheet.startsWith("```")) {
+      cleanSheet = cleanSheet.replace(/^```[\w]*\n?/, "").replace(/\n?```$/, "");
+    }
+
+    // textarea에 표시
+    if (sheetEl) sheetEl.value = cleanSheet;
+    if (sheetArea) sheetArea.style.display = "block";
+    if (toggleBtn) toggleBtn.style.display = "inline-flex";
+    if (copyBtn) copyBtn.style.display = "inline-flex";
+
+    // 설정 저장
+    if (typeof window.saveMVSettings === "function") {
+      window.saveMVSettings();
+    }
+
+    console.log(`✅ 캐릭터 시트 생성 완료 (인물 ${charIndex})`);
+
+    if (typeof window.showCopyIndicator === "function") {
+      window.showCopyIndicator(`✅ 인물 ${charIndex} 캐릭터 시트가 생성되었습니다!`);
+    }
+  } catch (error) {
+    console.error(`❌ 캐릭터 시트 생성 실패 (인물 ${charIndex}):`, error);
+    alert(`캐릭터 시트 생성 중 오류가 발생했습니다:\n\n${error.message}`);
+  } finally {
+    if (btn) btn.disabled = false;
+    if (loadingEl) loadingEl.style.display = "none";
+  }
+};
+
+/**
+ * 캐릭터 시트 영역 토글 (보기/숨기기)
+ */
+window.toggleCharacterSheet = function (charIndex) {
+  const sheetArea = document.getElementById(`mvCharacter${charIndex}_sheetArea`);
+  if (sheetArea) {
+    const isVisible = sheetArea.style.display !== "none";
+    sheetArea.style.display = isVisible ? "none" : "block";
+  }
+};
+
+/**
+ * 캐릭터 시트 클립보드 복사
+ */
+window.copyCharacterSheet = function (charIndex, event) {
+  const sheetEl = document.getElementById(`mvCharacter${charIndex}_sheet`);
+  if (!sheetEl || !sheetEl.value.trim()) {
+    alert("복사할 캐릭터 시트가 없습니다.");
+    return;
+  }
+  navigator.clipboard.writeText(sheetEl.value).then(() => {
+    if (typeof window.showCopyIndicator === "function") {
+      window.showCopyIndicator(`📋 인물 ${charIndex} 캐릭터 시트가 복사되었습니다!`);
+    }
+  }).catch((err) => {
+    console.error("복사 실패:", err);
+    // 폴백: 선택 후 복사
+    sheetEl.select();
+    document.execCommand("copy");
+    if (typeof window.showCopyIndicator === "function") {
+      window.showCopyIndicator(`📋 인물 ${charIndex} 캐릭터 시트가 복사되었습니다!`);
+    }
+  });
+};
+
+/**
+ * 캐릭터 시트에서 프롬프트용 핵심 정보를 축약 추출합니다.
+ * 씬 프롬프트에 주입할 때 토큰 절약을 위해 핵심만 발췌합니다.
+ * @param {number} charIndex - 인물 인덱스 (1-based)
+ * @returns {string} 축약된 캐릭터 정보 문자열
+ */
+window.getCharacterSheetSummary = function (charIndex) {
+  const sheetEl = document.getElementById(`mvCharacter${charIndex}_sheet`);
+  if (!sheetEl || !sheetEl.value.trim()) return "";
+
+  const sheet = sheetEl.value;
+  // 핵심 섹션만 추출: Identity, Body, Face, Hair, Outfit, Footwear
+  const sections = ["[Identity]", "[Body]", "[Face]", "[Hair]", "[Outfit]", "[Footwear]"];
+  const lines = sheet.split("\n");
+  let summary = "";
+  let inSection = false;
+  let currentSection = "";
+
+  for (const line of lines) {
+    const trimLine = line.trim();
+
+    // 새 섹션 시작 감지
+    for (const sec of sections) {
+      if (trimLine.startsWith(sec) || trimLine === sec) {
+        inSection = true;
+        currentSection = sec;
+        summary += `\n${sec}\n`;
+        break;
+      }
+    }
+
+    // 현재 핵심 섹션에 있으면 내용 수집
+    if (inSection && trimLine.startsWith("-")) {
+      summary += trimLine + "\n";
+    }
+
+    // 다른 섹션 시작하면 비핵심이면 종료
+    if (inSection && trimLine.startsWith("[") && !sections.some(s => trimLine.startsWith(s))) {
+      // 핵심이 아닌 다른 섹션으로 넘어감
+      if (trimLine.startsWith("[Makeup]") || trimLine.startsWith("[Pose]") ||
+          trimLine.startsWith("[Accessories")) {
+        inSection = false;
+      }
+    }
+  }
+
+  return summary.trim();
+};
+
+/**
+ * 전체 캐릭터 시트 텍스트를 반환합니다.
+ * @param {number} charIndex - 인물 인덱스 (1-based)
+ * @returns {string} 전체 캐릭터 시트 텍스트
+ */
+window.getCharacterSheetFull = function (charIndex) {
+  const sheetEl = document.getElementById(`mvCharacter${charIndex}_sheet`);
+  return sheetEl?.value?.trim() || "";
+};
+
+/**
+ * 모든 인물의 캐릭터 시트 요약을 문자열로 반환합니다.
+ * 씬 프롬프트 생성 시 주입용입니다.
+ * @returns {string} 전체 인물 캐릭터 시트 요약
+ */
+window.getAllCharacterSheetsSummary = function () {
+  const characterCount = parseInt(
+    document.getElementById("mvCharacterCount")?.value || "1"
+  );
+  const summaries = [];
+  for (let i = 1; i <= characterCount; i++) {
+    const summary = window.getCharacterSheetSummary(i);
+    if (summary) {
+      summaries.push(`【인물 ${i} 캐릭터 시트 요약】\n${summary}`);
+    }
+  }
+  return summaries.join("\n\n");
+};
+
+/**
+ * 모든 인물의 캐릭터 시트 원본(전체 텍스트)을 문자열로 반환합니다.
+ * 썸네일/배경/인물/씬 프롬프트 생성 시 최대한 상세한 정보를 반영하기 위함입니다.
+ * @returns {string} 전체 인물 캐릭터 시트 전체 텍스트
+ */
+window.getAllCharacterSheetsFull = function () {
+  const characterCount = parseInt(
+    document.getElementById("mvCharacterCount")?.value || "1"
+  );
+  const fullSheets = [];
+  for (let i = 1; i <= characterCount; i++) {
+    const fullText = window.getCharacterSheetFull(i);
+    if (fullText) {
+      fullSheets.push(`【인물 ${i} 캐릭터 시트 전체 원본】\n${fullText}`);
+    }
+  }
+  return fullSheets.join("\n\n---\n\n");
+};
+
+
 if (typeof document !== "undefined") {
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
@@ -7222,13 +5966,12 @@ window.loadProjectList = function (force = false) {
         if (data.trim().startsWith("[")) {
           const parsed = JSON.parse(data);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            // 프로젝트 객체인지 확인 (id와 title이 있는지)
+            // 프로젝트 객체인지 확인 (id가 있는지)
             const firstItem = parsed[0];
             if (
               firstItem &&
               typeof firstItem === "object" &&
-              firstItem.id &&
-              firstItem.title
+              firstItem.id
             ) {
               allProjects = allProjects.concat(parsed);
               foundKeys.push(key);
@@ -7242,8 +5985,7 @@ window.loadProjectList = function (force = false) {
           if (
             parsed &&
             typeof parsed === "object" &&
-            parsed.id &&
-            parsed.title
+            parsed.id
           ) {
             allProjects.push(parsed);
             foundKeys.push(key);
@@ -7255,8 +5997,10 @@ window.loadProjectList = function (force = false) {
       }
     }
 
-    // 중복 제거 (같은 id를 가진 프로젝트는 가장 최신 것만 유지)
+    // 중복 제거 (같은 id를 가진 프로젝트는 가장 최신 것 및 유효한 제목 우선 유지)
     const projectMap = new Map();
+    const isValidTitle = (t) => t && t !== "제목 없음" && t !== "undefined";
+
     allProjects.forEach((project) => {
       if (!project.id) return;
 
@@ -7264,13 +6008,25 @@ window.loadProjectList = function (force = false) {
       if (!existing) {
         projectMap.set(project.id, project);
       } else {
-        // 더 최신 프로젝트로 교체
-        const existingDate = new Date(
-          existing.savedAt || existing.createdAt || 0,
-        );
-        const newDate = new Date(project.savedAt || project.createdAt || 0);
-        if (newDate > existingDate) {
+        // 우선순위 1: 유효한 제목이 있는 프로젝트 우선
+        const existingHasValidTitle = isValidTitle(existing.title);
+        const nextHasValidTitle = isValidTitle(project.title);
+
+        if (!existingHasValidTitle && nextHasValidTitle) {
+          // 기존 것이 제목이 없는데 새 것이 있으면 교체
           projectMap.set(project.id, project);
+        } else if (existingHasValidTitle && !nextHasValidTitle) {
+          // 기존 것이 제목이 있는데 새 것이 없으면 유지
+          return;
+        } else {
+          // 둘 다 제목이 있거나 둘 다 없으면 더 최신 프로젝트로 교체
+          const existingDate = new Date(
+            existing.savedAt || existing.createdAt || 0,
+          );
+          const newDate = new Date(project.savedAt || project.createdAt || 0);
+          if (newDate > existingDate) {
+            projectMap.set(project.id, project);
+          }
         }
       }
     });
@@ -7753,24 +6509,36 @@ window.restoreProjectOrder = function (projects) {
   try {
     const order = JSON.parse(savedOrder);
     const orderedProjects = [];
-    const unorderedProjects = [];
 
-    // 순서대로 정렬
+    // 기존 저장 순서대로 배치
     order.forEach((id) => {
       const project = projects.find((p) => p.id === id);
-      if (project) {
-        orderedProjects.push(project);
-      }
+      if (project) orderedProjects.push(project);
     });
 
-    // 순서에 없는 프로젝트 추가
-    projects.forEach((project) => {
-      if (!order.includes(project.id)) {
-        unorderedProjects.push(project);
-      }
-    });
+    // 순서에 없는 프로젝트 (타기기/타계정에서 가져온 신규 프로젝트)
+    const unorderedProjects = projects.filter((p) => !order.includes(p.id));
 
-    return [...orderedProjects, ...unorderedProjects];
+    if (unorderedProjects.length === 0) return orderedProjects;
+
+    // 신규 프로젝트를 savedAt 기준으로 기존 목록의 올바른 위치에 삽입
+    const result = [...orderedProjects];
+    unorderedProjects
+      .slice()
+      .sort((a, b) => new Date(b.savedAt || 0) - new Date(a.savedAt || 0))
+      .forEach((newP) => {
+        const newDate = new Date(newP.savedAt || 0);
+        const insertIdx = result.findIndex(
+          (p) => new Date(p.savedAt || 0) < newDate
+        );
+        if (insertIdx === -1) {
+          result.push(newP);
+        } else {
+          result.splice(insertIdx, 0, newP);
+        }
+      });
+
+    return result;
   } catch (error) {
     console.error("프로젝트 순서 복원 오류:", error);
     return projects;
@@ -7822,13 +6590,16 @@ window.deleteProject = function (projectId) {
     // 무시
   }
 
-  // 삭제 확인
-  const confirmDelete = confirm(
-    `${projectTitle} 프로젝트를 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다.`,
-  );
-  if (!confirmDelete) {
-    return;
-  }
+  // ⚠️ setTimeout으로 confirm()을 다음 이벤트 루프로 지연
+  // 크롬에서 draggable 요소 안의 버튼 클릭 시 mousedown→confirm()→mouseup 순서로
+  // 진행되면 mouseup이 confirm 대화 상자 위에서 발생하여 자동으로 닫히는 버그 우회
+  setTimeout(() => {
+    const confirmDelete = confirm(
+      `${projectTitle} 프로젝트를 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다.`,
+    );
+    if (!confirmDelete) {
+      return;
+    }
 
   try {
     let deleted = false;
@@ -7941,6 +6712,7 @@ window.deleteProject = function (projectId) {
     console.error("프로젝트 삭제 오류:", error);
     alert("프로젝트 삭제 중 오류가 발생했습니다:\n\n" + error.message);
   }
+  }, 0); // setTimeout 종료 — 크롬 draggable+confirm 버그 우회
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -8035,7 +6807,34 @@ window.handleImport = function (event) {
 
       // 프로젝트 배열 추출
       let projects = [];
-      if (Array.isArray(importData)) {
+      let isFullBackup = false;
+
+      // 전체 프로그램 백업 형식 처리
+      if (importData.backupVersion && importData.projects) {
+        isFullBackup = true;
+        const projectKeys = ["musicCreatorProjects", "savedProjects", "sunoLyricsHistory", "stylePromptHistory"];
+        projectKeys.forEach(key => {
+          if (importData.projects[key] && Array.isArray(importData.projects[key])) {
+            projects = projects.concat(importData.projects[key]);
+          }
+        });
+        
+        // 설정 및 기타 데이터 복원
+        if (importData.settings) {
+          Object.keys(importData.settings).forEach(k => {
+            if (typeof importData.settings[k] === 'string') localStorage.setItem(k, importData.settings[k]);
+            else localStorage.setItem(k, JSON.stringify(importData.settings[k]));
+          });
+        }
+        if (importData.other) {
+          Object.keys(importData.other).forEach(k => {
+            if (typeof importData.other[k] === 'string') localStorage.setItem(k, importData.other[k]);
+            else localStorage.setItem(k, JSON.stringify(importData.other[k]));
+          });
+        }
+      } 
+      // 기존 백업 형식 처리
+      else if (Array.isArray(importData)) {
         projects = importData;
       } else if (importData.projects && Array.isArray(importData.projects)) {
         projects = importData.projects;
@@ -8552,72 +7351,104 @@ window.resetCurrentStep = function () {
   }
 };
 
-window.resetAllSteps = function () {
-  if (
-    !confirm(
-      "모든 단계의 데이터를 초기화하시겠습니까?\n\n⚠️ 경고: 이 작업은 되돌릴 수 없으며 모든 데이터가 삭제됩니다.\n\n계속하시겠습니까?",
-    )
-  ) {
-    return;
-  }
-
-  if (
-    !confirm("정말로 모든 데이터를 초기화하시겠습니까?\n\n마지막 확인입니다.")
-  ) {
-    return;
+window.resetAllSteps = function (skipConfirm = false) {
+  if (!skipConfirm) {
+    if (
+      !confirm(
+        "모든 단계의 데이터를 초기화하고 처음부터 다시 시작하시겠습니까?\n\n⚠️ 경고: 현재 작성 중인 모든 내용이 삭제됩니다.",
+      )
+    ) {
+      return;
+    }
   }
 
   try {
-    // 모든 입력 필드 초기화
+    console.log("🧹 앱 전체 초기화 시작...");
+
+    // 1. 전역 상태 초기화
+    window.currentProject = null;
+    window.currentProjectId = null;
+    window.currentScenes = [];
+    window.currentCharacters = [];
+    window.vocalPartAssignments = {};
+    if (window.vocalPartHistory) window.vocalPartHistory = [];
+
+    // 2. 모든 입력 필드 초기화 (텍스트, 체크박스, 셀렉트)
     const allInputs = document.querySelectorAll("input, textarea, select");
     allInputs.forEach((input) => {
+      // API 키나 지침서는 초기화에서 제외
+      const skipIds = ["openaiApiKey", "geminiApiKey", "musicCreatorGuidelines", "importFile"];
+      if (skipIds.includes(input.id)) return;
+
       if (input.type === "checkbox" || input.type === "radio") {
         input.checked = false;
+      } else if (input.type === "range") {
+        input.value = input.defaultValue || 50;
       } else {
         input.value = "";
       }
     });
 
-    // 결과 영역 초기화
-    const resultElements = [
-      "analysisResult",
-      "finalLyrics",
-      "youtubeDescription",
-      "instagramPost",
-      "twitterPost",
+    // 3. 태그 버튼 초기화 (.tag-btn의 active 클래스 제거)
+    const allTagButtons = document.querySelectorAll(".tag-btn, .genre-tag, .mood-tag, .era-tag, .theme-tag");
+    allTagButtons.forEach((btn) => btn.classList.remove("active"));
+
+    // 4. 결과 영역 및 컨테이너 초기화
+    const containersToClear = [
+      "aiLyricsOptions",          // 1단계 AI 가사 후보
+      "analysisResult",           // 3단계 분석 결과
+      "geminiAnalysisResult",     // 3단계 상세 분석
+      "improvementResults",       // 4단계 개선안 리스트
+      "thumbnailsGrid",           // 6단계 썸네일
+      "mvSceneOverviewContainer", // 6단계 MV 씬 그리드
+      "mvPromptsContainer",       // 6단계 MV 상세 프롬프트
     ];
-    resultElements.forEach((id) => {
+    containersToClear.forEach((id) => {
       const el = document.getElementById(id);
-      if (el) {
-        el.innerHTML = "";
-        el.style.display = "none";
-      }
+      if (el) el.innerHTML = "";
     });
 
-    // 단계를 1단계로 이동
+    // 5. 점수 및 상태 텍스트 초기화
+    const elementsToResetText = [
+      "beforeScore", "afterScore", "aiComment", "gradeText",
+      "finalLyrics", "finalStyle", "finalTitleText", "songTitleText"
+    ];
+    elementsToResetText.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = id.includes("Score") ? "-" : (id.includes("Title") ? "제목 없음" : "");
+    });
+
+    // 6. 가시성 초기화 (결과 카드들 숨기기)
+    const panelsToHide = ["analysisLoading", "analysisResult", "improvementCard", "marketingResult"];
+    panelsToHide.forEach((id) => {
+       const el = document.getElementById(id);
+       if (el) el.style.display = "none";
+    });
+
+    // 7. 6단계 전용 UI 필드 보정
+    if (typeof window.updateMVImageCount === "function") window.updateMVImageCount();
+    if (typeof window.updateCharacterInputs === "function") window.updateCharacterInputs();
+
+    // 8. 로컬 스토리지 관련 상태 정리 (현재 프로젝트 ID 등)
+    localStorage.removeItem("currentProjectId");
+
+    // 9. 1단계로 이동 및 화면 상단 스크롤
     if (typeof window.goToStep === "function") {
       window.goToStep(1, false, true);
     }
+    window.scrollTo({ top: 0, behavior: "smooth" });
 
-    // 전역 프로젝트 상태 초기화
-    window.currentProject = null;
-    window.currentProjectId = null;
-    window.currentScenes = null;
-
-    // 수정 모드 비활성화
+    // 10. 수정 모드 보정
     window.editMode = false;
-    updateEditModeUI();
-    setReadOnlyMode(false); // 새 프로젝트는 수정 가능
+    if (typeof window.updateEditModeUI === "function") window.updateEditModeUI();
+    if (typeof window.setReadOnlyMode === "function") window.setReadOnlyMode(false);
 
-    // 프로젝트 저장
-    if (typeof window.saveCurrentProject === "function") {
-      window.saveCurrentProject();
-    }
+    console.log("✅ 앱 전체 초기화 완료!");
+    if (!skipConfirm) alert("✅ 모든 내용이 초기화되었습니다. 새로 시작합니다!");
 
-    alert("✅ 모든 단계가 초기화되었습니다.");
   } catch (error) {
-    console.error("전체 초기화 오류:", error);
-    alert("전체 초기화 중 오류가 발생했습니다:\n\n" + error.message);
+    console.error("전체 초기화 중 오류 발생:", error);
+    alert("초기화 중 일부 오류가 발생했습니다. 페이지를 새로고침하는 것을 권장합니다.");
   }
 };
 
@@ -8626,9 +7457,9 @@ window.testAPIConnection = async function () {
     // API 키: localStorage 우선, 없으면 Firebase globalConfig(서버 키) 사용
     const gc = window.globalConfig || {};
     const openaiKey =
-      localStorage.getItem("openai_api_key") || gc.openai_api_key || "";
+      (typeof window.getOpenAIApiKey === "function" ? window.getOpenAIApiKey() : localStorage.getItem("openai_api_key")) || gc.openai_api_key || "";
     const geminiKey =
-      localStorage.getItem("gemini_api_key") || gc.gemini_api_key || "";
+      (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || gc.gemini_api_key || "";
 
     if (!openaiKey && !geminiKey) {
       alert(
@@ -8728,14 +7559,13 @@ window.testAPIConnection = async function () {
 // ═══════════════════════════════════════════════════════════════
 window.openAPISettings = function () {
   try {
-    // 🔐 권한 확인: 관리자만 접근 가능
+    // 🔐 권한 확인: 승인된 사용자만 접근 가능 (관리자 전용 제한 해제)
     const userData =
       typeof window.getCurrentUserData === "function"
         ? window.getCurrentUserData()
         : null;
-    if (!userData || userData.role !== "admin") {
-      alert("⚠️ 관리자만 API 설정에 접근할 수 있습니다.");
-      console.warn("🚫 비관리자 사용자의 API 설정 접근이 차단되었습니다.");
+    if (!userData || !userData.approved) {
+      alert("⚠️ 승인된 사용자만 API 설정에 접근할 수 있습니다.");
       return;
     }
 
@@ -8750,23 +7580,79 @@ window.openAPISettings = function () {
     console.log("✅ apiSettingsModal 요소 발견:", modal);
 
     // 저장된 API 키 로드
-    const openaiKey = localStorage.getItem("openai_api_key") || "";
-    const geminiKey = localStorage.getItem("gemini_api_key") || "";
+    const openaiKey = (typeof window.getOpenAIApiKey === "function" ? window.getOpenAIApiKey() : localStorage.getItem("openai_api_key")) || "";
+    const geminiKey = (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || "";
 
     const openaiInput = document.getElementById("openaiKeyInput");
     const geminiInput = document.getElementById("geminiKeyInput");
 
+    // 공용 키 상태 표시 업데이트
+    const gc = window.globalConfig || {};
+    const openaiSharedBadge = document.getElementById("openaiSharedBadge");
+    const geminiSharedBadge = document.getElementById("geminiSharedBadge");
+
+    if (openaiSharedBadge) {
+      if (gc.openai_api_key && gc.openai_api_key.startsWith("sk-")) {
+        openaiSharedBadge.classList.remove("d-none");
+      } else {
+        openaiSharedBadge.classList.add("d-none");
+      }
+    }
+    if (geminiSharedBadge) {
+      if (gc.gemini_api_key && gc.gemini_api_key.startsWith("AIza")) {
+        geminiSharedBadge.classList.remove("d-none");
+      } else {
+        geminiSharedBadge.classList.add("d-none");
+      }
+    }
+
     if (openaiInput) {
-      openaiInput.value = openaiKey;
-      if (openaiKey && typeof window.validateOpenAIKey === "function") {
+      // 일반 사용자는 마스킹 및 수정 금지 처리
+      if (userData && userData.role !== "admin") {
+        openaiInput.value = "**************************************************";
+        openaiInput.readOnly = true;
+        openaiInput.placeholder = "공용 키가 안전하게 보호되고 있습니다.";
+      } else {
+        openaiInput.value = localStorage.getItem("openai_api_key") || "";
+        openaiInput.readOnly = false;
+        if (gc.openai_api_key && gc.openai_api_key.startsWith("sk-")) {
+          openaiInput.placeholder = "공용 키 사용 중 (개인 키를 입력하면 우선 적용됩니다)";
+        } else {
+          openaiInput.placeholder = "sk-...";
+        }
+      }
+      if (openaiInput.value && typeof window.validateOpenAIKey === "function") {
         window.validateOpenAIKey(openaiInput);
       }
     }
     if (geminiInput) {
-      geminiInput.value = geminiKey;
-      if (geminiKey && typeof window.validateGeminiKey === "function") {
+      if (userData && userData.role !== "admin") {
+        geminiInput.value = "**************************************************";
+        geminiInput.readOnly = true;
+        geminiInput.placeholder = "공용 키가 안전하게 보호되고 있습니다.";
+      } else {
+        geminiInput.value = localStorage.getItem("gemini_api_key") || "";
+        geminiInput.readOnly = false;
+        if (gc.gemini_api_key && gc.gemini_api_key.startsWith("AIza")) {
+          geminiInput.placeholder = "공용 키 사용 중 (개인 키를 입력하면 우선 적용됩니다)";
+        } else {
+          geminiInput.placeholder = "AIza...";
+        }
+      }
+      if (geminiInput.value && typeof window.validateGeminiKey === "function") {
         window.validateGeminiKey(geminiInput);
       }
+    }
+
+    // 일반 사용자의 경우 저장/초기화 버튼 비활성화
+    const saveBtn = document.querySelector("#apiSettingsModal .modal-footer .btn-primary");
+    const resetBtn = document.querySelector("#apiSettingsModal .modal-body .btn-secondary") || document.getElementById("resetAPIKeysBtn");
+    if (userData && userData.role !== "admin") {
+      if (saveBtn) saveBtn.style.display = "none";
+      if (resetBtn) resetBtn.style.display = "none";
+    } else {
+      if (saveBtn) saveBtn.style.display = "inline-block";
+      if (resetBtn) resetBtn.style.display = "inline-block";
     }
 
     // 모달 강제 표시 (CSS !important 우회)
@@ -8827,6 +7713,13 @@ window.saveAPISettings = function () {
 
 window.saveAPIKeys = function () {
   try {
+    const userData = typeof window.getCurrentUserData === "function" ? window.getCurrentUserData() : null;
+    if (userData && userData.role !== "admin") {
+      alert("⚠️ 일반 사용자는 API 키를 직접 수정하거나 저장할 수 없습니다.");
+      window.closeAPISettings();
+      return;
+    }
+
     // index.html에서 사용하는 ID 확인
     const openaiInput = document.getElementById("openaiKeyInput");
     const geminiInput = document.getElementById("geminiKeyInput");
@@ -8871,6 +7764,12 @@ window.saveAPIKeys = function () {
 };
 
 window.resetAPIKeys = function () {
+  const userData = typeof window.getCurrentUserData === "function" ? window.getCurrentUserData() : null;
+  if (userData && userData.role !== "admin") {
+    alert("⚠️ 일반 사용자는 API 키를 초기화할 수 없습니다.");
+    return;
+  }
+
   if (
     !confirm("API 키를 초기화하시겠습니까?\n\n저장된 모든 API 키가 삭제됩니다.")
   ) {
@@ -8991,6 +7890,10 @@ window.openGuidelinesModal = function () {
 - 리듬감 있는 가사 구성
 - 일상적이면서도 특별한 순간을 담기
 
+## 인물 및 시각 묘사 (MV 프롬프트용)
+- 인물 생성 시 기형적인 배치를 지양하고, 손가락, 발가락, 손 모양, 발 모양, 팔, 다리 등 인체 구조를 매우 정밀하고 자연스럽게 묘사합니다.
+- 해부학적으로 정확하고 완벽한 관절 및 신체 부위 표현을 지속적으로 유지합니다.
+
 ## 구조
 - Verse (주제 전개)
 - Chorus (메시지 강조)
@@ -9080,6 +7983,10 @@ window.resetGuidelines = function () {
 - 감정을 진솔하게 표현
 - 리듬감 있는 가사 구성
 - 일상적이면서도 특별한 순간을 담기
+
+## 인물 및 시각 묘사 (MV 프롬프트용)
+- 인물 생성 시 기형적인 배치를 지양하고, 손가락, 발가락, 손 모양, 발 모양, 팔, 다리 등 인체 구조를 매우 정밀하고 자연스럽게 묘사합니다.
+- 해부학적으로 정확하고 완벽한 관절 및 신체 부위 표현을 지속적으로 유지합니다.
 
 ## 구조
 - Verse (주제 전개)

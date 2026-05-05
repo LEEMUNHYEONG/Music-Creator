@@ -79,12 +79,32 @@ function safeJsonParse(str, fallback = null) {
   } catch (e) {
     console.warn("⚠️ JSON 파싱 1차 실패, 심층 복구 시도:", e);
     try {
-      // 제어 문자 제거 및 정규식 추출
+      // 제어 문자 제거
       let fixedStr = str.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
-      const match = fixedStr.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
-      if (match) {
-        let candidate = match[0];
-        // 괄호 짝 맞추기 (단순 무식하지만 효과적)
+      
+      let candidate = "";
+      const firstBrace = fixedStr.indexOf('{');
+      const firstBracket = fixedStr.indexOf('[');
+      let startIndex = -1;
+      
+      if (firstBrace !== -1 && firstBracket !== -1) {
+        startIndex = Math.min(firstBrace, firstBracket);
+      } else if (firstBrace !== -1) {
+        startIndex = firstBrace;
+      } else if (firstBracket !== -1) {
+        startIndex = firstBracket;
+      }
+
+      if (startIndex !== -1) {
+        candidate = fixedStr.substring(startIndex);
+        
+        // 1. 따옴표 짝 맞추기 (문자열 절단 복구)
+        const unescapedQuotes = candidate.replace(/\\"/g, "").match(/"/g);
+        if (unescapedQuotes && unescapedQuotes.length % 2 !== 0) {
+          candidate += '"';
+        }
+
+        // 2. 괄호 짝 맞추기
         const openBraces = (candidate.match(/\{/g) || []).length;
         const closeBraces = (candidate.match(/\}/g) || []).length;
         const openBrackets = (candidate.match(/\[/g) || []).length;
@@ -103,6 +123,283 @@ function safeJsonParse(str, fallback = null) {
     return fallback;
   }
 }
+
+/**
+ * 씬의 감정(emotion)에 따라 Midjourney 스타일 키워드를 동적으로 반환합니다.
+ * 고정된 기술 키워드 대신 감정에 맞는 색채·질감·광학 키워드를 조합하여
+ * 더 감각적이고 예술적인 이미지를 유도합니다.
+ */
+function getArtisticKeywords(emotion) {
+  const emotionStyleMap = {
+    nostalgic: "soft focus, fine film grain, warm golden palette, golden hour glow, Kodak Portra 400 aesthetic, gentle lens flare, 8k ultra detail",
+    sad: "desaturated cool tones, shallow depth of field, rain-washed atmosphere, melancholic blue hour, muted colors, cinematic grain, 8k ultra detail",
+    melancholic: "low-key lighting, subtle vignette, cold desaturated palette, overcast diffused light, wabi-sabi texture, 8k ultra detail",
+    joyful: "vibrant saturated colors, dynamic lens flare, golden warm light, energetic composition, brilliant highlights, crystal clarity, 8k ultra detail",
+    happy: "bright natural lighting, vivid color palette, sun-drenched warmth, cheerful composition, soft bokeh, pristine detail, 8k ultra detail",
+    romantic: "rich bokeh background, warm amber and rose tones, soft candlelight diffusion, intimate close framing, silk-like skin tones, 8k ultra detail",
+    intense: "high contrast chiaroscuro, dramatic angular shadows, bold complementary color grading, anamorphic lens flare, visceral detail, 8k ultra detail",
+    angry: "harsh directional lighting, deep crimson accents, gritty texture, stark contrast, aggressive composition, raw intensity, 8k ultra detail",
+    peaceful: "pastel watercolor palette, even soft lighting, harmonious symmetry, gentle shadows, ethereal calm atmosphere, serene clarity, 8k ultra detail",
+    mysterious: "volumetric fog, dramatic silhouette rim lighting, deep teal and amber grade, noir atmosphere, enigmatic depth, 8k ultra detail",
+    dreamy: "ethereal prismatic glow, soft iridescent pastels, double exposure layering, dreamlike gaussian haze, otherworldly luminance, 8k ultra detail",
+    hopeful: "warm sunrise gradient, ascending golden rays, soft lens bloom, uplifting composition, luminous highlights, 8k ultra detail",
+    lonely: "isolated framing, vast negative space, cold single-source light, muted earth tones, contemplative stillness, 8k ultra detail",
+    energetic: "dynamic motion blur trails, electric neon accents, high saturation, fast shutter freeze, pulsing rhythm in composition, 8k ultra detail",
+    tender: "soft wrap-around lighting, delicate skin tones, shallow focus intimacy, warm whisper-like haze, gentle embrace of light, 8k ultra detail",
+  };
+  return emotionStyleMap[emotion?.toLowerCase()] ||
+    "cinematic lighting, rich color palette, masterful composition, photorealistic detail, fine art quality, 8k ultra detail";
+}
+
+// --- UI 렌더링 함수: MV 썸네일/배경/인물 프롬프트 표시 ---
+window.renderMvThumbnailPromptsUI = function (prompts) {
+  if (!prompts) return;
+  const reviewContainer = document.getElementById("mvPromptsReviewContainer");
+  if (!reviewContainer) return;
+
+  // prompts 구조 보정 (m.mvPrompts는 {thumbnail: {en, ko}, ...} 형태임)
+  const p = prompts;
+  const thumbEn = p.thumbnailEn || p.thumbnail?.en || "";
+  const thumbKo = p.thumbnailKo || p.thumbnail?.ko || "";
+  const backEn = p.backgroundEn || p.background?.en || p.backgroundDetailEn || "";
+  const backKo = p.backgroundKo || p.background?.ko || p.backgroundDetailKo || "";
+  const charEn = p.characterEn || p.character?.en || p.characterDetailEn || "";
+  const charKo = p.characterKo || p.character?.ko || p.characterDetailKo || "";
+
+  reviewContainer.innerHTML = `
+    <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--primary);">
+        <h3 style="margin: 0 0 15px 0; color: var(--text-primary); font-size: 1.1rem;">🖼️ 썸네일/배경/인물 프롬프트 리뷰</h3>
+        <p style="margin: 0 0 15px 0; color: var(--text-secondary); font-size: 0.85rem;">전체 뮤직비디오의 스타일을 결정하는 주요 프롬프트입니다. 내용을 확인하고 수정하세요.</p>
+        <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
+            <div style="padding: 15px; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--border);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <label style="margin: 0; color: var(--text-primary); font-size: 0.95rem; font-weight: 700;">🎬 썸네일 이미지 프롬프트</label>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-small btn-primary" onclick="window.regenerateSingleStylePrompt('thumbnail')" title="썸네일 프롬프트만 파생성" style="padding: 4px 8px; font-size: 0.75rem;">
+                            <i class="fas fa-sync-alt"></i> 재생성
+                        </button>
+                        <button class="btn btn-small btn-secondary" onclick="window.editReviewPrompt('review_thumbnail_en')" title="수정 포커스" style="padding: 4px 8px; font-size: 0.75rem;">
+                            <i class="fas fa-edit"></i> 수정
+                        </button>
+                        <button class="btn btn-small btn-success" onclick="window.copyReviewPrompt('review_thumbnail_en')" title="통합 영어 프롬프트 복사" style="padding: 4px 8px; font-size: 0.75rem;">
+                            <i class="fas fa-copy"></i> 영어 프롬프트 복사
+                        </button>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">통합 프롬프트(EN)</label>
+                        <textarea id="review_thumbnail_en" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${thumbEn}</textarea>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">한글 번역</label>
+                        <textarea id="review_thumbnail_ko" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${thumbKo}</textarea>
+                    </div>
+                </div>
+            </div>
+            <div style="padding: 15px; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--border);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <label style="margin: 0; color: var(--text-primary); font-size: 0.95rem; font-weight: 700;">🏞️ 배경 프롬프트 (상세)</label>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-small btn-primary" onclick="window.regenerateSingleStylePrompt('background')" title="배경 프롬프트만 재생성" style="padding: 4px 8px; font-size: 0.75rem;">
+                            <i class="fas fa-sync-alt"></i> 재생성
+                        </button>
+                        <button class="btn btn-small btn-secondary" onclick="window.editReviewPrompt('review_background_en')" title="수정 포커스" style="padding: 4px 8px; font-size: 0.75rem;">
+                            <i class="fas fa-edit"></i> 수정
+                        </button>
+                        <button class="btn btn-small btn-success" onclick="window.copyReviewPrompt('review_background_en')" title="통합 영어 프롬프트 복사" style="padding: 4px 8px; font-size: 0.75rem;">
+                            <i class="fas fa-copy"></i> 영어 프롬프트 복사
+                        </button>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">통합 프롬프트(EN)</label>
+                        <textarea id="review_background_en" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${backEn}</textarea>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">한글 번역</label>
+                        <textarea id="review_background_ko" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${backKo}</textarea>
+                    </div>
+                </div>
+            </div>
+            <div style="padding: 15px; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--border);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <label style="margin: 0; color: var(--text-primary); font-size: 0.95rem; font-weight: 700;">👤 인물 프롬프트 (상세)</label>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-small btn-primary" onclick="window.regenerateSingleStylePrompt('character')" title="인물 프롬프트만 재생성" style="padding: 4px 8px; font-size: 0.75rem;">
+                            <i class="fas fa-sync-alt"></i> 재생성
+                        </button>
+                        <button class="btn btn-small btn-secondary" onclick="window.editReviewPrompt('review_character_en')" title="수정 포커스" style="padding: 4px 8px; font-size: 0.75rem;">
+                            <i class="fas fa-edit"></i> 수정
+                        </button>
+                        <button class="btn btn-small btn-success" onclick="window.copyReviewPrompt('review_character_en')" title="통합 영어 프롬프트 복사" style="padding: 4px 8px; font-size: 0.75rem;">
+                            <i class="fas fa-copy"></i> 영어 프롬프트 복사
+                        </button>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">통합 프롬프트(EN)</label>
+                        <textarea id="review_character_en" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${charEn}</textarea>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">한글 번역</label>
+                        <textarea id="review_character_ko" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${charKo}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+  `;
+};
+
+// app.js 호환을 위한 별칭 및 데이터 로드 지원 함수
+window.renderMvPrompts = function () {
+  const data = window.currentProject?.data || window.currentProject;
+  if (!data) return;
+
+  const m = data.marketing || {};
+  const mvData =
+    typeof window.getMarketingMVData === "function"
+      ? window.getMarketingMVData(m)
+      : {
+          prompts: m.mvPrompts || {},
+          scenes: m.mvScenes || [],
+        };
+  const prompts = mvData.prompts;
+  
+  // 1. 썸네일/배경/인물 프롬프트 UI 복원
+  if (prompts && typeof window.renderMvThumbnailPromptsUI === "function") {
+    window.renderMvThumbnailPromptsUI(prompts);
+  }
+
+  // 2. 씬별 개별 프롬프트 UI 복원
+  const scenes = mvData.scenes;
+  if (scenes && Array.isArray(scenes) && scenes.length > 0) {
+    window.currentScenes = scenes;
+    
+    // 편집기(Overview) 렌더링
+    if (typeof window.renderSceneOverview === "function") {
+      window.renderSceneOverview(scenes);
+    }
+    
+    // 결과창(Results) 렌더링 (Silent 모드로 호출하여 화면 이동 방지)
+    if (typeof window.confirmSceneOverviewAndGenerate === "function") {
+      window.confirmSceneOverviewAndGenerate(true);
+    }
+  }
+};
+
+// --- UI 렌더링 함수: MV 씬별 프롬프트 목록 표시 ---
+window.renderSceneOverview = function (scenesArg) {
+  const scenes = scenesArg || window.currentScenes;
+  if (!scenes || !Array.isArray(scenes) || scenes.length === 0) return;
+
+  const container = document.getElementById("mvSceneOverviewContainer");
+  if (!container) return;
+
+  let html = `
+    <div style="margin: 10px 0 30px 0; padding: 15px; background: var(--bg-card); border-radius: 8px; border-left: 4px solid var(--accent);">
+        <h3 style="margin: 0 0 10px 0; color: var(--text-primary); font-size: 1.1rem;">
+            <i class="fas fa-film"></i> 씬별 세부 프롬프트 수정
+        </h3>
+        <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem;">각 씬의 이미지 및 비디오 통합 프롬프트를 세부적으로 수정할 수 있습니다.</p>
+    </div>
+  `;
+
+  scenes.forEach((scene, index) => {
+    let existingPrompt = scene.prompt || "";
+    existingPrompt = existingPrompt.replace(/\/\*\s*Scene\s+\d+\s*\*\//gi, "").trim();
+    if (existingPrompt && !existingPrompt.startsWith("/* Scene")) {
+      existingPrompt = `/* Scene ${index + 1} */ ${existingPrompt}`;
+    }
+    const existingPromptKo = scene.promptKo || "";
+
+    html += `
+                <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);" data-scene-index="${index}">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <h4 style="margin: 0; color: var(--text-primary);">씬 ${index + 1}</h4>
+                            <span style="color: var(--accent); font-weight: 600;">${scene.time}</span>
+                            ${scene._isFilled ? `<span style="background: #e67e22; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; font-weight: 700;">⚠ 자동보충 (재생성 권장)</span>` : ""}
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-small btn-primary" onclick="regenerateSceneOverviewPrompt(${index})" title="이 씬의 프롬프트 재생성" style="padding: 6px 12px; font-size: 0.8rem;">
+                                <i class="fas fa-sync-alt"></i> 재생성
+                            </button>
+                            <button id="editSceneOverviewBtn_${index}" class="btn btn-small btn-secondary" onclick="editSceneOverview(${index}, this)" title="씬 수정" style="padding: 6px 12px; font-size: 0.8rem;" data-state="edit" data-original-en="${existingPrompt.replace(/"/g, "&quot;")}">
+                                <i class="fas fa-edit"></i> 수정
+                            </button>
+                            <button id="copySceneOverviewBtn_${index}" class="btn btn-small btn-success" onclick="copySceneOverviewPromptEn(${index}, event)" title="영어 프롬프트 복사" style="padding: 6px 12px; font-size: 0.8rem;">
+                                <i class="fas fa-copy"></i> 영어 복사
+                            </button>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">📝 장면 설명:</label>
+                        <textarea class="scene-description" data-index="${index}" style="width: 100%; min-height: 80px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; resize: vertical;">${scene.scene || ""}</textarea>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">⛵ 통합 프롬프트 (EN):</label>
+                            <textarea id="scene_overview_${index}_en" class="scene-overview-en" data-index="${index}" style="width: 100%; min-height: 100px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${existingPrompt}</textarea>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">⛵ 통합 프롬프트 (한글):</label>
+                            <textarea id="scene_overview_${index}_ko" class="scene-overview-ko" data-index="${index}" style="width: 100%; min-height: 100px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${existingPromptKo}</textarea>
+                        </div>
+                    </div>
+                </div>
+            `;
+  });
+
+  container.innerHTML = html;
+
+  // 번역 미비 사항 보완 로직은 필요에 따라 별도 호출
+  
+  // 영어 프롬프트 직접 수정 시 자동 번역 이벤트 추가 (Debounce 적용)
+  const enTextareas = container.querySelectorAll('.scene-overview-en');
+  enTextareas.forEach(ta => {
+    let timeoutId;
+    ta.addEventListener('input', function(e) {
+      clearTimeout(timeoutId);
+      const index = e.target.dataset.index;
+      const currentEn = e.target.value.trim();
+      const koEl = document.getElementById(`scene_overview_${index}_ko`);
+      
+      timeoutId = setTimeout(async () => {
+        if (!currentEn) {
+          if (koEl) koEl.value = "";
+          return;
+        }
+        
+        if (koEl) {
+           koEl.dataset.originalPlaceholder = koEl.placeholder || "";
+           koEl.placeholder = "번역 중...";
+        }
+        
+        try {
+          if (typeof window.translateEnglishToKoreanForScene === "function") {
+            const translatedKo = await window.translateEnglishToKoreanForScene("prompt", currentEn);
+            if (translatedKo && koEl) {
+              koEl.value = translatedKo;
+              if (window.currentScenes && window.currentScenes[index]) {
+                window.currentScenes[index].prompt = currentEn;
+                window.currentScenes[index].promptKo = translatedKo;
+              }
+            }
+          }
+        } catch (error) {
+          console.error("자동 번역 오류:", error);
+        } finally {
+          if (koEl) koEl.placeholder = koEl.dataset.originalPlaceholder || "";
+        }
+      }, 1500); // 1.5초 후 번역 (타이핑 중 잦은 API 호출 방지)
+    });
+  });
+};
 
 // --- Extracted generateMVDetailPrompts ---
 window.generateMVDetailPrompts = async function (
@@ -137,6 +434,15 @@ window.generateMVDetailPrompts = async function (
     let characterEn = "";
     let characterKo = "";
 
+    // 캐릭터 시트 정보 사전 수집 (프롬프트에 주입용)
+    const charSheetInfoForPrompt =
+      typeof window.getAllCharacterSheetsSummary === "function"
+        ? window.getAllCharacterSheetsSummary()
+        : "";
+    const charSheetSection = charSheetInfoForPrompt
+      ? `\n【캐릭터 시트 — 인물 외형 일관성 유지】\n아래 캐릭터 시트의 외형 정보를 인물 프롬프트에 정확히 반영하세요.\n${charSheetInfoForPrompt}\n`
+      : "";
+
     if (
       geminiKey &&
       geminiKey.startsWith("AIza") &&
@@ -161,7 +467,7 @@ ${stylePrompt || "감성적인 발라드"}
 - 분위기: ${mood || "감성적"}
 - 인물: ${characters && characters.length > 0 ? characters.map((c) => `${c.gender || ""} ${c.appearance || ""}`).join(", ") : "1명"}
 ${customSettings ? `- 추가: ${customSettings}` : ""}
-
+${charSheetSection}
 【작업 요구사항】
 다음 3가지 프롬프트를 각각 **매우 상세하고 구체적으로** 작성하세요 (각 40단어 이상):
 
@@ -203,7 +509,7 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
 - 한글 프롬프트는 자연스러운 한글로 작성
 - JSON 형식만 출력`;
 
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
         const response = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -230,9 +536,8 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
           );
 
           // JSON 추출
-          let jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const aiPrompts = safeJsonParse(jsonMatch[0]);
+          const aiPrompts = safeJsonParse(aiResponse);
+          if (aiPrompts) {
 
             combinedEn = aiPrompts.combinedEn || "";
             combinedKo = aiPrompts.combinedKo || "";
@@ -594,7 +899,23 @@ window.generateSceneOverview = async function () {
         btnTextEl.innerHTML = on ? "⏳ 생성 중..." : originalBtnText;
     }
     var mvLoading = document.getElementById("mvLoading");
-    if (mvLoading) mvLoading.style.display = on ? "flex" : "none";
+
+    // [수정] 초기 설정 섹션을 숨기지 않고 그대로 둡니다. (사용자 요청: 재생성 버튼 유지)
+    // var mvSettingsSection = document.getElementById("mvSettingsSection");
+    // if (mvSettingsSection && on) {
+    //   mvSettingsSection.classList.add("hidden");
+    //   mvSettingsSection.style.display = "none";
+    // }
+
+    if (mvLoading) {
+      if (on) {
+        mvLoading.classList.remove("hidden");
+        mvLoading.style.display = "flex";
+      } else {
+        mvLoading.classList.add("hidden");
+        mvLoading.style.display = "none";
+      }
+    }
   }
 
   try {
@@ -620,9 +941,11 @@ window.generateSceneOverview = async function () {
       return;
     }
     if (mvSceneOverviewSection) {
+      mvSceneOverviewSection.classList.add("hidden");
       mvSceneOverviewSection.style.display = "none";
     }
     if (mvResultsSection) {
+      mvResultsSection.classList.add("hidden");
       mvResultsSection.style.display = "none";
     }
 
@@ -661,6 +984,12 @@ window.generateSceneOverview = async function () {
         characters.push({ gender, age, race, appearance });
       }
     }
+
+    // 캐릭터 시트 전체 원본 정보 수집 (씬 프롬프트에 주입)
+    const characterSheetsFull =
+      typeof window.getAllCharacterSheetsFull === "function"
+        ? window.getAllCharacterSheetsFull()
+        : "";
 
     // 인물 정보 문자열 생성 (AI 프롬프트에 사용)
     let characterInfoStr = "";
@@ -723,6 +1052,18 @@ window.generateSceneOverview = async function () {
     const cleanLyrics = extractLyricsOnly(finalLyrics);
     const lyricsLines = cleanLyrics.split("\n").filter((line) => line.trim());
 
+    // 전체 씬에 매핑할 가사 사전 배분 (1:1 매치 유지)
+    const preAllocatedLyrics = [];
+    for (let i = 0; i < imageCount; i++) {
+        const startIdx = Math.floor((i / imageCount) * lyricsLines.length);
+        const endIdx = Math.max(startIdx + 1, Math.floor(((i + 1) / imageCount) * lyricsLines.length));
+        let allocated = lyricsLines.slice(startIdx, endIdx).join(" ").trim();
+        if (!allocated && lyricsLines.length > 0) {
+            allocated = lyricsLines[Math.min(startIdx, lyricsLines.length - 1)] || "";
+        }
+        preAllocatedLyrics.push(allocated);
+    }
+
     // AI 기반 씬 생성 시도 (Gemini API 사용)
     let scenes = [];
     let useAI = false;
@@ -747,7 +1088,7 @@ window.generateSceneOverview = async function () {
         // ═══════════════════════════════════════════════════════════════
         const BATCH_SIZE = 7;
         const totalBatches = Math.ceil(imageCount / BATCH_SIZE);
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
 
         // ChatGPT API 키 확인 (배치 홀짝 교대에 사용)
         const openaiKey = window.getOpenAIApiKey
@@ -785,18 +1126,7 @@ window.generateSceneOverview = async function () {
               loadingText.textContent = `씬 생성 중... (배치 ${batchIdx + 1}/${totalBatches} · ${primaryApiName} · ${batchEnd}/${imageCount}개 완료)`;
           }
 
-          // 이 배치에 해당하는 가사 슬라이스 추출
-          const batchLyricStart = Math.floor(
-            (batchStart / imageCount) * lyricsLines.length,
-          );
-          const batchLyricEnd = Math.ceil(
-            (batchEnd / imageCount) * lyricsLines.length,
-          );
-          const batchLyrics =
-            lyricsLines.slice(batchLyricStart, batchLyricEnd).join("\n") ||
-            cleanLyrics.substring(0, 800);
-
-          // 이 배치의 씬별 시간대 목록 생성
+          // 이 배치의 씬별 시간대 및 가사 목록 생성
           const batchTimeList = [];
           for (let si = batchStart; si < batchEnd; si++) {
             const st = si * interval;
@@ -805,62 +1135,98 @@ window.generateSceneOverview = async function () {
             const ss = Math.floor(st % 60);
             const em = Math.floor(et / 60);
             const es = Math.floor(et % 60);
+            const allocatedLyric = preAllocatedLyrics[si] || "";
             batchTimeList.push(
-              `씬 ${si + 1} (${sm}:${String(ss).padStart(2, "0")}-${em}:${String(es).padStart(2, "0")})`,
+              `[씬 ${si + 1}] 시간: ${sm}:${String(ss).padStart(2, "0")}-${em}:${String(es).padStart(2, "0")} | 배정된 가사: "${allocatedLyric}"`
             );
           }
 
-          const analysisPrompt = `다음 음악 가사를 분석하여 Midjourney MV 제작용 씬을 생성하세요.
+          // 이전 배치의 마지막 씬 맥락 (연속성 전달용)
+          let previousBatchContext = "";
+          if (batchIdx > 0 && scenes.length > 0) {
+            const lastScene = scenes[scenes.length - 1];
+            previousBatchContext = `
+【이전 씬 맥락 — 연속성 유지를 위한 참고】
+직전 씬(씬 ${scenes.length})의 상태:
+- 감정: ${lastScene.emotion || "미정"}
+- 분위기: ${lastScene.mood || "미정"}
+- 장소: ${lastScene.location || "미정"}
+- 인물 동작: ${lastScene.characterAction || "미정"}
+- 영어 프롬프트 요약: ${(lastScene.prompt || "").substring(0, 200)}
+→ 이 씬의 분위기를 자연스럽게 이어받거나, 가사 감정 변화에 따라 의도적으로 대조·전환하세요.
+`;
+          }
 
-【가사】 (가장 중요 - 반드시 각 씬의 프롬프트에 반영하세요!)
-${batchLyrics}
+          const analysisPrompt = `당신은 이 뮤직비디오의 감독입니다. 가사의 감정 흐름을 하나의 영화적 서사 아크로 설계하세요.
+각 씬을 단순 배경 묘사가 아니라, 감정을 시각적 메타포로 전환한 '한 편의 그림'으로 구성하세요.
+빛·색채·질감·공간감·인물의 미세한 감정 표현에 집중하여, Midjourney에서 예술 작품 수준의 이미지가 나오도록 프롬프트를 설계하세요.
 
-【전체 가사 맥락】 (참고용)
+【전체 가사 맥락】 (서사 아크 파악 및 감정 추출용)
 ${cleanLyrics.substring(0, 600)}${cleanLyrics.length > 600 ? "..." : ""}
 
 【스타일】
 ${stylePrompt || "감성적인 발라드"}
-
-【MV 설정】 (보조 참고용 - 가사 내용을 우선하되 자연스럽게 융합)
+${previousBatchContext}
+【MV 설정】 (가사 감정과 자연스럽게 융합하세요)
 - 시대: ${era || "현대"}
 - 국가: ${country || "한국"}
-- 장소 유형 (사용자가 선택한 후보): ${location || "도시"}
-  **다중 선택된 경우**: 각 씬마다 해당 씬의 가사(lyrics)에 가장 잘 맞는 장소를 위 목록에서 **한 가지** 골라, 그 유형을 구체적으로 묘사하세요.
+- 장소 유형 후보: ${location || "도시"}
+  → 다중 선택된 경우, 각 씬의 가사 감정에 가장 어울리는 장소를 하나 골라 구체적으로 묘사
 - 조명: ${lighting || "자연광"}
 - 카메라: ${cameraWork || "중간 샷"}
 - 분위기: ${mood || "감성적"}
 - 인물: ${characterInfoStr || (characters.length > 0 ? `${characters.length}명` : "1명")}
 ${customSettings ? `- 추가: ${customSettings}` : ""}
+${characterSheetsFull ? `
+【캐릭터 디자인 시트 원본 — 인물 외형 및 스타일 100% 일관성 유지 필수】
+아래는 사용자가 확정한 캐릭터 디자인 시트 원본 전체 내용입니다.
+각 씬 프롬프트에서 인물이 등장할 때, 이 시트의 외형(이목구비, 머리스타일, 의상, 질감 등)과 분위기가 100% 일치하도록 가장 우선순위로 강하게 반영하세요. 단순한 요약이 아니라 원본 디테일 전체를 프롬프트에 그대로 살려야 합니다.
+${characterSheetsFull}
+` : ""}
 
 【작업 요구사항】
 이번 배치에서 **반드시 정확히 ${batchCount}개의 씬**을 생성하세요. (전체 ${imageCount}개 중 씬 ${batchStart + 1}번~${batchEnd}번)
 
-생성할 씬 번호와 시간대:
+생성할 씬 번호와 시간대, 그리고 배정된 가사:
 ${batchTimeList.join("\n")}
 
-**각 씬마다 다음 필드를 반드시 작성하세요:**
+**각 씬마다 다음 필드를 반드시 작성하세요 (예술적 품질 기준):**
 
-1. **time**: 위 시간대 목록에서 해당 씬의 시간 (예: "${batchTimeList[0]?.match(/\(([^)]+)\)/)?.[1] || "0:00-0:07"}")
-2. **lyrics**: 해당 구간의 가사 (없으면 빈 문자열)
-3. **emotion**: 감정 한 단어 (예: sad, joyful, nostalgic)
-4. **location**: 장소를 구체적으로 15단어 이상 영어로 작성
-5. **characterAction**: 인물 동작을 구체적으로 12단어 이상 영어로 작성
-   - **인물 상세 정보 반드시 포함**: ${characterInfoStr || "없음"}
-6. **mood**: 분위기 영어로
-7. **lighting**: 조명 영어로
-8. **cameraWork**: 카메라 영어로
-9. **promptKo**: 가사 내용 중심의 완성된 Midjourney 한글 프롬프트 (50단어 이상)
-   - 인물 정보(${characterInfoStr || "없음"}) 일관 반영
-   - 미드저니 고화질 키워드 포함: "초고화질, 8k 해상도, 사진처럼 사실적, 시네마틱 조명"
-10. **promptEn**: promptKo를 영어로 번역한 완성된 프롬프트 (50단어 이상)
-    - "ultra high quality, 8k resolution, photorealistic, cinematic lighting" 포함
-11. **runwayPrompt**: RunwayML 비디오 생성용 영어 프롬프트 (단일 문장, 쉼표 구조화)
-12. **runwayPromptKo**: runwayPrompt를 한글로 번역
+1. **time**: 위 시간대 목록에서 해당 씬의 시간
+2. **lyrics**: 위에서 [씬 N]에 '배정된 가사'를 그대로 작성. (1글자도 변경하거나 누락하지 마세요)
+3. **emotion**: 감정 한 단어 (예: sad, joyful, nostalgic, dreamy, intense, lonely, tender, hopeful)
+4. **location**: **감정이 깃든 공간**으로 묘사하세요 (20단어 이상, 영어).
+   ✗ 나쁜 예: "a park at night"
+   ✓ 좋은 예: "rain-slicked cobblestone path through a quiet park, amber streetlights casting long reflections in shallow puddles, mist curling around wrought-iron benches"
+5. **characterAction**: **내면 감정이 외면에 스며드는 동작**으로 묘사하세요 (15단어 이상, 영어).
+   ✗ 나쁜 예: "walking sadly"
+   ✓ 좋은 예: "trailing fingertips along a rain-beaded window, breath fogging the glass, gazing at blurred city lights below with distant eyes"
+   - 인물 상세 정보 일관 반영: ${characterInfoStr || "없음"}
+6. **mood**: 분위기를 색채·온도·질감으로 표현 (영어)
+   예: "warm amber intimacy dissolving into cool blue solitude"
+7. **lighting**: 빛의 방향·색·질감까지 묘사 (영어)
+   예: "soft golden hour sidelight with long shadows and warm lens flare kissing the edges"
+8. **cameraWork**: 카메라의 움직임·속도·프레이밍까지 표현 (영어)
+   예: "slow cinematic dolly-in from wide establishing shot to intimate medium close-up"
+9. **promptKo**: 가사 감정 중심의 완성된 Midjourney 한글 프롬프트 (150단어 내외의 방대하고 정밀한 서술형 문장)
+   - **프롬프트 구조화 필수**: [핵심 장면 요약] -> [인물 외모/표정/미세 동작] -> [배경/날씨/질감 정밀 묘사] -> [조명/색채/분위기] -> [카메라 앵글/모션] -> [고화질 기술 키워드]
+   - 인물 정보(${characterInfoStr || "없음"}) 일관 반영. (매우 중요: 기형 방지를 위해 손가락, 발가락, 손 모양, 발 모양, 팔, 다리 등 신체 구조를 해부학적으로 완벽하고 정밀하게 묘사할 것)
+   - 씬 설명의 감정, 인물, 배경, 조명, 구도, 카메라가 움직이는 느낌(바람, 빛 반사 등)을 문학적이고 시각적으로 구체적 서술.
+   - 마지막에 "초고화질, 8k 해상도, 시네마틱 구도, 역동적 카메라 무브먼트, 예리한 초점, 디테일한 조명" 포함
+10. **promptEn**: promptKo를 영어로 번역한 매우 풍성하고 디테일한 프롬프트 (150단어 내외, 완벽한 문장과 쉼표가 조화된 긴 단락 필수)
+    - 단순 단어 나열이 절대 아닙니다. 감정, 빛, 질감을 완벽한 문장(Sentence) 구조로 논리적이고 길게 묘사하세요.
+    - 프롬프트 맨 끝에 반드시 다음 텍스트를 그대로 복사해 붙여넣으세요: "ultra high quality, 8k resolution, photorealistic, cinematic composition, 16:9 aspect ratio, professional photography, cinematic motion, dynamic camera movement, sharp focus, detailed lighting"
+11. **runwayPrompt**: RunwayML 비디오 생성용 영어 프롬프트 (매우 상세한 서술형, 3문장 이상)
+    - 인물의 미세한 동작 (흔들리는 머리카락, 떨리는 손끝, 눈의 초점 변화, 피부의 질감 등) 및 해부학적으로 완벽하고 정밀한 손/발가락 묘사
+    - 환경의 살아있는 요소 (바람, 빛 번짐, 입자 등)와 카메라 모션을 눈앞에 보이듯 묘사
+    - 프롬프트 맨 끝에 반드시 다음 텍스트를 그대로 복사해 붙여넣으세요: "cinematic motion, fluid movement, photorealistic, highly detailed, 8k"
+12. **runwayPromptKo**: runwayPrompt를 감각적이고 길게 번역한 한글 버전
 
-**중요:**
+**중요 원칙:**
 - 반드시 ${batchCount}개 정확히 생성 (더 적게도, 더 많게도 안 됨)
-- promptKo와 runwayPromptKo는 한글로, promptEn/runwayPrompt는 영어로
-- 순수 JSON 배열만 출력
+- 각 씬은 독립된 예술 작품이면서, 전체 시퀀스는 감정의 흐름을 따라 유기적으로 연결
+- promptKo/runwayPromptKo는 한글, promptEn/runwayPrompt는 영어
+- 순수 JSON 배열만 출력 (설명이나 주석 없이)
 
 **출력 형식:**
 \`\`\`json
@@ -869,15 +1235,15 @@ ${batchTimeList.join("\n")}
     "time": "0:00-0:07",
     "lyrics": "가사 내용",
     "emotion": "nostalgic",
-    "location": "moonlit park bench under cherry blossom trees with petals falling",
-    "characterAction": "person sitting alone looking at stars with gentle smile",
-    "mood": "romantic and peaceful",
-    "lighting": "soft moonlight with warm ambient glow",
-    "cameraWork": "wide shot slowly pushing in",
-    "promptKo": "달빛이 비치는 벚꽃 나무 아래 벤치...",
-    "promptEn": "moonlit park bench under cherry blossom trees...",
-    "runwayPrompt": "Person sitting on a bench under cherry blossom trees...",
-    "runwayPromptKo": "벚꽃 나무 아래 벤치에 앉아 있는 사람..."
+    "location": "rain-slicked cobblestone path through a quiet park, amber streetlights casting reflections in shallow puddles, mist curling around wrought-iron benches",
+    "characterAction": "trailing fingertips along a rain-beaded window, breath fogging the glass, gazing at blurred city lights with distant longing eyes",
+    "mood": "warm amber intimacy dissolving into cool blue solitude",
+    "lighting": "soft golden hour sidelight with long shadows and warm lens flare kissing the edges",
+    "cameraWork": "slow cinematic dolly-in from wide shot to intimate medium close-up, shallow depth of field",
+    "promptKo": "비에 젖은 조약돌 길 위로 호박색 가로등 불빛이 웅덩이에 길게 반사되는 고요한 공원, 안개가 낡은 벤치 사이로 피어오르고...",
+    "promptEn": "rain-slicked cobblestone path through a hushed park, amber streetlights reflecting in shallow puddles, mist curling around weathered wrought-iron benches...",
+    "runwayPrompt": "A person trailing fingertips along a rain-beaded window, breath slowly fogging the cold glass, soft golden sidelight catching each droplet, gentle wind stirring nearby curtains, slow cinematic dolly pushing in, shallow depth of field with bokeh city lights dancing in the background...",
+    "runwayPromptKo": "빗물 맺힌 창문을 따라 손끝을 천천히 흘리는 사람, 차가운 유리에 서서히 입김이 서리고..."
   }
 ]
 \`\`\`
@@ -1010,10 +1376,7 @@ ${batchTimeList.join("\n")}
                   aiScene.cameraWork,
                   country || "",
                   era ? era + " era" : "",
-                  "ultra high quality",
-                  "8k resolution",
-                  "photorealistic",
-                  "cinematic lighting",
+                  getArtisticKeywords(aiScene.emotion),
                 ].filter((p) => p && p.trim() && !/[가-힣]/.test(p));
                 prompt = parts.join(", ").trim();
                 if (!prompt.endsWith(".")) prompt += ".";
@@ -1029,14 +1392,29 @@ ${batchTimeList.join("\n")}
                 .replace(/,\s*,+/g, ", ")
                 .replace(/\s+/g, " ")
                 .trim();
-              if (!prompt.endsWith(".")) prompt += ".";
+              if (!prompt.endsWith(".")) prompt = prompt.replace(/,+$/, "") + ".";
+
+              // 🌟 필수 품질 키워드 강제 병합 로직 (Midjourney)
+              const mjKeywords = "ultra high quality, 8k resolution, photorealistic, cinematic composition, 16:9 aspect ratio, professional photography, cinematic motion, dynamic camera movement, sharp focus, detailed lighting";
+              if (!prompt.includes("cinematic composition") && !prompt.includes("sharp focus")) {
+                 prompt = prompt.replace(/\.$/, ", ") + mjKeywords + ".";
+              }
+
+              // Runway 필수 통합 처리
+              let finalRunwayPrompt = aiScene.runwayPrompt || "";
+              if (finalRunwayPrompt) {
+                 const rwKeywords = "cinematic motion, fluid movement, photorealistic, highly detailed, 8k";
+                 if (!finalRunwayPrompt.includes("fluid movement")) {
+                   finalRunwayPrompt = finalRunwayPrompt.trim().replace(/\.$/, "") + ", " + rwKeywords + ".";
+                 }
+              }
 
               batchScenes.push({
                 time: timeStr,
-                scene: aiScene.lyrics || `씬 ${globalIdx + 1}`,
+                scene: (aiScene.lyrics && aiScene.lyrics !== `씬 ${globalIdx + 1}` && aiScene.lyrics.trim() !== "") ? aiScene.lyrics : (preAllocatedLyrics[globalIdx] || `씬 ${globalIdx + 1}`),
                 prompt: `/* Scene ${globalIdx + 1} */ ${prompt}`,
                 promptKo: promptKo,
-                runwayPrompt: aiScene.runwayPrompt || "",
+                runwayPrompt: finalRunwayPrompt,
                 runwayPromptKo: aiScene.runwayPromptKo || "",
                 location: aiScene.location || "",
                 emotion: aiScene.emotion || "",
@@ -1085,7 +1463,7 @@ ${batchTimeList.join("\n")}
 
               batchScenes.push({
                 time: fillTimeStr,
-                scene: `씬 ${globalIdx + 1}`,
+                scene: preAllocatedLyrics[globalIdx] || `씬 ${globalIdx + 1}`,
                 prompt: `/* Scene ${globalIdx + 1} */ ${baseFillPrompt}`,
                 promptKo: baseFillKo,
                 runwayPrompt: "",
@@ -1141,7 +1519,7 @@ ${batchTimeList.join("\n")}
               : "cinematic scene, photorealistic.";
             scenes.push({
               time: fillTimeStr,
-              scene: `씬 ${fillIdx + 1}`,
+              scene: preAllocatedLyrics[fillIdx] || `씬 ${fillIdx + 1}`,
               prompt: `/* Scene ${fillIdx + 1} */ ${baseEn}`,
               promptKo: lastScene?.promptKo || "",
               runwayPrompt: lastScene?.runwayPrompt || "",
@@ -1221,15 +1599,15 @@ ${batchTimeList.join("\n")}
                 .join(", ");
             }
 
-            const prompt = `다음 음악 가사와 설정을 기반으로 Midjourney용 **매우 상세하고 자연스러운** 영어 프롬프트와 한글 프롬프트를 각각 생성해주세요.
+            const prompt = `당신은 세계적인 뮤직비디오 감독입니다. 가사의 감정을 영화적 시각 언어로 변환하여, 예술 작품 수준의 Midjourney 프롬프트를 설계하세요.
 
-【가사 내용】 (가장 중요 - 반드시 프롬프트의 핵심이 되어야 합니다!)
+【가사 내용】 (가장 중요 — 감정과 서사를 여기서 추출하세요)
 "${sceneLyrics}"
 
-【전체 가사 맥락】 (참고용)
+【전체 가사 맥락】 (서사 아크 파악용)
 ${cleanLyrics.substring(0, 500)}${cleanLyrics.length > 500 ? "..." : ""}
 
-【MV 설정】 (보조 참고용 - 가사 내용을 우선하되 자연스럽게 융합)
+【MV 설정】 (가사 감정과 자연스럽게 융합하세요)
 - 시대: ${era || "현대"}
 - 국가: ${country || "한국"}
 - 장소: ${location || "도시"}
@@ -1239,17 +1617,17 @@ ${cleanLyrics.substring(0, 500)}${cleanLyrics.length > 500 ? "..." : ""}
 - 인물: ${characterInfo || "1명"}
 ${customSettings ? `- 추가: ${customSettings}` : ""}
 
-【작업 요구사항】
-1. **가사 내용을 중심으로** 매우 구체적이고 상세한 영어 프롬프트와 한글 프롬프트를 각각 작성
-2. **가사에서 묘사되는 장면, 감정, 상황을 구체적으로 포함**하세요
-3. 가사의 감정과 분위기를 시각적으로 표현하는 묘사 포함
-4. 위의 MV 설정(시대, 국가, 조명, 카메라, 분위기 등)을 **가사 내용과 자연스럽게 융합** (가사 내용이 우선)
+【작업 요구사항 — 예술적 품질 기준】
+1. 가사의 감정을 **시각적 메타포**로 전환하세요 (추상적 감정 → 구체적 시각 요소)
+2. 장소를 단순 나열이 아닌 **감정이 깃든 공간**으로 묘사 (빛·그림자·질감·공기의 느낌까지 표현)
+3. 인물 동작은 **내면 감정이 외면에 스며드는** 미세한 제스처로 표현하고, 기형이 없도록 손가락, 발가락, 손 모양, 발 모양, 팔, 다리 등 인체 구조를 매우 정밀하고 자연스럽게 묘사
+4. 빛·색채·질감을 감정에 맞게 세밀히 설정 (예: 부드러운 필름 결, 황금빛 렌즈 플레어, 보케 배경 등)
 5. 배경, 인물, 조명, 카메라 워크를 모두 포함한 완성된 프롬프트
-6. 영어 프롬프트는 한글 없이 **순수 영어만** 작성
-7. 한글 프롬프트는 자연스러운 한글로 작성
-8. 각 프롬프트는 50단어 이상의 상세한 묘사
-9. 고품질 키워드 포함 (ultra high quality, 8k resolution, photorealistic, cinematic lighting 등)
-10. **프롬프트만 출력** (설명이나 주석 없이 순수 프롬프트만)
+6. 영어 프롬프트('promptEn')는 한글 없이 순수 영어만 사용하며, 단순 단어 나열이 아닌 **최소 3~4문장의 긴 시각적 묘사 단락(Paragraph)**으로 작성.
+   - 마지막에 콤마(,)와 함께 다음 키워드를 반드시 붙여넣으세요: "ultra high quality, 8k resolution, photorealistic, cinematic composition, 16:9 aspect ratio, professional photography, cinematic motion, dynamic camera movement, sharp focus, detailed lighting"
+7. 한글 프롬프트('promptKo')는 위 영문을 바탕으로 매우 감각적이고 디테일한 한글 3문장 이상으로 작성.
+8. Runway 프롬프트('runwayPrompt')는 인물과 환경의 미세 애니메이션을 구체적으로 길게 서술. 마지막에 "cinematic motion, fluid movement, photorealistic, highly detailed, 8k" 를 붙여넣기.
+9. **프롬프트만 출력** (설명이나 주석 없이)
 
 **출력 형식 (순수 JSON만):**
 \`\`\`json
@@ -1258,34 +1636,34 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
     {
       "time": "0:00-0:15",
       "lyrics": "해당 구간의 실제 가사 내용",
-      "promptEn": "매우 상세한 Midjourney용 영어 프롬프트 (50단어 이상)",
-      "promptKo": "위 영어 프롬프트를 자연스럽게 번역한 한글 프롬프트",
-      "runwayPrompt": "Subject (누가), Action (무엇을 하는가), Emotion (감정), Environment (공간), Camera movement, Lighting, Style realism, Technical modifiers 형식을 따른 영문 비디오 프롬프트. 인물의 세밀한 동작과 카메라의 움직임, 조명을 중심으로 매우 상세히 작성",
-      "runwayPromptKo": "위 Runway 영문 프롬프트를 한글로 번역한 내용",
-      "location": "장소",
-      "characterAction": "인물 동작",
-      "lighting": "조명 설정"
+      "promptEn": "감정·빛·질감·공간감이 살아있는 60단어 이상의 Midjourney 영어 프롬프트",
+      "promptKo": "위 영어 프롬프트를 감각적으로 번역한 한글 프롬프트",
+      "runwayPrompt": "인물의 미세한 동작(머리카락 흔들림, 눈 초점 변화, 호흡)과 환경 모션(나뭇잎, 빛 변화, 구름), 카메라 모션(dolly, pan, parallax), 조명 변화까지 포함한 영문 비디오 프롬프트",
+      "runwayPromptKo": "위 Runway 프롬프트의 한글 번역",
+      "location": "감정이 스며든 공간 묘사",
+      "characterAction": "내면이 드러나는 섬세한 동작",
+      "lighting": "빛의 방향·색·질감 묘사"
     }
   ]
 }
 \`\`\`
 
-**Runway Video Prompt 작성 지침 (가장 중요):**
-1. **구성 요소 필수 포함**: Subject, Action, Emotion, Environment, Camera movement, Lighting, Style realism, Technical modifiers
-2. **세밀한 묘사**: 인물의 아주 구체적이고 세밀한 동작 표현에 집중하세요.
-3. **역동적 연출**: 카메라의 구체적인 움직임(Cinematic dolly, Pan, Tilt, Zoom 등)과 인상적인 조명(Cinematic lighting, Rim light, Volumetric, Golden hour 등)을 반드시 포함하세요.
-4. **참조**: 전체 가사 맥락과 각 씬의 상황, Midjourney용 영어 프롬프트의 시각적 요소를 모두 조화롭게 반영하세요.
+**Runway Video Prompt 작성 지침:**
+1. **미세한 인물 동작** 필수: 바람에 흔들리는 머리카락, 떨리는 손끝, 눈의 초점 변화, 호흡에 따른 미세한 움직임
+2. **환경의 살아있는 요소** 필수: 흔들리는 나뭇잎, 흐르는 물, 떨어지는 빗방울, 이동하는 구름, 먼지의 움직임
+3. **카메라 모션**: slow dolly, gentle pan, subtle parallax, floating steadicam 등 구체적 동작
+4. **조명 변화**: shifting shadows, flickering light, drifting sun rays 등 동적 조명
 
 **지금 바로 JSON을 생성하세요:**`;
 
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
             const response = await fetch(geminiUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
                 generationConfig: {
-                  temperature: 0.8,
+                  temperature: 0.92,
                   topK: 40,
                   topP: 0.95,
                   maxOutputTokens: 2048,
@@ -1390,10 +1768,7 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
               if (mood) promptParts.push(mood + " mood");
 
               promptParts.push(
-                "ultra high quality",
-                "8k resolution",
-                "photorealistic",
-                "cinematic lighting",
+                getArtisticKeywords(mood || ""),
               );
 
               promptEn = promptParts.join(", ").trim();
@@ -1486,250 +1861,33 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
       mood,
     );
 
-    const container = document.getElementById("mvSceneOverviewContainer");
-    if (container) {
-      let html = "";
-
-      // 썸네일/배경/인물 프롬프트 표시
-      const reviewContainer = document.getElementById(
-        "mvPromptsReviewContainer",
-      );
-      if (reviewContainer && thumbnailPrompts) {
-        reviewContainer.innerHTML = `
-            <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--primary);">
-                <h3 style="margin: 0 0 15px 0; color: var(--text-primary); font-size: 1.1rem;">🖼️ 썸네일/배경/인물 프롬프트 리뷰</h3>
-                <p style="margin: 0 0 15px 0; color: var(--text-secondary); font-size: 0.85rem;">전체 뮤직비디오의 스타일을 결정하는 주요 프롬프트입니다. 내용을 확인하고 수정하세요.</p>
-                <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
-                    <div style="padding: 15px; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--border);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                            <label style="margin: 0; color: var(--text-primary); font-size: 0.95rem; font-weight: 700;">🎬 썸네일 이미지 프롬프트</label>
-                            <div style="display: flex; gap: 8px;">
-                                <button class="btn btn-small btn-primary" onclick="window.regenerateSingleStylePrompt('thumbnail')" title="썸네일 프롬프트만 파생성" style="padding: 4px 8px; font-size: 0.75rem;">
-                                    <i class="fas fa-sync-alt"></i> 재생성
-                                </button>
-                                <button class="btn btn-small btn-secondary" onclick="window.editReviewPrompt('review_thumbnail_en')" title="수정 포커스" style="padding: 4px 8px; font-size: 0.75rem;">
-                                    <i class="fas fa-edit"></i> 수정
-                                </button>
-                                <button class="btn btn-small btn-success" onclick="window.copyReviewPrompt('review_thumbnail_en')" title="Midjourney 영어 프롬프트 복사" style="padding: 4px 8px; font-size: 0.75rem;">
-                                    <i class="fas fa-copy"></i> Midjourney 복사
-                                </button>
-                            </div>
-                        </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">Midjourney (EN)</label>
-                                <textarea id="review_thumbnail_en" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${thumbnailPrompts.thumbnailEn || ""}</textarea>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">한글 번역</label>
-                                <textarea id="review_thumbnail_ko" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${thumbnailPrompts.thumbnailKo || ""}</textarea>
-                            </div>
-                        </div>
-                    </div>
-                    <div style="padding: 15px; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--border);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                            <label style="margin: 0; color: var(--text-primary); font-size: 0.95rem; font-weight: 700;">🏞️ 배경 프롬프트 (상세)</label>
-                            <div style="display: flex; gap: 8px;">
-                                <button class="btn btn-small btn-primary" onclick="window.regenerateSingleStylePrompt('background')" title="배경 프롬프트만 재생성" style="padding: 4px 8px; font-size: 0.75rem;">
-                                    <i class="fas fa-sync-alt"></i> 재생성
-                                </button>
-                                <button class="btn btn-small btn-secondary" onclick="window.editReviewPrompt('review_background_en')" title="수정 포커스" style="padding: 4px 8px; font-size: 0.75rem;">
-                                    <i class="fas fa-edit"></i> 수정
-                                </button>
-                                <button class="btn btn-small btn-success" onclick="window.copyReviewPrompt('review_background_en')" title="Midjourney 영어 프롬프트 복사" style="padding: 4px 8px; font-size: 0.75rem;">
-                                    <i class="fas fa-copy"></i> Midjourney 복사
-                                </button>
-                            </div>
-                        </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">Midjourney (EN)</label>
-                                <textarea id="review_background_en" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${thumbnailPrompts.backgroundEn || ""}</textarea>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">한글 번역</label>
-                                <textarea id="review_background_ko" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${thumbnailPrompts.backgroundKo || ""}</textarea>
-                            </div>
-                        </div>
-                    </div>
-                    <div style="padding: 15px; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--border);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                            <label style="margin: 0; color: var(--text-primary); font-size: 0.95rem; font-weight: 700;">👤 인물 프롬프트 (상세)</label>
-                            <div style="display: flex; gap: 8px;">
-                                <button class="btn btn-small btn-primary" onclick="window.regenerateSingleStylePrompt('character')" title="인물 프롬프트만 재생성" style="padding: 4px 8px; font-size: 0.75rem;">
-                                    <i class="fas fa-sync-alt"></i> 재생성
-                                </button>
-                                <button class="btn btn-small btn-secondary" onclick="window.editReviewPrompt('review_character_en')" title="수정 포커스" style="padding: 4px 8px; font-size: 0.75rem;">
-                                    <i class="fas fa-edit"></i> 수정
-                                </button>
-                                <button class="btn btn-small btn-success" onclick="window.copyReviewPrompt('review_character_en')" title="Midjourney 영어 프롬프트 복사" style="padding: 4px 8px; font-size: 0.75rem;">
-                                    <i class="fas fa-copy"></i> Midjourney 복사
-                                </button>
-                            </div>
-                        </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">Midjourney (EN)</label>
-                                <textarea id="review_character_en" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${thumbnailPrompts.characterEn || ""}</textarea>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">한글 번역</label>
-                                <textarea id="review_character_ko" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${thumbnailPrompts.characterKo || ""}</textarea>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-      }
-
-      html += `
-          <div style="margin: 10px 0 30px 0; padding: 15px; background: var(--bg-card); border-radius: 8px; border-left: 4px solid var(--accent);">
-              <h3 style="margin: 0 0 10px 0; color: var(--text-primary); font-size: 1.1rem;">
-                  <i class="fas fa-film"></i> 씬별 세부 프롬프트 수정
-              </h3>
-              <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem;">각 씬의 이미지(Midjourney) 및 비디오(Runway) 프롬프트를 세부적으로 수정할 수 있습니다.</p>
-          </div>
-      `;
-      scenes.forEach((scene, index) => {
-        // 기존 프롬프트에서 영어와 한글 분리 (혼합되어 있을 수 있음)
-        let existingPrompt = scene.prompt || "";
-        // 영어 프롬프트에서 의도적으로 전달된 한글을 지우지 않음 (기본 방식/가사 전달용 보존)
-        // 씬 번호 주석 제거 후 다시 추가 (한글 제거 후)
-        existingPrompt = existingPrompt
-          .replace(/\/\*\s*Scene\s+\d+\s*\*\//gi, "")
-          .trim();
-        if (existingPrompt && !existingPrompt.startsWith("/* Scene")) {
-          existingPrompt = `/* Scene ${index + 1} */ ${existingPrompt}`;
-        }
-        const existingPromptKo = scene.promptKo || "";
-
-        html += `
-                    <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);" data-scene-index="${index}">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <h4 style="margin: 0; color: var(--text-primary);">씬 ${index + 1}</h4>
-                                <span style="color: var(--accent); font-weight: 600;">${scene.time}</span>
-                                ${scene._isFilled ? `<span style="background: #e67e22; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; font-weight: 700;">⚠ 자동보충 (재생성 권장)</span>` : ""}
-                            </div>
-                            <div style="display: flex; gap: 8px;">
-                                <button class="btn btn-small btn-primary" onclick="regenerateSceneOverviewPrompt(${index})" title="이 씬의 프롬프트 재생성" style="padding: 6px 12px; font-size: 0.8rem;">
-                                    <i class="fas fa-sync-alt"></i> 재생성
-                                </button>
-                                <button id="editSceneOverviewBtn_${index}" class="btn btn-small btn-secondary" onclick="editSceneOverview(${index}, this)" title="씬 수정" style="padding: 6px 12px; font-size: 0.8rem;" data-state="edit" data-original-en="${existingPrompt.replace(/"/g, "&quot;")}">
-                                    <i class="fas fa-edit"></i> 수정
-                                </button>
-                                <button id="copySceneOverviewBtn_${index}" class="btn btn-small btn-success" onclick="copySceneOverviewPromptEn(${index}, event)" title="영어 프롬프트 복사 (Midjourney용)" style="padding: 6px 12px; font-size: 0.8rem;">
-                                    <i class="fas fa-copy"></i> Midjourney 복사
-                                </button>
-                                <button id="copySceneOverviewRunwayBtn_${index}" class="btn btn-small btn-info" onclick="copySceneOverviewRunwayPrompt(${index}, event)" title="Runway 비디오 프롬프트 복사" style="padding: 6px 12px; font-size: 0.8rem; background-color: #3168E8; color: white;">
-                                    <i class="fas fa-video"></i> Runway 복사
-                                </button>
-                            </div>
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">📝 장면 설명:</label>
-                            <textarea class="scene-description" data-index="${index}" data-scene-index="${index}" style="width: 100%; min-height: 80px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; resize: vertical;">${scene.scene || ""}</textarea>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 10px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">⛵ Midjourney Prompt (EN):</label>
-                                <textarea id="scene_overview_${index}_en" class="scene-overview-en" data-index="${index}" data-scene-index="${index}" style="width: 100%; min-height: 100px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${existingPrompt}</textarea>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">🎬 Runway Prompt (EN):</label>
-                                <textarea id="scene_overview_${index}_runway" class="scene-overview-runway" data-index="${index}" data-scene-index="${index}" style="width: 100%; min-height: 100px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${scene.runwayPrompt || ""}</textarea>
-                            </div>
-                        </div>
-
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">⛵ Midjourney (한글):</label>
-                                <textarea id="scene_overview_${index}_ko" class="scene-overview-ko" data-index="${index}" data-scene-index="${index}" style="width: 100%; min-height: 60px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${existingPromptKo}</textarea>
-                            </div>
-                            <div>
-                                <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">🎬 Runway (한글):</label>
-                                <textarea id="scene_overview_${index}_runway_ko" class="scene-overview-runway-ko" data-index="${index}" data-scene-index="${index}" style="width: 100%; min-height: 60px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${scene.runwayPromptKo || ""}</textarea>
-                            </div>
-                        </div>
-                    </div>
-                `;
-      });
-      container.innerHTML = html;
-
-      // 씬에 promptKo가 있으면 한글 프롬프트에 설정, 없으면 영어에서 번역
-      scenes.forEach((scene, index) => {
-        const enEl = document.getElementById(`scene_overview_${index}_en`);
-        const koEl = document.getElementById(`scene_overview_${index}_ko`);
-
-        // 씬에 promptKo가 있으면 한글 프롬프트에 설정
-        if (koEl && scene.promptKo) {
-          koEl.value = scene.promptKo;
-          // currentScenes도 업데이트
-          if (window.currentScenes && window.currentScenes[index]) {
-            window.currentScenes[index].promptKo = scene.promptKo;
-          }
-        }
-
-        // 영어 프롬프트가 있고 한글 프롬프트가 없으면 한글로 번역
-        if (enEl && enEl.value && (!koEl || !koEl.value)) {
-          translateEnglishToKoreanForScene("prompt", enEl.value)
-            .then((translated) => {
-              if (koEl && translated) {
-                koEl.value = translated;
-                // currentScenes도 업데이트
-                if (window.currentScenes && window.currentScenes[index]) {
-                  window.currentScenes[index].promptKo = translated;
-                }
-              }
-            })
-            .catch((err) => {
-              console.error("자동 번역 오류:", err);
-            });
-        }
-
-        // 영어 프롬프트가 있고 Runway 프롬프트가 없으면 생성
-        const runwayEl = document.getElementById(
-          `scene_overview_${index}_runway`,
-        );
-        const runwayKoEl = document.getElementById(
-          `scene_overview_${index}_runway_ko`,
-        );
-
-        if (runwayEl && !runwayEl.value.trim() && scene.prompt) {
-          const derivedRunway =
-            scene.prompt.replace(/\/\*.*?\*\//g, "").trim() +
-            ", cinematic motion, 8k, highly detailed";
-          runwayEl.value = derivedRunway;
-          if (window.currentScenes && window.currentScenes[index]) {
-            window.currentScenes[index].runwayPrompt = derivedRunway;
-          }
-        }
-
-        // Runway 영어 프롬프트가 있고 한글 번역이 없으면 번역
-        if (
-          runwayEl &&
-          runwayEl.value.trim() &&
-          (!runwayKoEl || !runwayKoEl.value.trim())
-        ) {
-          translateEnglishToKoreanForScene("runwayPrompt", runwayEl.value).then(
-            (translated) => {
-              if (runwayKoEl && translated) {
-                runwayKoEl.value = translated;
-                if (window.currentScenes && window.currentScenes[index]) {
-                  window.currentScenes[index].runwayPromptKo = translated;
-                }
-              }
-            },
-          );
-        }
-      });
+    // [신규] 분리된 렌더링 함수 호출
+    if (typeof window.renderMvThumbnailPromptsUI === "function") {
+      window.renderMvThumbnailPromptsUI(thumbnailPrompts);
+    }
+    if (typeof window.renderSceneOverview === "function") {
+      window.renderSceneOverview(scenes);
     }
 
     if (mvSceneOverviewSection) {
+      mvSceneOverviewSection.classList.remove("hidden");
       mvSceneOverviewSection.style.display = "block";
     }
+
+    // 결과 섹션(mvResultsSection)은 이 단계(초안 작성)에서는 숨겨둠 (저장 후에만 표시)
+    if (mvResultsSection) {
+      mvResultsSection.classList.add("hidden");
+      mvResultsSection.style.display = "none";
+    }
+
+    // 총 이미지 수 및 길이 업데이트
+    const totalImagesEl = document.getElementById("mvTotalImages");
+    const totalDurationEl = document.getElementById("mvTotalDuration");
+    const intervalDisplayEl = document.getElementById("mvIntervalDisplay");
+    if (totalImagesEl) totalImagesEl.textContent = scenes.length;
+    if (totalDurationEl)
+      totalDurationEl.textContent = `${minutes}:${String(seconds).padStart(2, "0")}`;
+    if (intervalDisplayEl) intervalDisplayEl.textContent = interval;
 
     window.currentScenes = scenes;
 
@@ -1739,6 +1897,36 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
       "개 씬",
       useAI ? "(AI 생성)" : "(기본 방식)",
     );
+
+    // 썸네일/배경/인물 프롬프트 자동 생성
+    if (typeof window.generateMVThumbnailPrompts === "function") {
+      try {
+        console.log("🎨 썸네일/배경/인물 프롬프트 자동 생성 시작...");
+        await window.generateMVThumbnailPrompts(
+          era,
+          country,
+          location,
+          characters,
+          customSettings,
+          lighting,
+          cameraWork,
+          mood,
+        );
+        console.log("✅ 썸네일/배경/인물 프롬프트 자동 생성 완료");
+      } catch (thumbErr) {
+        console.warn("⚠️ 썸네일 프롬프트 자동 생성 실패:", thumbErr);
+      }
+    }
+
+    // [중요] 모든 생성이 완료된 후 즉시 프로젝트 자동 저장 (영속성 확보)
+    if (typeof window.saveCurrentProject === "function") {
+      console.log("💾 MV 프롬프트 생성 결과 자동 저장 중...");
+      window.saveCurrentProject();
+    }
+
+    // 생성 완료 후 버튼 상태 복원
+    setGeneratingUI(false);
+
   } catch (error) {
     console.error("❌ MV 프롬프트 생성 오류:", error);
     console.error("오류 스택:", error.stack);
@@ -1857,6 +2045,9 @@ window.generateMVThumbnailPrompts = async function (
 
     if (geminiKey && geminiKey.startsWith("AIza")) {
       try {
+        // 캐릭터 시트 원본 정보 수집
+        const characterSheetsFull = typeof window.getAllCharacterSheetsFull === "function" ? window.getAllCharacterSheetsFull() : "";
+
         const prompt = `다음 음악 가사와 설정을 기반으로 Midjourney용 **세밀하고 상세한** 영어 프롬프트와 한글 프롬프트를 각각 3개씩 생성하세요.
 
 【가사】 (가장 중요 - 반드시 각 프롬프트에 구체적으로 반영하세요!)
@@ -1872,62 +2063,66 @@ ${stylePrompt || "감성적인 발라드"}
 - 조명: ${lighting || "자연광"}
 - 카메라: ${cameraWork || "중간 샷"}
 - 분위기: ${mood || "감성적"}
-- 인물: ${characterInfo || "1명"}
+${characterSheetsFull ? `
+【캐릭터 디자인 시트 원본 — 외형 묘사 일관성 100% 원칙】
+아래는 확정된 캐릭터들의 디자인 시트 원본(Full Data)입니다. 
+생성하는 모든 프롬프트(썸네일, 배경, 인물 프롬프트)에서, 인물의 외모, 머리카락, 의상, 질감, 색상 등을 **정확하고 구체적으로 100% 일치하도록 최우선으로 반영**하세요.
+${characterSheetsFull}
+` : `- 인물: ${characterInfo || "1명"}`}
 ${customSettings ? `- 추가: ${customSettings}` : ""}
 
 【작업 요구사항】
-다음 3가지 프롬프트를 각각 **매우 상세하고 구체적으로** 작성하세요 (각 40단어 이상):
+다음 3가지 프롬프트를 각각 **매우 상세하고 구체적으로** 영어 한 단락으로 작성하세요 (각 150단어 내외의 긴 서술형 문장):
+- **프롬프트 구조화 필수**: [핵심 피사체/장면 요약] -> [피사체의 외모, 표정, 미세한 동작] -> [배경, 환경, 날씨, 질감의 정밀 묘사] -> [조명, 색채, 분위기] -> [카메라 앵글 및 모션] -> [고화질 기술 키워드] 순으로 논리적이고 풍부하게 작성.
+- 단순 단어 나열(쉼표 나열)을 지양하고, 완벽한 문장(Sentence)과 쉼표를 결합하여 문학적이고 시각적인 묘사로 채우세요.
 
 1. **썸네일 프롬프트 (Thumbnail Prompt)**: 
-   - MV 썸네일 이미지용
-   - **전체 가사의 핵심 감정과 분위기를 대표하는 이미지** (전체 가사 내용을 구체적으로 반영)
-   - **MV 프롬프트 상세 설정 반영**: 시대(${era || "현대"}), 국가(${country || "한국"}), 장소(${location || "도시"}), 조명(${lighting || "자연광"}), 카메라(${cameraWork || "중간 샷"}), 분위기(${mood || "감성적"})를 자연스럽게 융합
-   - 인물, 배경, 조명, 구도 모두 포함
-   - **인물 상세 정보 포함** (성별, 나이, 인종, 외모/스타일) - MV 설정의 인물 정보를 반영하여 일관되게 묘사
-   - 16:9 비율, 영화적 구도
-   - **미드저니 고화질 실사진 키워드 필수 포함**: "ultra high quality, 8k resolution, photorealistic, cinematic composition, 16:9 aspect ratio, professional photography, sharp focus, depth of field, color grading"
+   - MV 썸네일 이미지이자 대표 영상 소스용
+   - **전체 가사의 핵심 감정과 분위기를 대표하는 장면** (전체 가사 내용을 구체적으로 반영)
+   - **MV 프롬프트 상세 설정 반영**: 시대(${era || "현대"}), 국가(${country || "한국"}), 장소(${location || "도시"}), 조명(${lighting || "자연광"}), 카메라(${cameraWork || "중간 샷"}), 분위기(${mood || "감성적"})를 융합
+   - 인물, 배경, 조명, 구도 및 미세한 모션을 모두 포함
+   - **인물 상세 정보 포함** (성별, 나이, 인종, 외모/스타일) - 설정의 인물 정보를 반영
+   - **이미지/비디오 통합 고화질 키워드 필수 포함**: "ultra high quality, 8k resolution, photorealistic, cinematic composition, 16:9 aspect ratio, professional photography, cinematic motion, dynamic camera movement, sharp focus, detailed lighting"
 
 2. **배경 프롬프트 (Background Prompt)**:
-   - 배경 중심 구성
-   - **전체 가사와 분위기를 반영한 상세한 배경 묘사** (가사에서 묘사되는 장소나 분위기 반영)
-   - **MV 프롬프트 상세 설정 반영**: 시대, 국가, 장소, 조명, 분위기를 자연스럽게 융합
-   - 조명, 색감, 분위기 상세 묘사
-   - 인물은 최소화하거나 실루엣만
-   - **미드저니 고화질 실사진 키워드 필수 포함**: "background-focused composition, ultra high quality, 8k resolution, photorealistic, detailed background, professional photography"
+   - 배경 요소 중심 (인물은 없거나 원경 처럼 작게)
+   - **전체 가사와 분위기를 반영한 장소 묘사 및 날씨/환경의 변화(바람, 빛 반사, 입자 흩날림 등 정밀 묘사)**
+   - **MV 프롬프트 상세 설정 반영**: 시대, 국가, 장소, 조명, 분위기 융합
+   - 조명, 색감, 질감 상세 묘사 및 느리고 부드러운 카메라 전환 모션(slow panoramic panning, tracking shot) 포함
+   - **이미지/비디오 통합 고화질 키워드 필수 포함**: "background-focused composition, ultra high quality, 8k resolution, photorealistic, detailed background, atmospheric lighting, slow panoramic panning, cinematic motion"
 
 3. **인물 프롬프트 (Character Prompt)**:
-   - 인물 중심 구성
-   - **전체 가사의 감정을 인물 표정에 반영** (전체 가사에서 느껴지는 감정을 시각적으로 표현)
-   - **MV 프롬프트 상세 설정 반영**: 시대, 국가, 조명, 카메라, 분위기를 자연스럽게 융합
-   - **인물 상세 정보 포함** (성별, 나이, 인종, 외모/스타일) - MV 설정의 인물 정보를 반영하여 일관되게 묘사
-   - 인물의 표정, 포즈, 동작 상세 묘사
-   - 자연스러운 포즈, 상세한 손가락, 얼굴 특징
-   - **미드저니 고화질 실사진 키워드 필수 포함**: "character-focused composition, ultra high quality, 8k resolution, photorealistic, natural pose, detailed hands, detailed facial features, professional photography, sharp focus, depth of field"
+   - 인물 중심 구성 및 세밀한 동작 묘사
+   - **전체 가사의 감정을 인물 표정과 제스처에 세밀하게 반영**
+   - **MV 프롬프트 상세 설정 반영**: 시대, 국가, 조명, 카메라, 분위기 융합
+   - **인물 상세 정보 포함** (성별, 나이, 인종, 외모/스타일)
+   - 인물의 눈빛 변화, 미세한 입술 움직임, 자연스러운 포즈, 바람에 날리는 머릿결, 눈물이나 땀방울 등 구체적 동작(motion)과 피부 질감 명시
+   - **이미지/비디오 통합 고화질 키워드 필수 포함**: "character-focused composition, ultra high quality, 8k resolution, photorealistic, natural pose, detailed facial features, subtle emotive motion, close-up tracking, sharp focus, beautiful lighting"
 
 **출력 형식 (순수 JSON만):**
 \`\`\`json
 {
-  "thumbnailEn": "완성된 썸네일 영어 프롬프트 (60단어 이상, 전체 가사 내용 반영, MV 설정 융합, 고화질 실사진 키워드 포함)",
-  "thumbnailKo": "완성된 썸네일 한글 프롬프트 (60단어 이상, 전체 가사 내용 반영, MV 설정 융합, 고화질 실사진 키워드 포함)",
-  "backgroundEn": "완성된 배경 영어 프롬프트 (60단어 이상, 전체 가사 내용 반영, MV 설정 융합, 고화질 실사진 키워드 포함)",
-  "backgroundKo": "완성된 배경 한글 프롬프트 (60단어 이상, 전체 가사 내용 반영, MV 설정 융합, 고화질 실사진 키워드 포함)",
-  "characterEn": "완성된 인물 영어 프롬프트 (60단어 이상, 전체 가사 내용 반영, MV 설정 융합, 고화질 실사진 키워드 포함)",
-  "characterKo": "완성된 인물 한글 프롬프트 (60단어 이상, 전체 가사 내용 반영, MV 설정 융합, 고화질 실사진 키워드 포함)"
+  "thumbnailEn": "완성된 썸네일 영어 프롬프트 (150단어 내외, 전체 가사 내용 반영, MV 설정 융합, 고화질 실사진 키워드 포함)",
+  "thumbnailKo": "완성된 썸네일 한글 프롬프트 (150단어 내외, 전체 가사 내용 반영, MV 설정 융합, 고화질 실사진 키워드 포함)",
+  "backgroundEn": "완성된 배경 영어 프롬프트 (150단어 내외, 전체 가사 내용 반영, MV 설정 융합, 고화질 실사진 키워드 포함)",
+  "backgroundKo": "완성된 배경 한글 프롬프트 (150단어 내외, 전체 가사 내용 반영, MV 설정 융합, 고화질 실사진 키워드 포함)",
+  "characterEn": "완성된 인물 영어 프롬프트 (150단어 내외, 전체 가사 내용 반영, MV 설정 융합, 고화질 실사진 키워드 포함)",
+  "characterKo": "완성된 인물 한글 프롬프트 (150단어 내외, 전체 가사 내용 반영, MV 설정 융합, 고화질 실사진 키워드 포함)"
 }
 \`\`\`
 
 **매우 중요:**
-- **전체 가사 내용을 가장 우선적으로 반영하세요** - 각 프롬프트에 전체 가사에서 묘사되는 장면, 감정, 상황을 구체적으로 포함하세요
-- **MV 프롬프트 상세 설정을 반드시 반영하세요** - 시대, 국가, 장소, 조명, 카메라, 분위기, 인물 정보를 전체 가사 내용과 자연스럽게 융합
-- 각 프롬프트는 60단어 이상의 상세한 묘사
-- 가사의 감정과 내용을 시각적으로 표현
-- **인물 상세 정보(성별, 나이, 인종, 외모/스타일)는 모든 프롬프트에서 일관되게 반영되어야 합니다**
-- **미드저니 고화질 실사진 키워드는 필수로 포함**하세요 (각 프롬프트 설명에 명시된 키워드들)
-- 영어 프롬프트는 순수 영어만 (한글 없음)
-- 한글 프롬프트는 자연스러운 한글로 작성
+- **전체 가사 내용을 가장 우선적으로 깊이 있게 분석하여 반영하세요**
+- **MV 프롬프트 상세 설정을 반드시 반영하세요** - 시대, 국가, 장소, 조명, 카메라, 분위기, 인물 정보를 자연스럽게 융합
+- 각 프롬프트는 150단어 내외의 세밀하고 방대한 묘사 (사진 묘사뿐만 아니라 피사체의 미세한 동작, 조명 변화, 카메라 움직임, 렌즈 플레어 등의 비디오 생성 요소 포함)
+- 인물의 감정과 장면의 분위기를 시각적 모션과 함께 문학적으로 표현
+- **인물 상세 정보(성별, 나이, 인종, 외모/스타일)는 가능한 일관되게 반영**
+- **이미지/비디오 통합 고화질 키워드는 필수로 포함**하세요
+- 영어 프롬프트는 단일 단락으로 구성하며, 완벽한 문장과 콤마(,) 구분자를 조화롭게 활용해 최적화 요소를 나열
+- 한글 프롬프트는 영어 프롬프트의 의미를 충실히 번역
 - JSON 형식만 출력`;
 
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
         const response = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1951,9 +2146,8 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
           console.log("🤖 AI 응답 수신:", aiResponse.substring(0, 300) + "...");
 
           // JSON 추출
-          let jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const aiPrompts = safeJsonParse(jsonMatch[0]);
+          const aiPrompts = safeJsonParse(aiResponse);
+          if (aiPrompts) {
 
             // 영어 프롬프트
             thumbnailEn = aiPrompts.thumbnailEn || aiPrompts.thumbnail || "";
@@ -2137,38 +2331,35 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
 
     // 썸네일 프롬프트 UI 업데이트
     if (thumbnailEnEl) {
-      thumbnailEnEl.value = thumbnailEn || "설정된 내용이 없습니다.";
-      console.log(
-        "✅ 썸네일 영어 프롬프트 UI 업데이트:",
-        thumbnailEn.substring(0, 50) + "...",
-      );
+      const valEn = typeof thumbnailEn === 'string' ? thumbnailEn : JSON.stringify(thumbnailEn || "");
+      thumbnailEnEl.value = valEn || "설정된 내용이 없습니다.";
+      console.log("✅ 썸네일 영어 프롬프트 UI 업데이트:", valEn.substring(0, 50) + "...");
     }
     if (thumbnailKoEl) {
-      thumbnailKoEl.value = thumbnailKo || "설정된 내용이 없습니다.";
+      const valKo = typeof thumbnailKo === 'string' ? thumbnailKo : JSON.stringify(thumbnailKo || "");
+      thumbnailKoEl.value = valKo || "설정된 내용이 없습니다.";
     }
 
     // 배경 프롬프트 UI 업데이트
     if (backgroundDetailEnEl) {
-      backgroundDetailEnEl.value = backgroundEn || "설정된 내용이 없습니다.";
-      console.log(
-        "✅ 배경 영어 프롬프트 UI 업데이트:",
-        backgroundEn.substring(0, 50) + "...",
-      );
+      const valEn = typeof backgroundEn === 'string' ? backgroundEn : JSON.stringify(backgroundEn || "");
+      backgroundDetailEnEl.value = valEn || "설정된 내용이 없습니다.";
+      console.log("✅ 배경 영어 프롬프트 UI 업데이트:", valEn.substring(0, 50) + "...");
     }
     if (backgroundDetailKoEl) {
-      backgroundDetailKoEl.value = backgroundKo || "설정된 내용이 없습니다.";
+      const valKo = typeof backgroundKo === 'string' ? backgroundKo : JSON.stringify(backgroundKo || "");
+      backgroundDetailKoEl.value = valKo || "설정된 내용이 없습니다.";
     }
 
     // 인물 프롬프트 UI 업데이트
     if (characterDetailEnEl) {
-      characterDetailEnEl.value = characterEn || "설정된 내용이 없습니다.";
-      console.log(
-        "✅ 인물 영어 프롬프트 UI 업데이트:",
-        characterEn.substring(0, 50) + "...",
-      );
+      const valEn = typeof characterEn === 'string' ? characterEn : JSON.stringify(characterEn || "");
+      characterDetailEnEl.value = valEn || "설정된 내용이 없습니다.";
+      console.log("✅ 인물 영어 프롬프트 UI 업데이트:", valEn.substring(0, 50) + "...");
     }
     if (characterDetailKoEl) {
-      characterDetailKoEl.value = characterKo || "설정된 내용이 없습니다.";
+      const valKo = typeof characterKo === 'string' ? characterKo : JSON.stringify(characterKo || "");
+      characterDetailKoEl.value = valKo || "설정된 내용이 없습니다.";
     }
 
     console.log("✅ 썸네일/배경/인물 프롬프트 생성 및 UI 업데이트 완료!");
@@ -2197,7 +2388,12 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
 
 // --- Extracted getMVLocationValues ---
 window.getMVLocationValues = function () {
-  return getSelectedTags("mvLocationTags") || [];
+  const container = document.getElementById("mvLocationTags");
+  if (!container) return [];
+  const activeTags = container.querySelectorAll(".tag-btn.active");
+  return Array.from(activeTags)
+    .map((btn) => btn.getAttribute("data-value"))
+    .filter((v) => !!v);
 };
 
 // --- Extracted generateSRTPreview ---
@@ -2308,31 +2504,7 @@ window.generateSRTPreview = function () {
     alert("SRT 자막 생성 중 오류가 발생했습니다:\n\n" + error.message);
   }
 };
-// --- Extracted copySceneOverviewRunwayPrompt ---
-// --- Extracted copySceneOverviewRunwayPrompt ---
-window.copySceneOverviewRunwayPrompt = async function (index, event) {
-  try {
-    const runwayEl = document.getElementById(`scene_overview_${index}_runway`);
-    if (!runwayEl || !runwayEl.value.trim()) {
-      alert("복사할 Runway 프롬프트가 없습니다.");
-      return;
-    }
 
-    const promptText = runwayEl.value.trim();
-    await navigator.clipboard.writeText(promptText);
-
-    if (typeof window.showCopyIndicator === "function") {
-      window.showCopyIndicator(
-        `✅ 씬 ${index + 1} Runway 프롬프트가 복사되었습니다!`,
-      );
-    } else {
-      alert(`✅ 씬 ${index + 1} Runway 프롬프트가 복사되었습니다!`);
-    }
-  } catch (error) {
-    console.error("Runway 프롬프트 복사 오류:", error);
-    alert("Runway 프롬프트 복사 중 오류가 발생했습니다:\n\n" + error.message);
-  }
-};
 
 // --- Restored Translation Sync Functions ---
 window.syncMVPromptTranslation = async function (type, sourceLang) {
@@ -2389,6 +2561,11 @@ window.syncMVPromptTranslation = async function (type, sourceLang) {
       } else {
         enEl.value = "";
       }
+    }
+    
+    // 수정 내용 실시간 저장
+    if (typeof window.saveCurrentProject === "function") {
+      window.saveCurrentProject();
     }
   } catch (error) {
     console.error("프롬프트 상호 번역 오류:", error);
@@ -2483,6 +2660,11 @@ window.syncSceneOverviewPromptTranslation = async function (
         enEl.value = "";
       }
     }
+    
+    // 수정 내용 즉시 저장
+    if (typeof window.saveCurrentProject === "function") {
+      window.saveCurrentProject();
+    }
   } catch (error) {
     console.error("씬 개요 프롬프트 상호 번역 오류:", error);
   }
@@ -2527,6 +2709,11 @@ window.syncScenePromptTranslation = async function (sceneIndex, sourceLang) {
       } else {
         enEl.value = "";
       }
+    }
+    
+    // 수정 내용 즉시 저장
+    if (typeof window.saveCurrentProject === "function") {
+      window.saveCurrentProject();
     }
   } catch (error) {
     console.error("씬 프롬프트 상호 번역 오류:", error);
@@ -2577,6 +2764,15 @@ window.regenerateMVPrompt = async function (type) {
         mainBtn.dataset.originalHTML || '<i class="fas fa-copy"></i> 복사';
       mainBtn.disabled = false;
       mainBtn.classList.remove("copied");
+    }
+    const overviewBtn = document.querySelector(
+      '.copy-mv-overview-btn[data-type="' + type + '"]',
+    );
+    if (overviewBtn) {
+      overviewBtn.innerHTML =
+        overviewBtn.dataset.originalHTML || '<i class="fas fa-copy"></i> 복사';
+      overviewBtn.disabled = false;
+      overviewBtn.classList.remove("copied");
     }
   } catch (error) {
     console.error("프롬프트 재생성 오류:", error);
@@ -2661,41 +2857,45 @@ window.regenerateSingleStylePrompt = async function (type) {
         if (type === "thumbnail") {
           taskDescription = `
 1. **썸네일 프롬프트 (Thumbnail Prompt)**: 
-   - MV 썸네일 이미지용
-   - **전체 가사의 핵심 감정과 분위기를 대표하는 이미지** (전체 가사 내용을 구체적으로 반영)
-   - **MV 프롬프트 상세 설정 반영**: 시대(${era}), 국가(${country}), 장소(${location}), 조명(${lighting}), 카메라(${cameraWork}), 분위기(${mood})를 자연스럽게 융합
-   - 인물, 배경, 조명, 구도 모두 포함
-   - **인물 상세 정보 포함** (성별, 나이, 인종, 외모/스타일) - MV 설정의 인물 정보를 반영하여 일관되게 묘사
-   - 16:9 비율, 영화적 구도
-   - **미드저니 고화질 실사진 키워드 필수 포함**: "ultra high quality, 8k resolution, photorealistic, cinematic composition, 16:9 aspect ratio, professional photography, sharp focus, depth of field, color grading"`;
+   - MV 썸네일 이미지이자 대표 영상 소스용
+   - **전체 가사의 핵심 감정과 분위기를 대표하는 장면** (전체 가사 내용을 구체적으로 반영)
+   - **MV 프롬프트 상세 설정 반영**: 시대(${era}), 국가(${country}), 장소(${location}), 조명(${lighting}), 카메라(${cameraWork}), 분위기(${mood})를 융합
+   - 인물, 배경, 조명, 구도 및 미세한 모션을 모두 포함
+   - **인물 상세 정보 포함** (성별, 나이, 인종, 외모/스타일) - 설정의 인물 정보를 반영
+   - **이미지/비디오 통합 고화질 키워드 필수 포함**: "ultra high quality, 8k resolution, photorealistic, cinematic composition, 16:9 aspect ratio, professional photography, cinematic motion, dynamic camera movement, sharp focus, detailed lighting"`;
           jsonKeyEn = "thumbnailEn";
           jsonKeyKo = "thumbnailKo";
         } else if (type === "background") {
           taskDescription = `
 1. **배경 프롬프트 (Background Prompt)**:
-   - 배경 중심 구성
-   - **전체 가사와 분위기를 반영한 상세한 배경 묘사** (가사에서 묘사되는 장소나 분위기 반영)
-   - **MV 프롬프트 상세 설정 반영**: 시대(${era}), 국가(${country}), 장소(${location}), 조명(${lighting}), 분위기(${mood})를 자연스럽게 융합
-   - 조명, 색감, 분위기 상세 묘사
-   - 인물은 최소화하거나 실루엣만
-   - **미드저니 고화질 실사진 키워드 필수 포함**: "background-focused composition, ultra high quality, 8k resolution, photorealistic, detailed background, professional photography"`;
+   - 배경 요소 중심 (인물은 없거나 원경 처럼 작게)
+   - **전체 가사와 분위기를 반영한 장소 묘사 및 날씨/환경의 변화(바람, 입자 흩날림 등)**
+   - **MV 프롬프트 상세 설정 반영**: 시대(${era}), 국가(${country}), 장소(${location}), 조명(${lighting}), 분위기(${mood})를 융합
+   - 조명, 색감, 질감 상세 묘사 및 느리고 부드러운 카메라 전환 모션 포함
+   - **이미지/비디오 통합 고화질 키워드 필수 포함**: "background-focused composition, ultra high quality, 8k resolution, photorealistic, detailed background, atmospheric lighting, slow panoramic panning, cinematic motion"`;
           jsonKeyEn = "backgroundEn";
           jsonKeyKo = "backgroundKo";
         } else if (type === "character") {
+          // 캐릭터 시트 정보 수집
+          let charSheetInfo = "";
+          if (typeof window.getAllCharacterSheetsFull === "function") {
+            charSheetInfo = window.getAllCharacterSheetsFull();
+          }
           taskDescription = `
 1. **인물 프롬프트 (Character Prompt)**:
-   - 인물 중심 구성
-   - **전체 가사의 감정을 인물 표정에 반영** (전체 가사에서 느껴지는 감정을 시각적으로 표현)
-   - **MV 프롬프트 상세 설정 반영**: 시대(${era}), 국가(${country}), 조명(${lighting}), 카메라(${cameraWork}), 분위기(${mood})를 자연스럽게 융합
-   - **인물 상세 정보 포함** (성별, 나이, 인종, 외모/스타일) - MV 설정의 인물 정보를 반영하여 일관되게 묘사
-   - 인물의 표정, 포즈, 동작 상세 묘사
-   - 자연스러운 포즈, 상세한 손가락, 얼굴 특징
-   - **미드저니 고화질 실사진 키워드 필수 포함**: "character-focused composition, ultra high quality, 8k resolution, photorealistic, natural pose, detailed hands, detailed facial features, professional photography, sharp focus, depth of field"`;
+   - 인물 중심 구성 및 세밀한 동작 묘사
+   - **전체 가사의 감정을 인물 표정과 제스처에 세밀하게 반영**
+   - **MV 프롬프트 상세 설정 반영**: 시대(${era}), 국가(${country}), 조명(${lighting}), 카메라(${cameraWork}), 분위기(${mood})를 융합
+   - **인물 상세 정보 포함** (성별, 나이, 인종, 외모/스타일)
+   - 인물의 눈빛 변화, 미세한 입술 움직임, 자연스러운 포즈 등 구체적 동작(motion) 명시
+   - **이미지/비디오 통합 고화질 키워드 필수 포함**: "character-focused composition, ultra high quality, 8k resolution, photorealistic, natural pose, detailed facial features, subtle emotive motion, close-up tracking, sharp focus, beautiful lighting"
+${charSheetInfo ? `   - **【캐릭터 디자인 시트 원본 — 외형 100% 일관성 유지 필수】 아래 캐릭터 시트의 외형(얼굴, 머리카락, 의상, 체형 등)을 정확하게 전부 반영하세요:**
+${charSheetInfo}` : ""}`;
           jsonKeyEn = "characterEn";
           jsonKeyKo = "characterKo";
         }
 
-        const prompt = `다음 음악 가사와 설정을 기반으로 Midjourney용 **세밀하고 상세한** 영어 프롬프트와 한글 프롬프트를 1개만 생성하세요.
+        const prompt = `다음 음악 가사와 설정을 기반으로 **세밀하고 상세한** 영어 프롬프트와 한글 프롬프트를 1개만 생성하세요.
 
 【가사】 (가장 중요 - 반드시 프롬프트에 구체적으로 반영하세요!)
 ${cleanLyrics}
@@ -2703,7 +2903,7 @@ ${cleanLyrics}
 【스타일】
 ${stylePrompt || "감성적인 발라드"}
 
-【MV 설정】 (보조 참고용 - 가사 내용을 우선하되 자연스럽게 융합)
+【MV 설정】 (보조 참고용 - 가사 내용을 우선하되 융합)
 - 시대: ${era || "현대"}
 - 국가: ${country || "한국"}
 - 장소: ${location || "도시"}
@@ -2714,25 +2914,27 @@ ${stylePrompt || "감성적인 발라드"}
 ${customSettings ? `- 추가: ${customSettings}` : ""}
 
 【작업 요구사항】
-해당 프롬프트를 **매우 상세하고 구체적으로** 작성하세요 (60단어 이상):
+해당 프롬프트를 **매우 상세하고 구체적으로** 영어 한 단락으로 작성하세요 (150단어 내외의 긴 서술형 문장):
+- **프롬프트 구조화 필수**: [핵심 피사체/장면 요약] -> [피사체의 외모, 표정, 동작] -> [배경, 환경, 날씨, 빛 반사 등 질감의 정밀 묘사] -> [조명, 색채, 분위기] -> [카메라 앵글 및 모션] -> [고화질 기술 키워드] 순으로 논리적이고 풍부하게 작성.
+- 단순 단어 나열(쉼표 나열)을 지양하고, 완벽한 문장(Sentence)과 쉼표를 결합하여 문학적이고 시각적인 묘사로 채우세요.
 ${taskDescription}
 
 **출력 형식 (순수 JSON만):**
 \`\`\`json
 {
-  "${jsonKeyEn}": "완성된 영어 프롬프트 (60단어 이상, 전체 가사 내용 반영, MV 설정 융합, 고화질 실사진 키워드 포함)",
-  "${jsonKeyKo}": "완성된 한글 프롬프트 (60단어 이상, 전체 가사 내용 반영, MV 설정 융합, 고화질 실사진 키워드 포함)"
+  "${jsonKeyEn}": "완성된 영어 프롬프트 (150단어 내외, 전체 가사 내용 심층 반영, MV 설정 융합, 이미지+비디오 고화질 키워드 포함)",
+  "${jsonKeyKo}": "완성된 한글 프롬프트 (150단어 내외, 전체 가사 내용 심층 반영, MV 설정 융합, 번역본)"
 }
 \`\`\`
 
 **매우 중요:**
-- **전체 가사 내용을 가장 우선적으로 반영하세요**
-- **MV 프롬프트 상세 설정을 반드시 반영하세요**
-- **미드저니 고화질 실사진 키워드는 필수로 포함**하세요
-- 영어 프롬프트는 순수 영어만 (한글 없음)
+- **전체 가사 내용을 가장 우선적으로 깊이 있게 분석하여 반영하세요**
+- **MV 프롬프트 상세 설정과 모션(카메라 워크 및 피사체의 움직임, 바람, 렌즈 플레어 등)을 반드시 정밀하게 묘사하세요**
+- **이미지/비디오 통합 고화질 키워드는 필수로 포함**하세요
+- 영어 프롬프트는 단일 단락, 순수 영어만 (한글 없음)
 - JSON 형식만 출력`;
 
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
         const response = await fetch(geminiUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -2746,28 +2948,38 @@ ${taskDescription}
           const data = await response.json();
           const aiResponse =
             data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          let jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const aiPrompts = safeJsonParse(jsonMatch[0]);
-            promptEn =
-              aiPrompts[jsonKeyEn] ||
-              aiPrompts[`${type}En`] ||
-              aiPrompts[type] ||
-              "";
-            promptKo = aiPrompts[jsonKeyKo] || aiPrompts[`${type}Ko`] || "";
+          const aiPrompts = safeJsonParse(aiResponse);
+          if (aiPrompts) {
+            if (aiPrompts) {
+              promptEn =
+                aiPrompts[jsonKeyEn] ||
+                aiPrompts[`${type}En`] ||
+                aiPrompts[type] ||
+                "";
+              promptKo = aiPrompts[jsonKeyKo] || aiPrompts[`${type}Ko`] || "";
 
-            if (
-              !promptKo &&
-              promptEn &&
-              typeof translateEnglishToKoreanForScene === "function"
-            ) {
-              promptKo =
-                (await translateEnglishToKoreanForScene(type, promptEn)) || "";
+              if (
+                !promptKo &&
+                promptEn &&
+                typeof translateEnglishToKoreanForScene === "function"
+              ) {
+                promptKo =
+                  (await translateEnglishToKoreanForScene(type, promptEn)) || "";
+              }
+            } else {
+               throw new Error("AI 응답을 JSON으로 파싱할 수 없습니다.");
             }
+          } else {
+            throw new Error("AI 응답에서 JSON 데이터를 찾을 수 없습니다.");
           }
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(`API 오류: ${response.status} ${errData.error?.message || response.statusText}`);
         }
       } catch (aiError) {
         console.warn(`⚠️ ${type} 개별 AI 프롬프트 생성 실패:`, aiError);
+        alert(`프롬프트 재생성 실패: ${aiError.message}`);
+        return;
       }
     }
 
@@ -2797,6 +3009,10 @@ ${taskDescription}
 
       if (typeof window.showCopyIndicator === "function") {
         window.showCopyIndicator(`✅ 재생성 완료!`);
+      }
+
+      if (typeof window.saveCurrentProject === "function") {
+        window.saveCurrentProject();
       }
     } else {
       alert("재생성 결과가 비어있습니다.");
@@ -2851,7 +3067,18 @@ window.regenerateStylePrompts = async function () {
       mood,
     );
 
-    if (thumbnailPrompts) {
+    const hasGeneratedPrompts =
+      thumbnailPrompts &&
+      [
+        thumbnailPrompts.thumbnailEn,
+        thumbnailPrompts.thumbnailKo,
+        thumbnailPrompts.backgroundEn,
+        thumbnailPrompts.backgroundKo,
+        thumbnailPrompts.characterEn,
+        thumbnailPrompts.characterKo,
+      ].some((value) => typeof value === "string" && value.trim());
+
+    if (hasGeneratedPrompts) {
       const enThumb = document.getElementById("review_thumbnail_en");
       const koThumb = document.getElementById("review_thumbnail_ko");
       if (enThumb) enThumb.value = thumbnailPrompts.thumbnailEn || "";
@@ -2866,6 +3093,13 @@ window.regenerateStylePrompts = async function () {
       const koChar = document.getElementById("review_character_ko");
       if (enChar) enChar.value = thumbnailPrompts.characterEn || "";
       if (koChar) koChar.value = thumbnailPrompts.characterKo || "";
+      
+      // 저장 호출 (oninput은 수동 입력 시만 발생하므로 프로그램 변경 시 명시적 호출 필요)
+      if (typeof window.saveCurrentProject === "function") {
+          window.saveCurrentProject();
+      }
+    } else {
+      alert("재생성 결과가 비어있습니다.");
     }
   } catch (error) {
     console.error("스타일 프롬프트 재생성 오류:", error);
@@ -2949,30 +3183,18 @@ window.saveAndConfirmMVPrompts = async function () {
     mvSettings.characters = characters;
 
     const mvPrompts = {
-      thumbnailEn:
-        document.getElementById("review_thumbnail_en")?.value ||
-        document.getElementById("mvThumbnailPromptEn")?.value ||
-        "",
-      thumbnailKo:
-        document.getElementById("review_thumbnail_ko")?.value ||
-        document.getElementById("mvThumbnailPromptKo")?.value ||
-        "",
-      backgroundDetailEn:
-        document.getElementById("review_background_en")?.value ||
-        document.getElementById("mvBackgroundDetailPromptEn")?.value ||
-        "",
-      backgroundDetailKo:
-        document.getElementById("review_background_ko")?.value ||
-        document.getElementById("mvBackgroundDetailPromptKo")?.value ||
-        "",
-      characterDetailEn:
-        document.getElementById("review_character_en")?.value ||
-        document.getElementById("mvCharacterDetailPromptEn")?.value ||
-        "",
-      characterDetailKo:
-        document.getElementById("review_character_ko")?.value ||
-        document.getElementById("mvCharacterDetailPromptKo")?.value ||
-        "",
+      thumbnail: {
+        en: document.getElementById("review_thumbnail_en")?.value || document.getElementById("mvThumbnailPromptEn")?.value || "",
+        ko: document.getElementById("review_thumbnail_ko")?.value || document.getElementById("mvThumbnailPromptKo")?.value || ""
+      },
+      background: {
+        en: document.getElementById("review_background_en")?.value || document.getElementById("mvBackgroundDetailPromptEn")?.value || "",
+        ko: document.getElementById("review_background_ko")?.value || document.getElementById("mvBackgroundDetailPromptKo")?.value || ""
+      },
+      character: {
+        en: document.getElementById("review_character_en")?.value || document.getElementById("mvCharacterDetailPromptEn")?.value || "",
+        ko: document.getElementById("review_character_ko")?.value || document.getElementById("mvCharacterDetailPromptKo")?.value || ""
+      }
     };
 
     if (!window.currentProject) window.currentProject = {};
@@ -2989,6 +3211,9 @@ window.saveAndConfirmMVPrompts = async function () {
     window.currentProject.data.marketing.mvScenes = JSON.parse(
       JSON.stringify(window.currentScenes),
     );
+    if (typeof window.syncMarketingMVModel === "function") {
+      window.syncMarketingMVModel(window.currentProject.data.marketing);
+    }
 
     if (typeof window.saveCurrentProject === "function") {
       const saved = window.saveCurrentProject();
@@ -3004,17 +3229,42 @@ window.saveAndConfirmMVPrompts = async function () {
       alert("현재 편집 내용이 저장되었습니다.");
     }
 
-    // 저장 후 편집 화면(mvSceneOverviewSection)은 그대로 유지하고,
-    // 결과 섹션(mvResultsSection)은 명시적으로 숨겨서 화면 전환 방지
+    // DOM 업데이트 (수정 영역의 값을 결과 영역의 텍스트 에어리어에 반영)
+    if (document.getElementById("mvThumbnailPromptEn")) document.getElementById("mvThumbnailPromptEn").value = mvPrompts.thumbnail.en;
+    if (document.getElementById("mvThumbnailPromptKo")) document.getElementById("mvThumbnailPromptKo").value = mvPrompts.thumbnail.ko;
+    if (document.getElementById("mvBackgroundDetailPromptEn")) document.getElementById("mvBackgroundDetailPromptEn").value = mvPrompts.background.en;
+    if (document.getElementById("mvBackgroundDetailPromptKo")) document.getElementById("mvBackgroundDetailPromptKo").value = mvPrompts.background.ko;
+    if (document.getElementById("mvCharacterDetailPromptEn")) document.getElementById("mvCharacterDetailPromptEn").value = mvPrompts.character.en;
+    if (document.getElementById("mvCharacterDetailPromptKo")) document.getElementById("mvCharacterDetailPromptKo").value = mvPrompts.character.ko;
+
+    // app.js의 confirmSceneOverviewAndGenerate()를 호출하여 나머지 씬들을 렌더링하고 결과창 활성화
+    if (typeof window.confirmSceneOverviewAndGenerate === 'function') {
+      await window.confirmSceneOverviewAndGenerate();
+    }
+
+    // 결과창 가시성 최종 확인 (hidden 클래스 제거 필수)
     const mvResultsSection = document.getElementById("mvResultsSection");
-    const mvSceneOverviewSection = document.getElementById(
-      "mvSceneOverviewSection",
-    );
+    const marketingResult = document.getElementById("marketingResult");
+    const mvSceneOverviewSection = document.getElementById("mvSceneOverviewSection");
 
-    if (mvResultsSection) mvResultsSection.style.display = "none";
-    if (mvSceneOverviewSection) mvSceneOverviewSection.style.display = "block";
+    if (marketingResult) {
+      marketingResult.classList.remove("hidden");
+      marketingResult.style.display = "block";
+    }
+    if (mvResultsSection) {
+      mvResultsSection.classList.remove("hidden");
+      mvResultsSection.style.display = "block";
+    }
+    if (mvSceneOverviewSection) {
+      mvSceneOverviewSection.classList.add("hidden");
+      mvSceneOverviewSection.style.display = "none";
+    }
 
-    // [중요] 화면이 튀지 않도록 어떠한 스크롤(scrollIntoView 등) 로직도 실행하지 않음
+    // MV 탭으로 전환하여 즉시 결과 확인 가능하게 함
+    const mvTabBtn = document.querySelector('.tab-btn[data-tab="marketing-mv"]');
+    if (mvTabBtn && typeof mvTabBtn.click === 'function') {
+      mvTabBtn.click();
+    }
   } catch (error) {
     console.error("저장 오류:", error);
     alert("저장 중 오류가 발생했습니다.");
@@ -3118,6 +3368,10 @@ window.editSceneOverview = async function (sceneIndex, btnElement) {
 
 window.copySceneOverviewPromptEn = async function (sceneIndex, event) {
   try {
+    const btn = event
+      ? (event.currentTarget || event.target.closest("button"))
+      : document.getElementById(`copySceneOverviewBtn_${sceneIndex}`);
+
     const enEl = document.getElementById(`scene_overview_${sceneIndex}_en`);
     if (!enEl || !enEl.value.trim()) {
       alert("복사할 영어 프롬프트가 없습니다.");
@@ -3144,15 +3398,12 @@ window.copySceneOverviewPromptEn = async function (sceneIndex, event) {
 
     await navigator.clipboard.writeText(promptText);
 
-    const btn = event
-      ? event.currentTarget
-      : document.getElementById(`copySceneOverviewBtn_${sceneIndex}`);
     if (btn) {
-      const originalHTML = btn.innerHTML;
-      btn.innerHTML = "✅ 복사됨";
+      if (!btn.dataset.originalHTML) btn.dataset.originalHTML = btn.innerHTML;
+      btn.innerHTML = '<i class="fas fa-check"></i> 복사됨';
       btn.classList.add("copied");
       setTimeout(() => {
-        btn.innerHTML = originalHTML;
+        btn.innerHTML = btn.dataset.originalHTML;
         btn.classList.remove("copied");
       }, 2000);
     }
@@ -3275,27 +3526,31 @@ window.regenerateSceneOverviewPrompt = async function (sceneIndex) {
       const lightingEn = lightingMap[lighting] || lighting || "";
       const cameraEn = cameraMap[cameraWork] || cameraWork || "";
 
-      let sceneLyrics = "";
-      if (scene.time && cleanLyrics) {
-        const timeMatch = scene.time.match(/(\d+):(\d+)-(\d+):(\d+)/);
-        if (timeMatch) {
-          const startTotal =
-            parseInt(timeMatch[1]) * 60 + parseInt(timeMatch[2]);
-          const endTotal = parseInt(timeMatch[3]) * 60 + parseInt(timeMatch[4]);
-          const lyricsLines = cleanLyrics.split("\n").filter((l) => l.trim());
-          const estimatedLinesPerMinute =
-            lyricsLines.length / (totalSeconds / 60);
-          const startLine = Math.floor(
-            (startTotal / 60) * estimatedLinesPerMinute,
-          );
-          const endLine = Math.ceil((endTotal / 60) * estimatedLinesPerMinute);
-          sceneLyrics = lyricsLines
-            .slice(startLine, endLine + 1)
-            .join(" ")
-            .trim();
+      // 가사는 이미 1:1 사전 매핑되어 scene.scene에 저장되어 있음. 
+      // 만약 없거나 "씬 N" 형태인 경우 fallback으로 시간비례 추출 사용 (예외 대비)
+      let sceneLyrics = scene.scene || "";
+      if (!sceneLyrics || sceneLyrics.startsWith("씬 ")) {
+        if (scene.time && cleanLyrics) {
+          const timeMatch = scene.time.match(/(\d+):(\d+)-(\d+):(\d+)/);
+          if (timeMatch) {
+            const startTotal =
+              parseInt(timeMatch[1]) * 60 + parseInt(timeMatch[2]);
+            const endTotal = parseInt(timeMatch[3]) * 60 + parseInt(timeMatch[4]);
+            const lyricsLines = cleanLyrics.split("\n").filter((l) => l.trim());
+            const estimatedLinesPerMinute =
+              lyricsLines.length / (totalSeconds / 60);
+            const startLine = Math.floor(
+              (startTotal / 60) * estimatedLinesPerMinute,
+            );
+            const endLine = Math.ceil((endTotal / 60) * estimatedLinesPerMinute);
+            sceneLyrics = lyricsLines
+              .slice(startLine, endLine + 1)
+              .join(" ")
+              .trim();
+          }
         }
       }
-      if (!sceneLyrics) sceneLyrics = scene.scene || "music scene";
+      if (!sceneLyrics) sceneLyrics = "music scene";
 
       let characterInfoStr = characters
         .map((c, idx) => {
@@ -3303,21 +3558,57 @@ window.regenerateSceneOverviewPrompt = async function (sceneIndex) {
         })
         .join("; ");
 
-      const prompt = `Generate a detailed Midjourney prompt for a music video scene based on:
-Lyrics: "${sceneLyrics}"
-Scene description: "${scene.scene || ""}"
-Style: ${stylePrompt || "cinematic"}
-Settings: ${eraEn}, ${countryEn}, ${location}, ${lightingEn}, ${cameraEn}, ${moodEn}
-Characters: ${characterInfoStr}
-Output JSON: {"promptEn": "...", "promptKo": "..."}`;
+      const prompt = `다음 음악 가사와 설정을 기반으로 **세밀하고 상세한** 통합 영어 프롬프트와 한글 프롬프트를 1개만 생성하세요.
 
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+【가사】 (가장 중요 - 반드시 프롬프트에 구체적으로 시각화하여 반영하세요!)
+"${sceneLyrics}"
+
+【현재 씬 설명】
+"${scene.scene || "음악 씬"}"
+
+【스타일】
+${stylePrompt || "감성적인 발라드"}
+
+【MV 설정】 (가사 내용을 우선하되 융합)
+- 시대: ${era || "현대"}
+- 국가: ${country || "한국"}
+- 장소: ${location || "도시"}
+- 조명: ${lighting || "자연광"}
+- 카메라: ${cameraWork || "중간 샷"}
+- 분위기: ${mood || "감성적"}
+- 인물 정보: ${characterInfoStr}
+${customSettings ? `- 추가: ${customSettings}` : ""}
+
+【작업 요구사항】
+해당 씬의 비주얼을 **매우 상세하고 구체적으로** 영어 한 단락으로 묘사하세요 (최소 150단어 이상의 방대하고 정밀한 서술형 문장):
+- **프롬프트 구조화 필수**: [핵심 피사체/장면 요약] -> [피사체의 외모, 표정, 동작] -> [배경, 환경, 날씨, 빛 반사 등 질감의 정밀 묘사] -> [조명, 색채, 분위기] -> [카메라 앵글 및 모션] -> [고화질 기술 키워드] 순으로 논리적이고 풍부하게 작성.
+- 단순 단어 나열을 지양하고, 완벽한 문장(Sentence)과 쉼표를 결합하여 문학적이고 시각적인 묘사로 채우세요.
+- 가사의 감정과 디테일을 눈에 보이듯 깊이 있게 묘사
+- 인물, 배경, 조명, 구도 및 미세한 대상의 움직임(모션)을 모두 포함
+- 느리고 자연스러운 카메라 워크 추가
+- **이미지/비디오 통합 고화질 키워드 필수 포함**: "ultra high quality, 8k resolution, photorealistic, cinematic composition, 16:9 aspect ratio, professional photography, cinematic motion, dynamic camera movement, sharp focus, detailed lighting"
+
+**출력 형식 (순수 JSON만):**
+\`\`\`json
+{
+  "promptEn": "완성된 영어 프롬프트 (최소 150단어 이상, 가사 내용 기반 심층 묘사 및 모션 포함)",
+  "promptKo": "완성된 한글 프롬프트 (최소 150단어 이상, 번역본)"
+}
+\`\`\`
+
+**매우 중요:**
+- **가사 내용을 가장 우선적으로 상세히 시각화하세요**
+- **미세한 카메라 워크와 피사체의 움직임을 필수로 묘사하세요**
+- 영어 프롬프트는 단일 단락, 순수 영어만 (한글 없음)
+- JSON 형식만 출력`;
+
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
       const response = await fetch(geminiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.8, maxOutputTokens: 1000 },
+          generationConfig: { temperature: 0.8, maxOutputTokens: 4096 },
         }),
       });
 
@@ -3325,31 +3616,59 @@ Output JSON: {"promptEn": "...", "promptKo": "..."}`;
         const data = await response.json();
         const aiResponse =
           data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        let jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const aiPrompts = safeJsonParse(jsonMatch[0]);
-          const newPromptEn = aiPrompts.promptEn || "";
-          const newPromptKo = aiPrompts.promptKo || "";
+        const aiPrompts = safeJsonParse(aiResponse);
+        if (aiPrompts) {
+          if (aiPrompts) {
+            const newPromptEn = aiPrompts.promptEn || "";
+            const newPromptKo = aiPrompts.promptKo || "";
 
-          if (newPromptEn) {
-            const enEl = document.getElementById(
-              `scene_overview_${sceneIndex}_en`,
-            );
-            const koEl = document.getElementById(
-              `scene_overview_${sceneIndex}_ko`,
-            );
-            if (enEl)
-              enEl.value = `/* Scene ${sceneIndex + 1} */ ${newPromptEn}`;
-            if (koEl) {
-              if (newPromptKo) koEl.value = newPromptKo;
-              else
-                await window.syncSceneOverviewPromptTranslation(
-                  sceneIndex,
-                  "en",
-                );
+            if (newPromptEn) {
+              const enEl = document.getElementById(
+                `scene_overview_${sceneIndex}_en`,
+              );
+              const koEl = document.getElementById(
+                `scene_overview_${sceneIndex}_ko`,
+              );
+              if (enEl)
+                enEl.value = `/* Scene ${sceneIndex + 1} */ ${newPromptEn}`;
+              if (koEl) {
+                if (newPromptKo) {
+                  koEl.value = newPromptKo;
+                  if (window.currentScenes && window.currentScenes[sceneIndex]) {
+                    window.currentScenes[sceneIndex].prompt = enEl
+                      ? enEl.value
+                      : `/* Scene ${sceneIndex + 1} */ ${newPromptEn}`;
+                    window.currentScenes[sceneIndex].promptKo = newPromptKo;
+                  }
+                  if (typeof window.saveCurrentProject === "function") {
+                    window.saveCurrentProject();
+                  }
+                } else {
+                  await window.syncSceneOverviewPromptTranslation(
+                    sceneIndex,
+                    "en",
+                  );
+                }
+              }
+            } else {
+              throw new Error("AI 응답에 영어 프롬프트가 포함되어 있지 않습니다.");
             }
+          } else {
+            throw new Error("AI 응답을 JSON으로 파싱할 수 없습니다.");
           }
+        } else {
+          throw new Error("AI 응답에서 JSON 데이터를 찾을 수 없습니다.");
         }
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(`API 오류: ${response.status} ${errData.error?.message || response.statusText}`);
+      }
+    } else {
+      const basicPrompt = `/* Scene ${sceneIndex + 1} */ ${scene.scene || "music scene"}, ${stylePrompt || "cinematic"}, ${location || "visual setting"}, ${lighting || "natural lighting"}, ${cameraWork || "medium shot"}, ${mood || "emotional mood"}, ultra high quality, 8k resolution, photorealistic, cinematic composition, 16:9 aspect ratio`;
+      const enEl = document.getElementById(`scene_overview_${sceneIndex}_en`);
+      if (enEl) {
+        enEl.value = basicPrompt;
+        await window.syncSceneOverviewPromptTranslation(sceneIndex, "en");
       }
     }
     if (typeof window.showCopyIndicator === "function") {
@@ -3359,6 +3678,7 @@ Output JSON: {"promptEn": "...", "promptKo": "..."}`;
     }
   } catch (error) {
     console.error("씬 개요 프롬프트 재생성 오류:", error);
+    alert(`씬 개요 프롬프트 재생성 중 오류가 발생했습니다:\n${error.message}`);
   }
 };
 
@@ -3522,6 +3842,11 @@ window.copyMVPromptEn = async function (type, event) {
       return;
     }
 
+    let copyButton =
+      event
+        ? (event.currentTarget || event.target.closest("button"))
+        : document.getElementById(typeInfo.btnId);
+
     const enEl = document.getElementById(typeInfo.en);
     if (!enEl || !enEl.value.trim()) {
       alert(`${typeInfo.name} 영어 프롬프트가 없습니다.`);
@@ -3531,18 +3856,16 @@ window.copyMVPromptEn = async function (type, event) {
     const promptText = enEl.value.trim();
     await navigator.clipboard.writeText(promptText);
 
-    let copyButton =
-      event && event.target
-        ? event.target.closest("button")
-        : document.getElementById(typeInfo.btnId);
-
     if (copyButton) {
       if (!copyButton.dataset.originalHTML) {
         copyButton.dataset.originalHTML = copyButton.innerHTML;
       }
       copyButton.innerHTML = '<i class="fas fa-check"></i> 복사됨';
-      copyButton.disabled = true;
       copyButton.classList.add("copied");
+      setTimeout(() => {
+        copyButton.innerHTML = copyButton.dataset.originalHTML;
+        copyButton.classList.remove("copied");
+      }, 2000);
     }
 
     if (typeof window.showCopyIndicator === "function") {
@@ -3596,24 +3919,30 @@ window.copyMVPromptEnOverview = async function (type, event) {
     };
     const typeInfo = typeMap[type];
     if (!typeInfo) return;
+    var copyButton =
+      event
+        ? (event.currentTarget || event.target.closest("button"))
+        : document.querySelector(
+            '.copy-mv-overview-btn[data-type="' + type + '"]',
+          );
+
     const enEl = document.getElementById(typeInfo.en);
     if (!enEl || !enEl.value.trim()) {
       alert(typeInfo.name + " 영어 프롬프트가 없습니다.");
       return;
     }
     await navigator.clipboard.writeText(enEl.value.trim());
-    var copyButton =
-      event && event.target
-        ? event.target.closest("button")
-        : document.querySelector(
-            '.copy-mv-overview-btn[data-type="' + type + '"]',
-          );
+    
     if (copyButton) {
-      if (!copyButton.dataset.originalHTML)
+      if (!copyButton.dataset.originalHTML) {
         copyButton.dataset.originalHTML = copyButton.innerHTML;
+      }
       copyButton.innerHTML = '<i class="fas fa-check"></i> 복사됨';
-      copyButton.disabled = true;
       copyButton.classList.add("copied");
+      setTimeout(() => {
+        copyButton.innerHTML = copyButton.dataset.originalHTML;
+        copyButton.classList.remove("copied");
+      }, 2000);
     }
     if (typeof window.showCopyIndicator === "function") {
       window.showCopyIndicator(
@@ -3730,12 +4059,25 @@ window.regenerateScenePrompt = async function (sceneIndex) {
     const geminiKey = window.getGeminiApiKey();
     if (geminiKey && geminiKey.startsWith("AIza")) {
       const cleanLyrics = extractLyricsOnly(finalLyrics);
-      const prompt = `Generate a detailed Midjourney prompt for a music video scene based on:
-Lyrics: "${scene.scene || cleanLyrics}"
-Style: ${stylePrompt || "cinematic"}
-Output: Pure English prompt only.`;
+      const prompt = `다음 씬 설명을 기반으로 **세밀하고 상세한** 통합 영어 프롬프트를 1개 생성하세요.
 
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
+【씬 설명 / 가사】
+"${scene.scene || cleanLyrics}"
+
+【스타일】
+${stylePrompt || "감성적인 발라드"}
+
+【작업 요구사항】
+해당 씬의 비주얼을 **매우 상세하고 구체적으로** 영어 한 단락으로 묘사하세요:
+- 씬 설명의 감정과 디테일을 눈에 보이듯 묘사
+- 인물, 배경, 조명, 구도 및 미세한 대상의 움직임(모션)을 모두 포함
+- 느리고 자연스러운 카메라 워크 추가
+- **이미지/비디오 통합 고화질 키워드 필수 포함**: "ultra high quality, 8k resolution, photorealistic, cinematic composition, 16:9 aspect ratio, professional photography, cinematic motion, dynamic camera movement, sharp focus, detailed lighting"
+
+**출력 형식:**
+순수하게 완성된 영어 단일 프롬프트 텍스트만 출력하세요. (따옴표, 설명, JSON 형식 등 불필요한 텍스트 없이 프롬프트 본문만 출력)`;
+
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
       const response = await fetch(geminiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -3758,7 +4100,12 @@ Output: Pure English prompt only.`;
             enEl.value = newPrompt;
             await window.syncScenePromptTranslation(sceneIndex, "en");
           }
+        } else {
+          throw new Error("AI 응답이 비어있습니다.");
         }
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(`API 오류: ${response.status} ${errData.error?.message || response.statusText}`);
       }
     } else {
       const basicPrompt = `${scene.scene || "music scene"}, high quality, photorealistic, natural pose, detailed hands`;
@@ -3787,6 +4134,7 @@ Output: Pure English prompt only.`;
     }
   } catch (error) {
     console.error("씬 프롬프트 재생성 오류:", error);
+    alert(`씬 프롬프트 재생성 중 오류가 발생했습니다: ${error.message}`);
   }
 };
 
@@ -3820,9 +4168,11 @@ window.initializeTagButtons = function () {
     const tagContainers = document.querySelectorAll(".tag-container");
 
     tagContainers.forEach((container) => {
-      // 인라인 onclick 대신 이벤트 리스너 사용 (중복 방지 위해 초기화)
-      container.onclick = null;
-      container.addEventListener("click", function (e) {
+      // 기존 이벤트 리스너 제거 (중복 방지)
+      const newContainer = container.cloneNode(true);
+      container.parentNode.replaceChild(newContainer, container);
+
+      newContainer.addEventListener("click", function (e) {
         const tagBtn = e.target.closest(".tag-btn");
         if (tagBtn && !tagBtn.classList.contains("custom-tag-btn")) {
           e.preventDefault();
@@ -3833,7 +4183,7 @@ window.initializeTagButtons = function () {
 
           // 6단계 장소 유형 선택 시 설정 저장
           if (
-            container.id === "mvLocationTags" &&
+            newContainer.id === "mvLocationTags" &&
             typeof window.saveMVSettings === "function"
           ) {
             window.saveMVSettings();

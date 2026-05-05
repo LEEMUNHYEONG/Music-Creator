@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "test:mv": "node tests/run_mv_smoke_tests.js"
+  },
   "dependencies": {
     "firebase-tools": "^15.7.0"
   }
