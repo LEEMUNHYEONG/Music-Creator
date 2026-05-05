@@ -534,7 +534,8 @@ function getMVSceneQualityConfirmMessage(scenesArg) {
   return [
     `${stats.needsReview}개 씬에 확인 필요 항목이 남아 있습니다.`,
     `시간 확인 ${stats.invalidTime}개, 메타데이터 없음 ${stats.missingMetadata}개, 가사 없음 ${stats.missingLyrics}개, EN 없음 ${stats.missingEnPrompt}개, KO 없음 ${stats.missingKoPrompt}개`,
-    "이 상태로 확정하고 결과 화면으로 이동할까요?",
+    "취소하면 첫 확인 필요 씬으로 이동합니다.",
+    "이 상태로 확정하고 결과 화면으로 이동하려면 확인을 누르세요.",
   ].join("\n");
 }
 

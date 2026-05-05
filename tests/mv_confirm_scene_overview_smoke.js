@@ -268,6 +268,11 @@ addElement("scene_camera_work_1", "slow dolly-in");
   elements.set("scene_overview_0_ko", { value: "" });
   await window.saveAndConfirmMVPrompts();
   assert.ok(confirms.some((message) => message.includes("확인 필요 항목")));
+  assert.ok(
+    confirms.some((message) =>
+      message.includes("취소하면 첫 확인 필요 씬으로 이동"),
+    ),
+  );
   assert.strictEqual(confirmGenerateCalls, 0);
   window.confirmSceneOverviewAndGenerate = originalConfirmSceneOverviewAndGenerate;
 

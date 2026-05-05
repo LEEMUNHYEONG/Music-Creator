@@ -209,7 +209,8 @@ const confirmMessage = getMVSceneQualityConfirmMessage([
 assert.ok(confirmMessage.includes("1개 씬에 확인 필요"));
 assert.ok(confirmMessage.includes("시간 확인 1개"));
 assert.ok(confirmMessage.includes("메타데이터 없음 1개"));
-assert.ok(confirmMessage.includes("이 상태로 확정"));
+assert.ok(confirmMessage.includes("취소하면 첫 확인 필요 씬으로 이동"));
+assert.ok(confirmMessage.includes("결과 화면으로 이동하려면 확인"));
 assert.strictEqual(getMVSceneQualityConfirmMessage([scene]), "");
 assert.deepStrictEqual(
   getMVSceneReviewIndexes([
