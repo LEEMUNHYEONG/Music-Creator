@@ -1,5 +1,37 @@
 # MV 개선작업 이력
 
+## 2026-05-06: 씬 개요 전체 품질 요약 표시
+
+### 작업 목적
+
+씬 개요를 확정하기 전에 전체 씬 중 준비 완료와 확인 필요 개수를 확인하고, 시간/메타데이터/가사/EN/KO 프롬프트 누락 항목을 한눈에 볼 수 있도록 개선했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `getMVSceneQualityStats(scenesArg)` 추가
+   - `getMVSceneQualitySummaryText(scenesArg)` 추가
+   - `renderMVSceneQualitySummary(scenesArg)` 추가
+   - `updateMVSceneQualitySummary()` 추가
+   - 씬 개요 상단에 전체 품질 요약 표시
+   - 시간/가사/메타데이터/EN/KO 입력 변경 시 전체 요약도 즉시 갱신
+
+2. `tests/mv_scene_timing_editor_smoke.js`
+   - 전체 품질 요약이 준비 완료/확인 필요 개수를 반영하는지 확인
+   - 시간/메타데이터/가사/EN/KO 누락 집계가 유지되는지 확인
+   - 씬 개요 렌더링에 전체 품질 요약 마커가 남아 있는지 확인
+
+3. `MV_테스트_실행_가이드.md`, `MV_중복함수_정리계획.md`
+   - 보호 범위와 진행 상태에 전체 씬 품질 요약 항목 추가
+   - 다음 추천 작업을 확인 필요 씬 필터/포커스 보강으로 갱신
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (69 checks)
+```
+
 ## 2026-05-06: 씬 개요 편집 카드 상태 요약 표시
 
 ### 작업 목적

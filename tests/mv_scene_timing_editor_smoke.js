@@ -41,6 +41,7 @@ elements.set("scene_editor_notice_0", {
   },
 });
 elements.set("scene_editor_summary_0", { textContent: "" });
+elements.set("mv_scene_quality_summary", { textContent: "" });
 
 const scene = {
   time: "0:00-0:08",
@@ -51,6 +52,7 @@ const scene = {
   location: "old location",
   emotion: "sad",
 };
+window.currentScenes = [scene];
 
 window.updateMVSceneTimelineFromEditor(scene, 0);
 
@@ -72,6 +74,9 @@ assert.ok(elements.get("scene_editor_summary_0").textContent.includes("메타데
 assert.ok(elements.get("scene_editor_summary_0").textContent.includes("가사 있음"));
 assert.ok(elements.get("scene_editor_summary_0").textContent.includes("EN 있음"));
 assert.ok(elements.get("scene_editor_summary_0").textContent.includes("KO 있음"));
+assert.ok(elements.get("mv_scene_quality_summary").textContent.includes("전체 1개 씬"));
+assert.ok(elements.get("mv_scene_quality_summary").textContent.includes("준비 완료 1개"));
+assert.ok(elements.get("mv_scene_quality_summary").textContent.includes("확인 필요 0개"));
 
 elements.set("scene_time_start_1", { value: "0:30" });
 elements.set("scene_time_end_1", { value: "0:20" });
@@ -148,6 +153,26 @@ assert.ok(renderOverviewSource.includes('role="status"'));
 assert.ok(renderOverviewSource.includes('aria-live="polite"'));
 assert.ok(renderOverviewSource.includes('aria-describedby="scene_editor_notice_${index}"'));
 assert.ok(renderOverviewSource.includes("renderMVSceneEditorSummary(scene, index)"));
+assert.ok(renderOverviewSource.includes("renderMVSceneQualitySummary(scenes)"));
 assert.ok(renderOverviewSource.includes(".scene-overview-en,.scene-overview-ko"));
+
+const mixedQualityText = getMVSceneQualitySummaryText([
+  scene,
+  {
+    time: "0:30-0:20",
+    lyrics: "",
+    prompt: "",
+    promptKo: "",
+    location: "",
+  },
+]);
+assert.ok(mixedQualityText.includes("전체 2개 씬"));
+assert.ok(mixedQualityText.includes("준비 완료 1개"));
+assert.ok(mixedQualityText.includes("확인 필요 1개"));
+assert.ok(mixedQualityText.includes("시간 확인 1개"));
+assert.ok(mixedQualityText.includes("메타데이터 없음 1개"));
+assert.ok(mixedQualityText.includes("가사 없음 1개"));
+assert.ok(mixedQualityText.includes("EN 없음 1개"));
+assert.ok(mixedQualityText.includes("KO 없음 1개"));
 
 console.log("MV scene timing editor smoke test: PASS");

@@ -356,6 +356,87 @@ function getMVSceneEditorSummaryText(scene, index) {
   ].join(" · ");
 }
 
+function getMVSceneQualityStats(scenesArg) {
+  const scenes = Array.isArray(scenesArg) ? scenesArg : [];
+  const stats = {
+    total: scenes.length,
+    ready: 0,
+    needsReview: 0,
+    invalidTime: 0,
+    missingMetadata: 0,
+    missingLyrics: 0,
+    missingEnPrompt: 0,
+    missingKoPrompt: 0,
+  };
+
+  scenes.forEach((scene, index) => {
+    const timing = getMVSceneTimingParts(scene);
+    const hasValidTime =
+      timing.startSeconds !== null &&
+      timing.endSeconds !== null &&
+      timing.endSeconds >= timing.startSeconds;
+    const metadataCount = [
+      scene?.location,
+      scene?.emotion,
+      scene?.mood,
+      scene?.lighting,
+      scene?.cameraWork,
+    ].filter((value) => String(value || "").trim()).length;
+    const enEl = document.getElementById(`scene_overview_${index}_en`);
+    const koEl = document.getElementById(`scene_overview_${index}_ko`);
+    const hasLyrics = Boolean(String(scene?.lyrics || "").trim());
+    const hasEnPrompt = Boolean(String(enEl?.value || scene?.prompt || "").trim());
+    const hasKoPrompt = Boolean(String(koEl?.value || scene?.promptKo || "").trim());
+
+    if (!hasValidTime) stats.invalidTime += 1;
+    if (metadataCount === 0) stats.missingMetadata += 1;
+    if (!hasLyrics) stats.missingLyrics += 1;
+    if (!hasEnPrompt) stats.missingEnPrompt += 1;
+    if (!hasKoPrompt) stats.missingKoPrompt += 1;
+
+    if (
+      hasValidTime &&
+      metadataCount > 0 &&
+      hasLyrics &&
+      hasEnPrompt &&
+      hasKoPrompt
+    ) {
+      stats.ready += 1;
+    }
+  });
+
+  stats.needsReview = stats.total - stats.ready;
+  return stats;
+}
+
+function getMVSceneQualitySummaryText(scenesArg) {
+  const stats = getMVSceneQualityStats(scenesArg);
+  return [
+    `전체 ${stats.total}개 씬`,
+    `준비 완료 ${stats.ready}개`,
+    `확인 필요 ${stats.needsReview}개`,
+    `시간 확인 ${stats.invalidTime}개`,
+    `메타데이터 없음 ${stats.missingMetadata}개`,
+    `가사 없음 ${stats.missingLyrics}개`,
+    `EN 없음 ${stats.missingEnPrompt}개`,
+    `KO 없음 ${stats.missingKoPrompt}개`,
+  ].join(" · ");
+}
+
+function renderMVSceneQualitySummary(scenesArg) {
+  return `
+    <div id="mv_scene_quality_summary" class="mv-scene-quality-summary" role="status" aria-live="polite" style="margin: 10px 0 18px 0; padding: 12px 14px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.24); border-radius: 8px; color: var(--text-secondary); font-size: 0.84rem; line-height: 1.5;">
+      ${getMVSceneQualitySummaryText(scenesArg)}
+    </div>
+  `;
+}
+
+function updateMVSceneQualitySummary() {
+  const summaryEl = document.getElementById("mv_scene_quality_summary");
+  if (!summaryEl || !Array.isArray(window.currentScenes)) return;
+  summaryEl.textContent = getMVSceneQualitySummaryText(window.currentScenes);
+}
+
 function renderMVSceneEditorSummary(scene, index) {
   return `
     <div id="scene_editor_summary_${index}" class="mv-scene-editor-summary" role="status" aria-live="polite" style="margin: -2px 0 15px 0; padding: 9px 12px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.22); border-radius: 6px; color: var(--text-secondary); font-size: 0.8rem; line-height: 1.45;">
@@ -429,6 +510,7 @@ window.updateMVSceneTimelineFromEditor = function (scene, index) {
   }
   updateMVSceneEditorNotice(index, notices);
   updateMVSceneEditorSummary(scene, index);
+  updateMVSceneQualitySummary();
 
   return scene;
 };
@@ -634,6 +716,7 @@ window.renderSceneOverview = function (scenesArg) {
         </h3>
         <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem;">각 씬의 이미지 및 비디오 통합 프롬프트를 세부적으로 수정할 수 있습니다.</p>
     </div>
+    ${renderMVSceneQualitySummary(scenes)}
     ${typeof window.renderMVSceneTimelinePreview === "function" ? window.renderMVSceneTimelinePreview(scenes) : ""}
   `;
 
@@ -759,6 +842,7 @@ window.renderSceneOverview = function (scenesArg) {
         const index = Number(event.target?.dataset?.index);
         if (!Number.isInteger(index) || !window.currentScenes?.[index]) return;
         updateMVSceneEditorSummary(window.currentScenes[index], index);
+        updateMVSceneQualitySummary();
       };
       field.addEventListener("input", syncEditorSummary);
       field.addEventListener("change", syncEditorSummary);
@@ -794,6 +878,8 @@ window.renderSceneOverview = function (scenesArg) {
               if (window.currentScenes && window.currentScenes[index]) {
                 window.currentScenes[index].prompt = currentEn;
                 window.currentScenes[index].promptKo = translatedKo;
+                updateMVSceneEditorSummary(window.currentScenes[index], index);
+                updateMVSceneQualitySummary();
               }
             }
           }
