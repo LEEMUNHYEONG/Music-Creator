@@ -2071,6 +2071,41 @@ npm run test:mv
 MV smoke test suite: PASS (67 checks)
 ```
 
+## 2026-05-06: 씬별 타임라인/메타데이터 내보내기 반영
+
+### 작업 목적
+
+사용자가 편집한 씬별 시간, 가사 구간, 장소, 감정, 무드, 조명, 카메라 정보가 복사나 파일 다운로드 과정에서 빠지지 않도록 내보내기 포맷을 보강했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `downloadMVPrompts()`의 씬별 TXT 출력에 `[씬 메타데이터]` 블록 추가
+   - `copyAllMVPrompts()`의 전체 복사 출력에도 같은 메타데이터 블록 추가
+   - `generateSRTPreview()`가 씬별 `startSeconds/endSeconds/lyrics`가 있는 경우 해당 타임라인을 우선 사용
+   - SRT 씬 자막에 장소/감정/무드 요약을 함께 포함
+
+2. `tests/mv_download_prompts_smoke.js`
+   - TXT 다운로드에 가사 구간, 장소, 감정, 조명, 카메라, 길이가 포함되는지 확인
+
+3. `tests/mv_copy_prompts_smoke.js`
+   - 전체 복사 결과에 씬별 메타데이터가 포함되는지 확인
+
+4. `tests/mv_srt_scene_timeline_smoke.js`
+   - 씬별 타임라인 기반 SRT 생성 확인
+   - SRT 자막 본문에 장소/감정/무드 요약이 포함되는지 확인
+
+5. `MV_테스트_실행_가이드.md`
+   - 현재 정상 기준을 `PASS (69 checks)`로 갱신
+   - 보호 범위에 TXT/전체 복사/SRT 내보내기 메타데이터 반영 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (69 checks)
+```
+
 ## 2026-05-06: 편집된 씬 메타데이터의 재생성 프롬프트 우선 반영
 
 ### 작업 목적

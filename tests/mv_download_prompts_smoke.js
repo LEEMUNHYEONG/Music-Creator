@@ -83,6 +83,13 @@ window.currentScenes = [
   {
     time: "00:00-00:08",
     scene: "첫 장면",
+    lyrics: "첫 가사 구간",
+    location: "rainy alley",
+    emotion: "lonely",
+    mood: "quiet negative space",
+    lighting: "blue-hour side light",
+    cameraWork: "slow dolly-in",
+    durationSeconds: 8,
     prompt: "scene zero fallback en",
     promptKo: "씬 0 fallback ko",
   },
@@ -105,6 +112,13 @@ assert.ok(blobText.includes("=== 통합 프롬프트 ==="));
 assert.ok(blobText.includes("combined english"));
 assert.ok(blobText.includes("=== 씬별 개별 프롬프트 ==="));
 assert.ok(blobText.includes("씬 1 (00:00-00:08)"));
+assert.ok(blobText.includes("[씬 메타데이터]"));
+assert.ok(blobText.includes("가사 구간: 첫 가사 구간"));
+assert.ok(blobText.includes("장소: rainy alley"));
+assert.ok(blobText.includes("감정: lonely"));
+assert.ok(blobText.includes("조명: blue-hour side light"));
+assert.ok(blobText.includes("카메라: slow dolly-in"));
+assert.ok(blobText.includes("길이: 8초"));
 assert.ok(blobText.includes("scene zero textarea en"));
 assert.ok(blobText.includes("씬 0 textarea ko"));
 assert.ok(blobText.includes("씬 2 (00:08-00:16)"));

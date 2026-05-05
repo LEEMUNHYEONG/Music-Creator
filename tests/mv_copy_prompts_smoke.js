@@ -42,6 +42,13 @@ window.currentScenes = [
   {
     time: "0:00-0:06",
     scene: "비 오는 도시 골목",
+    lyrics: "비처럼 흘러내린 밤",
+    location: "rainy alley",
+    emotion: "lonely",
+    mood: "quiet negative space",
+    lighting: "blue-hour side light",
+    cameraWork: "slow dolly-in",
+    durationSeconds: 6,
     prompt: "rainy city alley, cinematic lighting",
     promptKo: "비 오는 도시 골목, 시네마틱 조명",
   },
@@ -74,6 +81,11 @@ setImmediate(() => {
   assert.ok(clipboardText.includes("character english"));
   assert.ok(clipboardText.includes("=== 씬별 개별 프롬프트 ==="));
   assert.ok(clipboardText.includes("씬 1 (0:00-0:06)"));
+  assert.ok(clipboardText.includes("[씬 메타데이터]"));
+  assert.ok(clipboardText.includes("가사 구간: 비처럼 흘러내린 밤"));
+  assert.ok(clipboardText.includes("장소: rainy alley"));
+  assert.ok(clipboardText.includes("감정: lonely"));
+  assert.ok(clipboardText.includes("카메라: slow dolly-in"));
   assert.ok(clipboardText.includes("scene zero english from textarea"));
   assert.ok(clipboardText.includes("씬 0 한글 textarea"));
   assert.ok(clipboardText.includes("씬 2 (0:06-0:12)"));

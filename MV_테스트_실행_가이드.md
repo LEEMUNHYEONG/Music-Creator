@@ -26,7 +26,7 @@ npm run test:mv
 정상 통과 시 마지막 줄에 아래와 비슷한 결과가 표시됩니다.
 
 ```text
-MV smoke test suite: PASS (67 checks)
+MV smoke test suite: PASS (69 checks)
 ```
 
 이 결과는 MV 관련 핵심 보호 테스트가 모두 통과했다는 뜻입니다.
@@ -64,6 +64,7 @@ MV smoke test suite: PASS (67 checks)
 27. 씬별 시작/종료 시간과 가사 구간 편집 저장
 28. 씬별 장소/감정/무드/조명/카메라 메타데이터 편집 저장
 29. 편집된 씬별 메타데이터의 프롬프트 재생성 우선 반영
+30. TXT/전체 복사/SRT 내보내기에 씬별 타임라인과 메타데이터 반영
 
 ## 실패했을 때 확인 순서
 

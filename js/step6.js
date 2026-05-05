@@ -4013,6 +4013,20 @@ window.downloadMVPrompts = function () {
     return;
   }
 
+  const formatSceneExportMetadata = (scene) => {
+    const lines = [];
+    if (scene.lyrics) lines.push(`가사 구간: ${scene.lyrics}`);
+    if (scene.location) lines.push(`장소: ${scene.location}`);
+    if (scene.emotion) lines.push(`감정: ${scene.emotion}`);
+    if (scene.mood) lines.push(`무드: ${scene.mood}`);
+    if (scene.lighting) lines.push(`조명: ${scene.lighting}`);
+    if (scene.cameraWork) lines.push(`카메라: ${scene.cameraWork}`);
+    if (typeof scene.durationSeconds === "number") {
+      lines.push(`길이: ${scene.durationSeconds}초`);
+    }
+    return lines.length ? `[씬 메타데이터]\n${lines.join("\n")}\n` : "";
+  };
+
   let text = "MV 프롬프트\n\n";
 
   // 통합/배경/인물 프롬프트 추가
@@ -4053,6 +4067,7 @@ window.downloadMVPrompts = function () {
 
     text += `씬 ${index + 1} (${scene.time})\n`;
     text += `장면: ${scene.scene || ""}\n`;
+    text += formatSceneExportMetadata(scene);
     if (enEl && enEl.value) {
       text += `[영어 프롬프트]\n${enEl.value}\n\n`;
     } else if (scene.prompt) {
@@ -4275,6 +4290,70 @@ window.generateSRTPreview = function () {
       alert(
         "⚠️ 추출할 가사가 없습니다.\n\n가사에 지시어만 있고 실제 가사 내용이 없는 것 같습니다.",
       );
+      return;
+    }
+
+    const toSRTTime = (seconds) => {
+      const safeSeconds = Math.max(0, Math.round(Number(seconds) || 0));
+      const hours = Math.floor(safeSeconds / 3600);
+      const minutes = Math.floor((safeSeconds % 3600) / 60);
+      const secs = safeSeconds % 60;
+      return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")},000`;
+    };
+
+    const sceneSubtitles = Array.isArray(window.currentScenes)
+      ? window.currentScenes
+          .filter(
+            (scene) =>
+              scene &&
+              scene.lyrics &&
+              typeof scene.startSeconds === "number" &&
+              typeof scene.endSeconds === "number" &&
+              scene.endSeconds > scene.startSeconds,
+          )
+          .map((scene) => {
+            const meta = [scene.location, scene.emotion, scene.mood]
+              .filter(Boolean)
+              .join(" · ");
+            return {
+              startTime: toSRTTime(scene.startSeconds),
+              endTime: toSRTTime(scene.endSeconds),
+              text: meta ? `${scene.lyrics}\n[${meta}]` : scene.lyrics,
+            };
+          })
+      : [];
+
+    if (sceneSubtitles.length > 0) {
+      let srtContent = "";
+      sceneSubtitles.forEach((subtitle, index) => {
+        srtContent += `${index + 1}\n`;
+        srtContent += `${subtitle.startTime} --> ${subtitle.endTime}\n`;
+        srtContent += `${subtitle.text}\n\n`;
+      });
+
+      const previewEl = document.getElementById("srtPreview");
+      if (previewEl) {
+        previewEl.innerHTML = `
+                <div style="padding: 20px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border);">
+                    <h4 style="margin: 0 0 15px 0; color: var(--text-primary); font-size: 1.1rem;">
+                        <i class="fas fa-file-alt"></i> 생성된 SRT 자막 (${sceneSubtitles.length}개 자막)
+                    </h4>
+                    <pre style="background: var(--bg-input); padding: 15px; border-radius: 8px; overflow-x: auto; font-size: 0.85rem; line-height: 1.6; color: var(--text-primary); white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto;">${escapeHtml(srtContent)}</pre>
+                </div>
+            `;
+      }
+
+      window.currentSRTContent = srtContent;
+
+      if (typeof window.showCopyIndicator === "function") {
+        window.showCopyIndicator(
+          `✅ SRT 자막이 생성되었습니다! (${sceneSubtitles.length}개 자막)`,
+        );
+      } else {
+        alert(`✅ SRT 자막이 생성되었습니다! (${sceneSubtitles.length}개 자막)`);
+      }
+
+      console.log("✅ SRT 자막 생성 완료:", sceneSubtitles.length, "개 자막");
       return;
     }
 
@@ -5736,6 +5815,20 @@ window.copyAllMVPrompts = function (event) {
     return;
   }
 
+  const formatSceneExportMetadata = (scene) => {
+    const lines = [];
+    if (scene.lyrics) lines.push(`가사 구간: ${scene.lyrics}`);
+    if (scene.location) lines.push(`장소: ${scene.location}`);
+    if (scene.emotion) lines.push(`감정: ${scene.emotion}`);
+    if (scene.mood) lines.push(`무드: ${scene.mood}`);
+    if (scene.lighting) lines.push(`조명: ${scene.lighting}`);
+    if (scene.cameraWork) lines.push(`카메라: ${scene.cameraWork}`);
+    if (typeof scene.durationSeconds === "number") {
+      lines.push(`길이: ${scene.durationSeconds}초`);
+    }
+    return lines.length ? `[씬 메타데이터]\n${lines.join("\n")}\n` : "";
+  };
+
   let text = "";
 
   // 통합/배경/인물 프롬프트 추가
@@ -5822,6 +5915,7 @@ window.copyAllMVPrompts = function (event) {
 
     text += `씬 ${index + 1} (${scene.time})\n`;
     text += `장면: ${scene.scene || ""}\n`;
+    text += formatSceneExportMetadata(scene);
     if (enEl && enEl.value) {
       text += `[영어 프롬프트]\n${enEl.value}\n\n`;
     } else if (scene.prompt) {
