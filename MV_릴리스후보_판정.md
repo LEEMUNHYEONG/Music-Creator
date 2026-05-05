@@ -11,7 +11,8 @@ MV 6단계 개선 작업은 자동 검증 기준으로 릴리스 후보 상태�
 ```text
 릴리스 후보: 가능
 자동 검증: 통과
-남은 작업: 실제 사용자 프로젝트 1개 수동 리허설
+리허설 서버: 실행 확인
+남은 작업: 실제 사용자 프로젝트 1개 화면 수동 리허설
 ```
 
 ## 2. 자동 검증 결과
@@ -32,6 +33,16 @@ npm run rehearse:mv
 
 ```text
 MV smoke test suite: PASS (75 checks)
+```
+
+수동 리허설 사전 실행 확인:
+
+```text
+2026-05-06 07:33 KST
+브랜치: codex/mv-data-model-stabilize
+기준 커밋: 37b79e8 Add MV rehearsal start command
+앱 주소: http://127.0.0.1:4180/index.html
+서버 응답: HTTP 200 OK
 ```
 
 현재 보호 범위에는 다음 항목이 포함됩니다.

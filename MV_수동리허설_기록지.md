@@ -39,7 +39,21 @@ npm run test:mv
 MV smoke test suite: PASS (75 checks)
 ```
 
-## 2. 수동 리허설 체크 결과
+## 2. 사전 실행 확인 기록
+
+2026-05-06 07:33 KST 기준으로 수동 리허설 시작 전 상태를 확인했습니다.
+
+```text
+브랜치: codex/mv-data-model-stabilize
+기준 커밋: 37b79e8 Add MV rehearsal start command
+실행 명령: npm run rehearse:mv
+자동 테스트: PASS (75 checks)
+앱 주소: http://127.0.0.1:4180/index.html
+서버 응답: HTTP 200 OK
+상태: 실제 사용자 프로젝트 1개 선택 후 화면 리허설 대기
+```
+
+## 3. 수동 리허설 체크 결과
 
 아래 항목을 `통과`, `보류`, `실패` 중 하나로 기록합니다.
 
@@ -59,7 +73,7 @@ MV smoke test suite: PASS (75 checks)
 | 12 | 프로젝트 저장 후 재진입 복원 확인 |  |  |
 | 13 | 모바일 폭에서 씬 카드 가로 깨짐 없음 확인 |  |  |
 
-## 3. 문제 기록
+## 4. 문제 기록
 
 문제가 있으면 아래 형식으로 남깁니다.
 
@@ -74,7 +88,7 @@ MV smoke test suite: PASS (75 checks)
 판정: 보류 / 실패
 ```
 
-## 4. 최종 판정
+## 5. 최종 판정
 
 ```text
 최종 판정: 통과 / 보류 / 실패
