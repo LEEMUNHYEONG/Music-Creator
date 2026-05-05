@@ -2443,6 +2443,33 @@ npm run test:mv
 MV smoke test suite: PASS (69 checks)
 ```
 
+## 2026-05-06: 실제 Chrome 기준 MV 6단계 시각 안정성 점검 자동화
+
+### 작업 목적
+
+인앱 브라우저 자동 연결이 불안정한 상황에서도 MV 6단계 씬 카드가 실제 렌더링에서 깨지지 않는지 반복 확인할 수 있도록, Chrome headless 기반 시각 안정성 테스트를 추가했습니다.
+
+### 변경 내용
+
+1. `tests/mv_step6_visual_sanity_check.js`
+   - 실제 Chrome에서 `index.html`을 로드한 뒤 MV 6단계 씬 개요 화면을 렌더링
+   - 390px, 700px, 1280px 화면 폭에서 품질 요약, 타임라인, 씬 카드, 시간/메타데이터/프롬프트 편집 그리드 존재 확인
+   - 페이지 가로 넘침과 카드 밖으로 빠지는 입력/버튼/상태 요소가 없는지 확인
+   - 각 화면 폭에서 비어 있지 않은 PNG 스크린샷이 생성되는지 확인
+
+2. `tests/run_mv_smoke_tests.js`
+   - MV 통합 테스트에 시각 안정성 점검을 포함
+
+3. `MV_중복함수_정리계획.md`, `MV_테스트_실행_가이드.md`
+   - 진행 상태와 보호 범위에 실제 Chrome 렌더링 기준 시각 점검 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (71 checks)
+```
+
 ## 2026-05-06: 편집된 씬 메타데이터의 재생성 프롬프트 우선 반영
 
 ### 작업 목적
