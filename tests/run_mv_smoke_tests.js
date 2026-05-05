@@ -11,6 +11,7 @@ const tests = [
   "tests/mv_chrome_runtime_check.js",
   "tests/mv_confirm_scene_overview_smoke.js",
   "tests/mv_generate_thumbnail_prompts_smoke.js",
+  "tests/mv_generate_character_sheet_smoke.js",
   "tests/mv_regenerate_style_prompts_smoke.js",
   "tests/mv_regenerate_single_style_prompt_smoke.js",
   "tests/mv_regenerate_prompt_ownership_smoke.js",

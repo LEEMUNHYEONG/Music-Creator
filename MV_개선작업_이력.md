@@ -1245,6 +1245,35 @@ npm run test:mv
 MV smoke test suite: PASS (41 checks)
 ```
 
+## 2026-05-06: MV 캐릭터 시트 생성 보호 테스트 추가
+
+### 작업 목적
+
+`generateCharacterSheet`를 향후 `js/step6.js`로 이관하기 전에, AI 캐릭터 시트 생성의 핵심 성공/가드/저장 흐름을 테스트로 고정했습니다.
+
+### 변경 내용
+
+1. `tests/mv_generate_character_sheet_smoke.js`
+   - Gemini 요청 프롬프트에 캐릭터 고정 요소, MV 장소, 가사 맥락이 포함되는지 확인
+   - AI 응답 코드 블록 정리 후 캐릭터 시트 textarea에 반영되는지 확인
+   - 시트 영역/토글/복사 버튼 표시 상태 확인
+   - 생성 후 `saveMVSettings` 호출 확인
+   - 입력값이 없는 경우 생성 차단 확인
+   - Gemini API 키가 없는 경우 생성 차단 확인
+
+2. `tests/run_mv_smoke_tests.js`
+   - 캐릭터 시트 생성 보호 테스트를 통합 실행 목록에 추가
+
+3. `MV_테스트_실행_가이드.md`
+   - 현재 보호 범위에 캐릭터 시트 생성 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (43 checks)
+```
+
 ## 2026-05-06: MV 캐릭터 입력 UI 함수 step6.js 이관
 
 ### 작업 목적
