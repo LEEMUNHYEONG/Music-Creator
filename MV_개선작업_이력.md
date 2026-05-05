@@ -2443,6 +2443,34 @@ npm run test:mv
 MV smoke test suite: PASS (69 checks)
 ```
 
+## 2026-05-06: MV 운영 전 리허설 런타임 자동화
+
+### 작업 목적
+
+사용자가 직접 프로젝트를 선택하기 전에도 실제 브라우저 저장소 복원 흐름을 검증할 수 있도록, 대표 프로젝트를 Chrome `localStorage`에 넣고 6단계 MV 화면을 복원하는 운영 전 리허설 테스트를 추가했습니다.
+
+### 변경 내용
+
+1. `tests/mv_preflight_rehearsal_runtime_check.js`
+   - 실제 Chrome headless에서 `index.html` 로드
+   - 대표 프로젝트를 `musicCreatorProjects`, `savedProjects`, `currentProjectId`에 저장
+   - `loadProject()`로 6단계 프로젝트 복원 실행
+   - MV 탭 활성화, MV 설정, 공통 프롬프트, 씬 데이터, 결과 화면 표시 확인
+   - 비어 있지 않은 스크린샷과 페이지 가로 넘침 없음 확인
+
+2. `tests/run_mv_smoke_tests.js`
+   - MV 통합 테스트에 운영 전 리허설 런타임 점검 포함
+
+3. `MV_중복함수_정리계획.md`, `MV_테스트_실행_가이드.md`
+   - 진행 상태와 보호 범위에 운영 전 리허설 런타임 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (75 checks)
+```
+
 ## 2026-05-06: MV 실제 프로젝트 리허설 준비 결과 기록
 
 ### 작업 목적
