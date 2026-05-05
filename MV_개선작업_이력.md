@@ -1776,3 +1776,26 @@ MV smoke test suite: PASS
 npm run test:mv
 MV smoke test suite: PASS (53 checks)
 ```
+
+## 2026-05-06: MV 6단계 복원 로직 헬퍼 분리
+
+### 작업 목적
+
+`restoreStepData`가 모든 단계의 복원 세부 구현을 직접 들고 있어 커지고 있었기 때문에, 6단계 마케팅/MV 복원 로직을 별도 헬퍼로 분리했습니다.
+
+### 변경 내용
+
+1. `app.js`
+   - `restoreMarketingMVStepData(projectData)` 헬퍼 추가
+   - `restoreStepData(6)`는 6단계 분기 후 헬퍼 호출만 담당하도록 축소
+   - 기존 복원 동작은 유지
+
+2. `tests/mv_restore_step6_smoke.js`
+   - 분리된 헬퍼까지 포함해 테스트하도록 검사 범위 조정
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (53 checks)
+```

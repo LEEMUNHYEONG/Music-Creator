@@ -207,7 +207,7 @@ window.currentProject = {
 };
 
 const appSource = fs.readFileSync(path.resolve(__dirname, "../app.js"), "utf8");
-const start = appSource.indexOf("window.restoreStepData = function (step) {");
+const start = appSource.indexOf("function restoreMarketingMVStepData(projectData) {");
 const end = appSource.indexOf("window.saveAndClose = function ()", start);
 assert.ok(start !== -1, "restoreStepData should exist in app.js");
 assert.ok(end !== -1, "restoreStepData block should end before saveAndClose");

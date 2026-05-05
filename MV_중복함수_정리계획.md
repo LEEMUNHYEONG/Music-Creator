@@ -198,9 +198,13 @@ npm run test:mv
 
 MV 함수 소유권 정리는 완료됐으므로, 다음 단계는 구조 정리보다 실제 제품 기능 고도화로 넘어가는 것이 좋습니다.
 
-추천 순서:
+진행 상태:
 
-1. `app.js`의 6단계 복원 로직을 더 작은 헬퍼로 분리
+1. 완료: `app.js`의 6단계 복원 로직을 `restoreMarketingMVStepData(projectData)` 헬퍼로 분리
+
+다음 추천 순서:
+
+1. `restoreMarketingMVStepData(projectData)` 내부를 설정/프롬프트/씬 표시 헬퍼로 한 번 더 정리
 2. `js/step6.js` 안의 MV 설정/캐릭터/씬/SRT 영역을 내부 섹션 단위로 정돈
 3. MV 씬 데이터 모델을 `marketing.mv.scenes` 기준으로 더 엄격하게 확장
 4. 가사 기반 씬 분할 고도화
