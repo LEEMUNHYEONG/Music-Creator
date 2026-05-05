@@ -18,6 +18,7 @@ const tests = [
   "tests/mv_regenerate_scene_overview_prompt_smoke.js",
   "tests/mv_regenerate_scene_prompt_smoke.js",
   "tests/mv_sync_prompt_translation_smoke.js",
+  "tests/mv_prompt_helpers_smoke.js",
   "tests/mv_sync_scene_overview_translation_smoke.js",
   "tests/mv_sync_scene_prompt_translation_smoke.js",
   "tests/mv_settings_smoke.js",

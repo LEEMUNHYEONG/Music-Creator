@@ -1302,6 +1302,34 @@ npm run test:mv
 MV smoke test suite: PASS (45 checks)
 ```
 
+## 2026-05-06: MV 프롬프트 보조 함수 보호 테스트 추가
+
+### 작업 목적
+
+`updateMVPromptTranslation`, `saveMVPrompt`, `copyMVPromptSection`을 향후 `js/step6.js`로 이관하기 전에 로컬 저장 키, 복사 포맷, 간단 번역 흐름을 테스트로 고정했습니다.
+
+### 변경 내용
+
+1. `tests/mv_prompt_helpers_smoke.js`
+   - 한글 프롬프트 입력 시 영어 프롬프트 자동 번역 확인
+   - 한글 프롬프트가 비어 있을 때 영어 필드 초기화 확인
+   - 프롬프트 저장 시 `mvPrompt_{type}` localStorage 키와 저장 payload 확인
+   - 프롬프트 섹션 복사 포맷 확인
+   - 클립보드 복사 실패 시 오류 알림 확인
+
+2. `tests/run_mv_smoke_tests.js`
+   - MV 프롬프트 보조 함수 테스트를 통합 실행 목록에 추가
+
+3. `MV_테스트_실행_가이드.md`
+   - 현재 보호 범위에 MV 프롬프트 저장/복사/간단 번역 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (47 checks)
+```
+
 ## 2026-05-06: MV 장소 헬퍼 step6.js 이관
 
 ### 작업 목적
