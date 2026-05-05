@@ -1965,3 +1965,38 @@ MV 씬이 여러 개 생성되면 결과 화면에서 전체 흐름을 한눈에
 npm run test:mv
 MV smoke test suite: PASS (61 checks)
 ```
+
+## 2026-05-06: 가사 감정 기반 장소/조명 추천 고도화
+
+### 작업 목적
+
+AI 씬 생성이 실패하거나 기본 생성 흐름을 사용할 때도 가사의 감정 흐름이 장소, 조명, 카메라 톤에 반영되도록 보강했습니다. 이를 통해 슬픈 장면은 비 오는 거리/푸른 조명, 희망적인 장면은 루프탑/일출 톤처럼 더 일관된 뮤직비디오 콘셉트가 나오도록 했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `MV_EMOTION_VISUAL_PRESETS` 추가
+   - `recommendMVSceneVisualTone(sceneText, selectedLocations)` 추가
+   - 가사/장면 텍스트의 감정 키워드를 기준으로 장소 힌트, 조명, 카메라워크, 무드 추천
+   - 사용자가 선택한 장소 후보가 있으면 추천 장소와 자연스럽게 매칭
+   - 기본 씬 생성 프롬프트에 추천 장소/조명/카메라/무드/감정 키워드 반영
+   - 생성된 씬 데이터에 `emotion`, `mood`, `lighting`, `cameraWork` 메타데이터 저장
+
+2. `tests/mv_emotion_visual_tone_smoke.js`
+   - 슬픔/희망/긴장/사랑 계열 키워드 추천 확인
+   - 선택 장소 후보가 추천 장소에 반영되는지 확인
+   - 빈 입력에서도 안전한 기본 톤을 반환하는지 확인
+
+3. `tests/run_mv_smoke_tests.js`
+   - 감정 기반 비주얼 톤 추천 테스트를 MV 통합 테스트에 추가
+
+4. `MV_테스트_실행_가이드.md`
+   - 현재 정상 기준을 `PASS (63 checks)`로 갱신
+   - 보호 범위에 가사 감정 키워드 기반 장소/조명/카메라 톤 추천 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (63 checks)
+```

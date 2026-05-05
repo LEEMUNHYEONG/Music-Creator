@@ -1849,6 +1849,17 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
                 ? window.pickBestLocationForScene(sceneLyrics, i, imageCount)
                 : null) ||
               (location ? (location.split(",")[0] || location).trim() : null);
+            const selectedLocationValues =
+              typeof window.getMVLocationValues === "function"
+                ? window.getMVLocationValues()
+                : [];
+            const visualTone =
+              typeof window.recommendMVSceneVisualTone === "function"
+                ? window.recommendMVSceneVisualTone(sceneLyrics, selectedLocationValues)
+                : null;
+            if (visualTone?.locationHint) {
+              chosenLoc = visualTone.locationHint;
+            }
 
             // AI 생성 실패 시 기본 조합
             if (!promptEn || promptEn.length < 50) {
@@ -1893,12 +1904,13 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
                 promptParts.push(countryMap[country] || country);
               }
               if (era) promptParts.push(era + " era");
-              if (lighting) promptParts.push(lighting + " lighting");
-              if (cameraWork) promptParts.push(cameraWork);
-              if (mood) promptParts.push(mood + " mood");
+              promptParts.push((visualTone?.lighting || lighting || "cinematic") + " lighting");
+              promptParts.push(visualTone?.cameraWork || cameraWork || "slow cinematic camera movement");
+              promptParts.push((visualTone?.mood || mood || "emotional") + " mood");
+              if (visualTone?.emotion) promptParts.push(visualTone.emotion + " emotion");
 
               promptParts.push(
-                getArtisticKeywords(mood || ""),
+                getArtisticKeywords(visualTone?.emotion || mood || ""),
               );
 
               promptEn = promptParts.join(", ").trim();
@@ -1950,6 +1962,10 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
                   : promptEn.replace(/\/\*.*?\*\//g, "").trim() +
                     ", cinematic motion, 8k, highly detailed",
               location: sceneLocationLabel,
+              emotion: visualTone?.emotion || "",
+              mood: visualTone?.mood || mood || "",
+              lighting: visualTone?.lighting || lighting || "",
+              cameraWork: visualTone?.cameraWork || cameraWork || "",
             });
 
             currentTime = endTime;
@@ -2666,6 +2682,95 @@ const MV_LOCATION_KEYWORDS = {
   "bridge-night": ["다리", "야경", "밤", "bridge", "night"],
   "rooftop-pool": ["옥상", "풀", "수영", "rooftop", "pool"],
   "rooftop-garden": ["옥상", "정원", "rooftop", "garden"],
+};
+
+const MV_EMOTION_VISUAL_PRESETS = {
+  sad: {
+    keywords: ["슬퍼", "눈물", "이별", "아파", "외로", "그리", "sad", "cry", "tears", "goodbye", "lonely"],
+    emotion: "sad",
+    mood: "desaturated cool solitude",
+    lighting: "soft blue-hour side light with rain-muted contrast",
+    cameraWork: "slow dolly-in with shallow depth of field",
+    locationHints: ["rain", "street", "alley", "bedroom", "bridge-night"],
+  },
+  lonely: {
+    keywords: ["혼자", "홀로", "공허", "빈", "외로", "alone", "empty", "lonely", "silent"],
+    emotion: "lonely",
+    mood: "quiet negative space and muted blue grey atmosphere",
+    lighting: "single practical light surrounded by deep soft shadows",
+    cameraWork: "locked wide shot slowly pushing toward the subject",
+    locationHints: ["rooftop-night", "station", "bedroom", "street"],
+  },
+  hopeful: {
+    keywords: ["희망", "다시", "빛", "내일", "괜찮", "일어나", "hope", "again", "light", "tomorrow"],
+    emotion: "hopeful",
+    mood: "warm sunrise optimism with clean airy texture",
+    lighting: "golden sunrise backlight with gentle lens bloom",
+    cameraWork: "gradual crane-up revealing a wider horizon",
+    locationHints: ["sunrise", "sky", "rooftop", "bridge", "park"],
+  },
+  romantic: {
+    keywords: ["사랑", "입맞춤", "품", "설레", "너와", "love", "kiss", "romance", "together"],
+    emotion: "romantic",
+    mood: "warm intimate glow with soft rose and amber tones",
+    lighting: "diffused warm practical lights with creamy bokeh",
+    cameraWork: "gentle handheld close-up with intimate framing",
+    locationHints: ["cafe", "bedroom", "park", "sunset", "street"],
+  },
+  intense: {
+    keywords: ["불타", "소리쳐", "미쳐", "폭발", "달려", "fire", "scream", "run", "burn", "intense"],
+    emotion: "intense",
+    mood: "high contrast urgency with electric saturated accents",
+    lighting: "hard directional light with sharp shadows and neon edges",
+    cameraWork: "fast tracking shot with controlled motion blur",
+    locationHints: ["club", "concert", "urban-night", "warehouse", "parking"],
+  },
+  peaceful: {
+    keywords: ["평온", "고요", "쉬어", "바람", "잔잔", "calm", "peace", "quiet", "breeze"],
+    emotion: "peaceful",
+    mood: "soft spacious calm with pastel natural color",
+    lighting: "even natural light with delicate soft shadows",
+    cameraWork: "slow panoramic pan with stable meditative rhythm",
+    locationHints: ["forest", "lake", "park", "garden", "sea"],
+  },
+};
+
+window.recommendMVSceneVisualTone = function (sceneText, selectedLocations) {
+  const text = String(sceneText || "").toLowerCase();
+  const locations = Array.isArray(selectedLocations) ? selectedLocations : [];
+  let bestPreset = null;
+  let bestScore = 0;
+
+  Object.values(MV_EMOTION_VISUAL_PRESETS).forEach((preset) => {
+    const score = preset.keywords.reduce(
+      (sum, keyword) => sum + (text.includes(String(keyword).toLowerCase()) ? 1 : 0),
+      0,
+    );
+    if (score > bestScore) {
+      bestScore = score;
+      bestPreset = preset;
+    }
+  });
+
+  const preset = bestPreset || {
+    emotion: "cinematic",
+    mood: "balanced cinematic atmosphere",
+    lighting: "cinematic natural light with detailed texture",
+    cameraWork: "slow cinematic dolly with stable composition",
+    locationHints: [],
+  };
+  const selectedLocation =
+    locations.find((loc) => preset.locationHints.includes(loc)) ||
+    locations[0] ||
+    null;
+
+  return {
+    emotion: preset.emotion,
+    mood: preset.mood,
+    lighting: preset.lighting,
+    cameraWork: preset.cameraWork,
+    locationHint: selectedLocation,
+  };
 };
 
 /**
