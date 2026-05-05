@@ -64,12 +64,13 @@ global.document = {
     return selector === ".tag-container" ? [currentContainer] : [];
   },
 };
-window.saveMVSettings = function saveMVSettingsStub() {
-  saveCount += 1;
-};
 
 currentContainer = makeContainer();
 require("../js/step6.js");
+
+window.saveMVSettings = function saveMVSettingsStub() {
+  saveCount += 1;
+};
 
 window.initializeTagButtons();
 window.initializeTagButtons();

@@ -2396,6 +2396,171 @@ window.getMVLocationValues = function () {
     .filter((v) => !!v);
 };
 
+// --- Extracted MV settings helpers ---
+window.updateMVImageCount = function () {
+  const minutes = parseInt(document.getElementById("mvMinutes")?.value || 3);
+  const seconds = parseInt(document.getElementById("mvSeconds")?.value || 30);
+  const interval = parseInt(document.getElementById("mvInterval")?.value || 8);
+
+  const totalSeconds = minutes * 60 + seconds;
+  const imageCount = Math.ceil(totalSeconds / interval);
+
+  const resultEl = document.getElementById("mvImageCount");
+  if (resultEl) {
+    resultEl.textContent = imageCount;
+  }
+
+  const intervalDisplay = document.getElementById("mvIntervalDisplay");
+  if (intervalDisplay) {
+    intervalDisplay.textContent = interval;
+  }
+
+  const totalDuration = document.getElementById("mvTotalDuration");
+  if (totalDuration) {
+    totalDuration.textContent = `${minutes}:${String(seconds).padStart(2, "0")}`;
+  }
+};
+
+window.saveMVSettings = function () {
+  const characterCount =
+    document.getElementById("mvCharacterCount")?.value || "1";
+  const characters = [];
+  for (let i = 1; i <= parseInt(characterCount); i++) {
+    const gender =
+      document.getElementById(`mvCharacter${i}_gender`)?.value || "";
+    const age = document.getElementById(`mvCharacter${i}_age`)?.value || "";
+    const race = document.getElementById(`mvCharacter${i}_race`)?.value || "";
+    const appearance =
+      document.getElementById(`mvCharacter${i}_appearance`)?.value || "";
+    const artStyle =
+      document.getElementById(`mvCharacter${i}_artStyle`)?.value || "photorealistic";
+    const characterSheet =
+      document.getElementById(`mvCharacter${i}_sheet`)?.value || "";
+    characters.push({ gender, age, race, appearance, artStyle, characterSheet });
+  }
+
+  const settings = {
+    minutes: document.getElementById("mvMinutes")?.value || 3,
+    seconds: document.getElementById("mvSeconds")?.value || 30,
+    interval: document.getElementById("mvInterval")?.value || 8,
+    era: document.getElementById("mvEra")?.value || "",
+    country: document.getElementById("mvCountry")?.value || "",
+    location:
+      typeof window.getMVLocationValues === "function"
+        ? window.getMVLocationValues()
+        : [],
+    characterCount: characterCount,
+    characters: characters,
+    customSettings: document.getElementById("mvCustomSettings")?.value || "",
+    lighting: document.getElementById("mvLighting")?.value || "",
+    cameraWork: document.getElementById("mvCameraWork")?.value || "",
+    mood: document.getElementById("mvMood")?.value || "",
+  };
+
+  localStorage.setItem("mvSettings", JSON.stringify(settings));
+
+  if (window.currentProject && window.currentProject.data) {
+    if (!window.currentProject.data.marketing) {
+      window.currentProject.data.marketing = {};
+    }
+    window.currentProject.data.marketing.mvSettings = JSON.parse(
+      JSON.stringify(settings),
+    );
+
+    if (typeof window.saveCurrentProject === "function") {
+      window.saveCurrentProject();
+    }
+  }
+};
+
+window.loadMVSettings = function () {
+  try {
+    if (window.currentProject && window.currentProject.data) {
+      console.log("ℹ️ 프로젝트 데이터가 존재하여 전역 설정 로드를 건너뜁니다.");
+      return;
+    }
+
+    const saved = localStorage.getItem("mvSettings");
+    if (saved) {
+      const settings = JSON.parse(saved);
+      if (document.getElementById("mvMinutes"))
+        document.getElementById("mvMinutes").value = settings.minutes || 3;
+      if (document.getElementById("mvSeconds"))
+        document.getElementById("mvSeconds").value = settings.seconds || 30;
+      if (document.getElementById("mvInterval"))
+        document.getElementById("mvInterval").value = settings.interval || 8;
+      if (document.getElementById("mvEra"))
+        document.getElementById("mvEra").value = settings.era || "";
+      if (document.getElementById("mvCountry"))
+        document.getElementById("mvCountry").value = settings.country || "";
+
+      const locationTagsContainer = document.getElementById("mvLocationTags");
+      if (locationTagsContainer) {
+        const locationArr = Array.isArray(settings.location)
+          ? settings.location
+          : settings.location
+            ? [settings.location]
+            : [];
+        locationTagsContainer.querySelectorAll(".tag-btn").forEach((btn) => {
+          const v = btn.getAttribute("data-value");
+          if (locationArr.indexOf(v) !== -1) btn.classList.add("active");
+          else btn.classList.remove("active");
+        });
+      }
+
+      if (document.getElementById("mvCharacterCount"))
+        document.getElementById("mvCharacterCount").value =
+          settings.characterCount || "1";
+      if (document.getElementById("mvCustomSettings"))
+        document.getElementById("mvCustomSettings").value =
+          settings.customSettings || "";
+      if (document.getElementById("mvLighting"))
+        document.getElementById("mvLighting").value = settings.lighting || "";
+      if (document.getElementById("mvCameraWork"))
+        document.getElementById("mvCameraWork").value =
+          settings.cameraWork || "";
+      if (document.getElementById("mvMood"))
+        document.getElementById("mvMood").value = settings.mood || "";
+
+      window.updateMVImageCount();
+      window.updateCharacterInputs();
+
+      if (settings.characters && Array.isArray(settings.characters)) {
+        settings.characters.forEach((char, index) => {
+          const i = index + 1;
+          if (document.getElementById(`mvCharacter${i}_gender`))
+            document.getElementById(`mvCharacter${i}_gender`).value =
+              char.gender || "";
+          if (document.getElementById(`mvCharacter${i}_age`))
+            document.getElementById(`mvCharacter${i}_age`).value =
+              char.age || "";
+          if (document.getElementById(`mvCharacter${i}_race`))
+            document.getElementById(`mvCharacter${i}_race`).value =
+              char.race || "";
+          if (document.getElementById(`mvCharacter${i}_appearance`))
+            document.getElementById(`mvCharacter${i}_appearance`).value =
+              char.appearance || "";
+          if (char.artStyle && document.getElementById(`mvCharacter${i}_artStyle`))
+            document.getElementById(`mvCharacter${i}_artStyle`).value =
+              char.artStyle;
+          if (char.characterSheet && document.getElementById(`mvCharacter${i}_sheet`)) {
+            document.getElementById(`mvCharacter${i}_sheet`).value =
+              char.characterSheet;
+            const sheetArea = document.getElementById(`mvCharacter${i}_sheetArea`);
+            if (sheetArea) sheetArea.style.display = "block";
+            const sheetToggle = document.getElementById(`mvCharacter${i}_sheetToggle`);
+            if (sheetToggle) sheetToggle.style.display = "inline-flex";
+            const sheetCopy = document.getElementById(`mvCharacter${i}_sheetCopy`);
+            if (sheetCopy) sheetCopy.style.display = "inline-flex";
+          }
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("MV 설정 로드 실패:", e);
+  }
+};
+
 // --- Extracted generateSRTPreview ---
 window.generateSRTPreview = function () {
   try {

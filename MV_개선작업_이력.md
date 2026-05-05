@@ -1186,7 +1186,37 @@ npm run test:mv
 
 ```text
 npm run test:mv
-MV smoke test suite: PASS
+MV smoke test suite: PASS (37 checks)
+```
+
+## 2026-05-06: MV 설정 함수 step6.js 이관
+
+### 작업 목적
+
+MV 화면 설정 함수의 소유권을 `js/step6.js`로 옮겨, `app.js`는 공통 앱 흐름에 더 집중하도록 정리했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `updateMVImageCount` 추가
+   - `saveMVSettings` 추가
+   - `loadMVSettings` 추가
+
+2. `app.js`
+   - 위 3개 함수의 중복 전역 정의 제거
+   - `updateCharacterInputs` 등 나머지 캐릭터 UI 생성 함수는 기존 위치 유지
+
+3. `tests/mv_settings_smoke.js`
+   - 테스트 기준 파일을 `app.js`에서 `js/step6.js`로 변경
+
+4. `MV_중복함수_정리계획.md`
+   - MV 설정 함수 3개의 이관 완료 기록 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (37 checks)
 ```
 
 ## 2026-05-06: MV 테스트 정상 로그 추가 정리
@@ -1233,6 +1263,33 @@ MV smoke test suite: PASS (35 checks)
 
 ```text
 MV smoke test suite: PASS (35 checks)
+```
+
+## 2026-05-06: MV 설정 보호 테스트 추가
+
+### 작업 목적
+
+`saveMVSettings`, `loadMVSettings`, `updateMVImageCount`를 향후 `step6.js` 쪽으로 이관하기 전에 현재 동작을 테스트로 고정했습니다.
+
+### 변경 내용
+
+1. `tests/mv_settings_smoke.js`
+   - MV 길이와 이미지 간격 기준 이미지 수 계산 확인
+   - MV 설정이 `localStorage.mvSettings`와 현재 프로젝트 `marketing.mvSettings`에 저장되는지 확인
+   - 캐릭터 상세 정보와 캐릭터 시트 저장 확인
+   - 전역 설정 불러오기 시 태그 선택, 캐릭터 정보, 총 길이 표시 복원 확인
+
+2. `tests/run_mv_smoke_tests.js`
+   - MV 설정 보호 테스트를 통합 실행 목록에 추가
+
+3. `MV_테스트_실행_가이드.md`
+   - 현재 보호 범위에 MV 설정 저장/불러오기와 이미지 수 계산 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS
 ```
 
 ## 2026-05-06: MV 테스트 출력 정리

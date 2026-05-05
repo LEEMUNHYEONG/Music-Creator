@@ -86,6 +86,15 @@ MV 화면/프롬프트/씬 관련 함수는 최종적으로 `js/step6.js`가 소
 9. `initializeTagButtons`
    - 완료: `js/step6.js` 구현을 중복 리스너 방지 방식으로 보강한 뒤 소유권을 넘겼습니다.
 
+10. `updateMVImageCount`
+    - 완료: MV 길이/이미지 수 계산을 `js/step6.js` 소유로 이관했습니다.
+
+11. `saveMVSettings`
+    - 완료: MV 설정과 캐릭터 정보를 `localStorage.mvSettings` 및 프로젝트 `marketing.mvSettings`에 저장하는 흐름을 `js/step6.js` 소유로 이관했습니다.
+
+12. `loadMVSettings`
+    - 완료: 전역 MV 설정 복원 흐름을 `js/step6.js` 소유로 이관했습니다.
+
 ## 5. 추가된 보호 테스트
 
 중복 상태를 실수로 바꾸지 않도록 다음 테스트를 추가했습니다.
