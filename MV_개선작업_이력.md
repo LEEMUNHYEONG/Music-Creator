@@ -1931,3 +1931,37 @@ MV smoke test suite: PASS (57 checks)
 npm run test:mv
 MV smoke test suite: PASS (59 checks)
 ```
+
+## 2026-05-06: 씬 타임라인 프리뷰 UI 추가
+
+### 작업 목적
+
+MV 씬이 여러 개 생성되면 결과 화면에서 전체 흐름을 한눈에 파악하기 어려웠습니다. 개별 씬 카드로 바로 이동할 수 있는 가로 타임라인 프리뷰를 추가해 씬 순서, 시간, 장면 요약, 감정/장소 흐름을 빠르게 훑을 수 있게 했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `renderMVSceneTimelinePreview(scenes)` 추가
+   - `focusMVSceneCard(sceneIndex)` 추가
+   - 씬 개요 화면 상단에 타임라인 프리뷰 표시
+   - 씬 확정 후 결과 화면 상단에도 같은 타임라인 프리뷰 표시
+   - 개요 카드와 결과 카드에 포커스용 데이터 속성 추가
+
+2. `tests/mv_scene_timeline_preview_smoke.js`
+   - 타임라인 HTML 렌더링 확인
+   - 씬 수, 시간, 장면 요약, 감정/장소 메타 표시 확인
+   - 타임라인 클릭 시 해당 씬 카드로 스크롤하는 포커스 헬퍼 확인
+
+3. `tests/mv_confirm_scene_overview_smoke.js`
+   - 씬 확정 후 결과 화면에 타임라인 프리뷰가 함께 렌더링되는지 확인
+
+4. `MV_테스트_실행_가이드.md`
+   - 현재 정상 기준을 `PASS (61 checks)`로 갱신
+   - 보호 범위에 씬 카드/타임라인 프리뷰 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (61 checks)
+```

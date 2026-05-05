@@ -162,6 +162,74 @@ function getArtisticKeywords(emotion) {
 }
 
 // === MV Step 6: Prompt and scene review rendering ===
+function getMVSceneTimelineLabel(scene, index) {
+  const meta = [scene.emotion, scene.location]
+    .filter((value) => typeof value === "string" && value.trim())
+    .join(" · ");
+  const sceneText = scene.scene || scene.lyrics || `씬 ${index + 1}`;
+  return {
+    title: `씬 ${index + 1}`,
+    time: scene.time || "",
+    meta,
+    sceneText,
+  };
+}
+
+window.renderMVSceneTimelinePreview = function (scenesArg) {
+  const scenes = Array.isArray(scenesArg) ? scenesArg : [];
+  if (scenes.length === 0) return "";
+
+  const items = scenes
+    .map((scene, index) => {
+      const label = getMVSceneTimelineLabel(scene || {}, index);
+      return `
+        <button
+          type="button"
+          class="mv-scene-timeline-item"
+          data-scene-index="${index}"
+          onclick="window.focusMVSceneCard(${index})"
+          style="min-width: 170px; max-width: 220px; text-align: left; padding: 10px 12px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text-primary); border-radius: 8px; cursor: pointer;"
+          title="${label.sceneText.replace(/"/g, "&quot;")}"
+        >
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
+            <strong style="font-size: 0.85rem; color: var(--text-primary);">${label.title}</strong>
+            <span style="font-size: 0.75rem; color: var(--accent); white-space: nowrap;">${label.time}</span>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${label.sceneText}</div>
+          ${label.meta ? `<div style="margin-top: 6px; font-size: 0.72rem; color: var(--text-secondary); opacity: 0.9; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">${label.meta}</div>` : ""}
+        </button>
+      `;
+    })
+    .join("");
+
+  return `
+    <div class="mv-scene-timeline-preview" style="margin: 10px 0 20px 0;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px;">
+        <h4 style="margin: 0; color: var(--text-primary); font-size: 0.95rem;">씬 타임라인</h4>
+        <span style="color: var(--text-secondary); font-size: 0.8rem;">총 ${scenes.length}개 씬</span>
+      </div>
+      <div style="display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px;">
+        ${items}
+      </div>
+    </div>
+  `;
+};
+
+window.focusMVSceneCard = function (sceneIndex) {
+  const selectors = [
+    `.mv-scene-overview-card[data-scene-index="${sceneIndex}"]`,
+    `.mv-prompt-item[data-result-scene-index="${sceneIndex}"]`,
+    `[data-result-scene-index="${sceneIndex}"]`,
+  ];
+  for (const selector of selectors) {
+    const el = document.querySelector(selector);
+    if (el && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+  }
+};
+
 // --- UI 렌더링 함수: MV 썸네일/배경/인물 프롬프트 표시 ---
 window.renderMvThumbnailPromptsUI = function (prompts) {
   if (!prompts) return;
@@ -317,6 +385,7 @@ window.renderSceneOverview = function (scenesArg) {
         </h3>
         <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem;">각 씬의 이미지 및 비디오 통합 프롬프트를 세부적으로 수정할 수 있습니다.</p>
     </div>
+    ${typeof window.renderMVSceneTimelinePreview === "function" ? window.renderMVSceneTimelinePreview(scenes) : ""}
   `;
 
   scenes.forEach((scene, index) => {
@@ -328,7 +397,7 @@ window.renderSceneOverview = function (scenesArg) {
     const existingPromptKo = scene.promptKo || "";
 
     html += `
-                <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);" data-scene-index="${index}">
+                <div class="mv-scene-overview-card" style="margin-bottom: 20px; padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border);" data-scene-index="${index}">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <h4 style="margin: 0; color: var(--text-primary);">씬 ${index + 1}</h4>
@@ -4725,12 +4794,15 @@ window.confirmSceneOverviewAndGenerate = async function (isSilent = false) {
     // 개별 씬 프롬프트 표시 (영어/한글 상호 번역 지원)
     const container = document.getElementById("mvPromptsContainer");
     if (container) {
-      let html = "";
+      let html =
+        typeof window.renderMVSceneTimelinePreview === "function"
+          ? window.renderMVSceneTimelinePreview(window.currentScenes)
+          : "";
 
       window.currentScenes.forEach((scene, index) => {
         const sceneId = `scene_${index}`;
         html += `
-                    <div class="mv-prompt-item" style="margin-bottom: 25px; padding: 20px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border);">
+                    <div class="mv-prompt-item" style="margin-bottom: 25px; padding: 20px; background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border);" data-result-scene-index="${index}">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                             <h4 style="margin: 0; color: var(--text-primary); font-size: 1.1rem;">씬 ${index + 1}</h4>
                             <div style="display: flex; gap: 8px; align-items: center;">

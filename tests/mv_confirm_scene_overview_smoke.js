@@ -189,6 +189,8 @@ addElement("scene_overview_1_ko", "개요 씬 2 한글");
 
   assert.ok(container.innerHTML.includes("regenerateScenePrompt(0)"));
   assert.ok(container.innerHTML.includes("saveScenePrompt(1)"));
+  assert.ok(container.innerHTML.includes("mv-scene-timeline-preview"));
+  assert.ok(container.innerHTML.includes("씬 타임라인"));
   assert.strictEqual(elements.get("scene_0_en").value, "overview scene one en");
   assert.strictEqual(elements.get("scene_0_ko").value, "개요 씬 1 한글");
   assert.strictEqual(elements.get("scene_1_en").value, "overview scene two en");
