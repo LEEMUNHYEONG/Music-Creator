@@ -28,6 +28,7 @@ const tests = [
   "tests/mv_character_sheet_helpers_smoke.js",
   "tests/mv_update_character_inputs_smoke.js",
   "tests/mv_model_storage_smoke.js",
+  "tests/mv_restore_step6_smoke.js",
   "tests/mv_copy_prompts_smoke.js",
   "tests/mv_save_scene_prompt_smoke.js",
   "tests/mv_tag_buttons_smoke.js",

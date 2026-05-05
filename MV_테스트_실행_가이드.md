@@ -26,7 +26,7 @@ npm run test:mv
 정상 통과 시 마지막 줄에 아래와 비슷한 결과가 표시됩니다.
 
 ```text
-MV smoke test suite: PASS (51 checks)
+MV smoke test suite: PASS (53 checks)
 ```
 
 이 결과는 MV 관련 핵심 보호 테스트가 모두 통과했다는 뜻입니다.
@@ -54,6 +54,7 @@ MV smoke test suite: PASS (51 checks)
 17. 썸네일, 스타일, 씬, 씬 개요 프롬프트 재생성 보호
 18. 한글/영어 프롬프트 동기화 보호
 19. 씬 개요 확정 후 결과 화면 렌더링 보호
+20. 프로젝트 재진입 시 6단계 마케팅/MV 데이터 복원 보호
 
 ## 실패했을 때 확인 순서
 

@@ -1748,3 +1748,31 @@ MV smoke test suite: PASS
 npm run test:mv
 MV smoke test suite: PASS
 ```
+
+## 2026-05-06: MV 6단계 복원 로직 보호 테스트 추가
+
+### 작업 목적
+
+`restoreStepData(6)` 내부를 정리하기 전에 프로젝트 재진입 시 마케팅/MV 데이터가 현재처럼 복원되는지 테스트로 고정했습니다.
+
+### 변경 내용
+
+1. `tests/mv_restore_step6_smoke.js`
+   - 유튜브/틱톡 설명, 해시태그, 썸네일 복원 확인
+   - MV 설정값, 장소/동작 태그, 캐릭터 입력과 캐릭터 시트 복원 확인
+   - 썸네일/배경/인물 프롬프트의 결과 영역과 검토 영역 동시 복원 확인
+   - 씬 데이터 deep copy, 씬 개요 렌더링, 결과/개요 섹션 표시 상태 확인
+   - 수정 모드와 프로젝트 미선택 상태에서는 안전하게 복원을 건너뛰는지 확인
+
+2. `tests/run_mv_smoke_tests.js`
+   - 6단계 복원 보호 테스트를 통합 실행 목록에 추가
+
+3. `MV_테스트_실행_가이드.md`
+   - 현재 보호 범위에 6단계 마케팅/MV 데이터 복원 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (53 checks)
+```
