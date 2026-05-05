@@ -55,13 +55,13 @@ window.showCopyIndicator = function showCopyIndicatorStub(message) {
   toasts.push(message);
 };
 
-const appSource = fs.readFileSync(path.resolve(__dirname, "../app.js"), "utf8");
-const start = appSource.indexOf("window.updateMVPromptTranslation = async function");
-const end = appSource.indexOf("// ═══════════════════════════════════════════════════════════════\n// 가사 작성 모드 전환 함수", start);
-assert.ok(start !== -1, "updateMVPromptTranslation should exist in app.js");
-assert.ok(end !== -1, "prompt helper block should end before lyrics mode");
-vm.runInThisContext(appSource.slice(start, end), {
-  filename: "app.js.mv-prompt-helper-slice",
+const step6Source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
+const start = step6Source.indexOf("window.updateMVPromptTranslation = async function");
+const end = step6Source.indexOf("// --- Extracted generateSRTPreview ---", start);
+assert.ok(start !== -1, "updateMVPromptTranslation should exist in js/step6.js");
+assert.ok(end !== -1, "prompt helper block should end before SRT helpers");
+vm.runInThisContext(step6Source.slice(start, end), {
+  filename: "js/step6.js.mv-prompt-helper-slice",
 });
 
 addElement("mvBackgroundPromptKo", "비 오는 골목");

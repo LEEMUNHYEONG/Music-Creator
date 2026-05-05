@@ -1330,6 +1330,35 @@ npm run test:mv
 MV smoke test suite: PASS (47 checks)
 ```
 
+## 2026-05-06: MV 프롬프트 보조 함수 step6.js 이관
+
+### 작업 목적
+
+MV 프롬프트 간단 번역, 저장, 섹션 복사 함수를 `js/step6.js`로 옮겨 MV 프롬프트 관련 조작 함수의 소유권을 더 일관되게 정리했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `updateMVPromptTranslation` 추가
+   - `saveMVPrompt` 추가
+   - `copyMVPromptSection` 추가
+
+2. `app.js`
+   - 위 3개 함수의 중복 전역 정의 제거
+
+3. `tests/mv_prompt_helpers_smoke.js`
+   - 테스트 기준 파일을 `app.js`에서 `js/step6.js`로 변경
+
+4. `MV_중복함수_정리계획.md`
+   - 프롬프트 보조 함수 이관 완료 기록 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (47 checks)
+```
+
 ## 2026-05-06: MV 장소 헬퍼 step6.js 이관
 
 ### 작업 목적
