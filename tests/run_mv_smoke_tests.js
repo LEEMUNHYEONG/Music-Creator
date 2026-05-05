@@ -21,6 +21,7 @@ const tests = [
   "tests/mv_sync_scene_prompt_translation_smoke.js",
   "tests/mv_settings_smoke.js",
   "tests/mv_character_sheet_helpers_smoke.js",
+  "tests/mv_update_character_inputs_smoke.js",
   "tests/mv_model_storage_smoke.js",
   "tests/mv_copy_prompts_smoke.js",
   "tests/mv_save_scene_prompt_smoke.js",

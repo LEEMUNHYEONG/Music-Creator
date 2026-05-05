@@ -1217,6 +1217,64 @@ npm run test:mv
 MV smoke test suite: PASS (39 checks)
 ```
 
+## 2026-05-06: MV 캐릭터 입력 UI 보호 테스트 추가
+
+### 작업 목적
+
+`updateCharacterInputs`를 향후 `js/step6.js`로 이관하기 전에, 인물 수 변경과 UI 재생성 과정에서 기존 캐릭터 설정과 캐릭터 시트가 보존되는지 테스트로 고정했습니다.
+
+### 변경 내용
+
+1. `tests/mv_update_character_inputs_smoke.js`
+   - 인물 수에 맞는 캐릭터 입력 UI 생성 확인
+   - 캐릭터 시트 생성/토글/복사 버튼 연결 확인
+   - 기존 성별, 나이, 인종, 외모, Art Style 복원 확인
+   - 기존 캐릭터 시트 텍스트와 시트 영역 표시 상태 복원 확인
+   - 인물 수 감소 시 남은 인물의 기존 시트 보존 확인
+
+2. `tests/run_mv_smoke_tests.js`
+   - 캐릭터 입력 UI 보호 테스트를 통합 실행 목록에 추가
+
+3. `MV_테스트_실행_가이드.md`
+   - 현재 보호 범위에 캐릭터 입력 UI 생성/복원 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (41 checks)
+```
+
+## 2026-05-06: MV 캐릭터 입력 UI 함수 step6.js 이관
+
+### 작업 목적
+
+MV 캐릭터 입력 UI 생성 함수 `updateCharacterInputs`를 `js/step6.js`로 옮겨, MV 설정/캐릭터 시트 보조 함수와 같은 소유 파일에서 관리되도록 정리했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `updateCharacterInputs` 추가
+   - 기존 입력값 백업/복원 흐름 유지
+   - 캐릭터 시트 텍스트와 시트 버튼 표시 상태 복원 흐름 유지
+
+2. `app.js`
+   - `updateCharacterInputs` 중복 전역 정의 제거
+   - AI 캐릭터 시트 생성 함수 `generateCharacterSheet`는 기존 위치 유지
+
+3. `tests/mv_update_character_inputs_smoke.js`
+   - 테스트 기준 파일을 `app.js`에서 `js/step6.js`로 변경
+
+4. `MV_중복함수_정리계획.md`
+   - `updateCharacterInputs` 이관 완료 기록 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (41 checks)
+```
+
 ## 2026-05-06: MV 캐릭터 시트 보조 함수 step6.js 이관
 
 ### 작업 목적
