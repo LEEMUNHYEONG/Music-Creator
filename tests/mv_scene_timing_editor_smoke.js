@@ -226,13 +226,16 @@ assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "missingEnPrompt"), [
 assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "missingKoPrompt"), [1]);
 let focusedReviewIndex = null;
 window.currentScenes = issueScenes;
+elements.set("scene_editor_summary_1", { textContent: "" });
 window.focusMVSceneCard = function (index) {
   focusedReviewIndex = index;
 };
 assert.strictEqual(window.focusMVFirstReviewScene(), true);
 assert.strictEqual(focusedReviewIndex, 1);
+assert.ok(elements.get("scene_editor_summary_1").textContent.includes("선택 필터: 확인 필요 확인"));
 focusedReviewIndex = null;
 assert.strictEqual(window.focusMVSceneIssue("missingMetadata"), true);
 assert.strictEqual(focusedReviewIndex, 1);
+assert.ok(elements.get("scene_editor_summary_1").textContent.includes("선택 필터: 메타데이터 확인"));
 
 console.log("MV scene timing editor smoke test: PASS");

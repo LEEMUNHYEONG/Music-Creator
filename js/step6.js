@@ -347,13 +347,35 @@ function getMVSceneEditorSummaryText(scene, index) {
   const koPrompt = String(koEl?.value || scene?.promptKo || "").trim();
   const lyrics = String(scene?.lyrics || "").trim();
 
-  return [
+  const summaryParts = [
     `저장/재생성 전 상태: ${timeSummary}`,
     `메타데이터 ${metadataCount}/5`,
     lyrics ? "가사 있음" : "가사 없음",
     enPrompt ? "EN 있음" : "EN 없음",
     koPrompt ? "KO 있음" : "KO 없음",
-  ].join(" · ");
+  ];
+  if (
+    window.currentMVSceneQualityFilter &&
+    getMVSceneIssueIndexes([scene], window.currentMVSceneQualityFilter).length
+  ) {
+    summaryParts.push(
+      `선택 필터: ${getMVSceneIssueLabel(window.currentMVSceneQualityFilter)} 확인`,
+    );
+  }
+  return summaryParts.join(" · ");
+}
+
+function getMVSceneIssueLabel(issueType) {
+  return (
+    {
+      invalidTime: "시간",
+      missingMetadata: "메타데이터",
+      missingLyrics: "가사",
+      missingEnPrompt: "EN",
+      missingKoPrompt: "KO",
+      review: "확인 필요",
+    }[issueType] || "확인 필요"
+  );
 }
 
 function getMVSceneQualityStats(scenesArg) {
@@ -480,6 +502,12 @@ function getMVSceneIssueIndexes(scenesArg, issueType) {
         missingLyrics: !hasLyrics,
         missingEnPrompt: !hasEnPrompt,
         missingKoPrompt: !hasKoPrompt,
+        review:
+          !hasValidTime ||
+          !hasMetadata ||
+          !hasLyrics ||
+          !hasEnPrompt ||
+          !hasKoPrompt,
       };
       return issueMap[issueType] ? index : null;
     })
@@ -592,11 +620,25 @@ function highlightMVSceneIssueIndexes(indexes) {
   });
 }
 
+function refreshMVSceneEditorSummaries(indexes) {
+  if (!Array.isArray(window.currentScenes)) return;
+  const targetIndexes = Array.isArray(indexes)
+    ? indexes
+    : window.currentScenes.map((_, index) => index);
+  targetIndexes.forEach((index) => {
+    if (window.currentScenes[index]) {
+      updateMVSceneEditorSummary(window.currentScenes[index], index);
+    }
+  });
+}
+
 window.focusMVFirstReviewScene = function () {
   if (!Array.isArray(window.currentScenes)) return false;
   const reviewIndexes = getMVSceneReviewIndexes(window.currentScenes);
   if (!reviewIndexes.length) return false;
+  window.currentMVSceneQualityFilter = "review";
   highlightMVSceneIssueIndexes(reviewIndexes);
+  refreshMVSceneEditorSummaries();
   if (typeof window.focusMVSceneCard === "function") {
     window.focusMVSceneCard(reviewIndexes[0]);
     return true;
@@ -608,7 +650,9 @@ window.focusMVSceneIssue = function (issueType) {
   if (!Array.isArray(window.currentScenes)) return false;
   const issueIndexes = getMVSceneIssueIndexes(window.currentScenes, issueType);
   if (!issueIndexes.length) return false;
+  window.currentMVSceneQualityFilter = issueType;
   highlightMVSceneIssueIndexes(issueIndexes);
+  refreshMVSceneEditorSummaries();
   if (typeof window.focusMVSceneCard === "function") {
     window.focusMVSceneCard(issueIndexes[0]);
     return true;
