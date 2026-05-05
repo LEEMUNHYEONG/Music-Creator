@@ -5,13 +5,13 @@ const vm = require("vm");
 
 global.window = global;
 
-const appSource = fs.readFileSync(path.resolve(__dirname, "../app.js"), "utf8");
-const start = appSource.indexOf("const MV_LOCATION_MAP = {");
-const end = appSource.indexOf("if (typeof document !== \"undefined\")", start);
-assert.ok(start !== -1, "MV_LOCATION_MAP should exist in app.js");
-assert.ok(end !== -1, "MV location helper block should end before DOM init");
-vm.runInThisContext(appSource.slice(start, end), {
-  filename: "app.js.mv-location-helper-slice",
+const step6Source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
+const start = step6Source.indexOf("const MV_LOCATION_MAP = {");
+const end = step6Source.indexOf("// --- Extracted getMVLocationValues ---", start);
+assert.ok(start !== -1, "MV_LOCATION_MAP should exist in js/step6.js");
+assert.ok(end !== -1, "MV location helper block should end before getMVLocationValues");
+vm.runInThisContext(step6Source.slice(start, end), {
+  filename: "js/step6.js.mv-location-helper-slice",
 });
 
 window.getMVLocationValues = function getMVLocationValuesStub() {

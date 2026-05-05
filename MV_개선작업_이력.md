@@ -1302,6 +1302,37 @@ npm run test:mv
 MV smoke test suite: PASS (45 checks)
 ```
 
+## 2026-05-06: MV 장소 헬퍼 step6.js 이관
+
+### 작업 목적
+
+MV 씬 생성과 캐릭터 시트 생성에서 사용하는 장소 매핑/선택 헬퍼를 `js/step6.js`로 옮겨 MV 프롬프트 생성 흐름의 소유권을 더 일관되게 정리했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `MV_LOCATION_MAP` 추가
+   - `MV_LOCATION_KEYWORDS` 추가
+   - `pickBestLocationForScene` 추가
+   - `getMVLocationEnString` 추가
+   - `getMVLocationKoString` 추가
+
+2. `app.js`
+   - 위 상수/함수의 중복 정의 제거
+
+3. `tests/mv_location_helpers_smoke.js`
+   - 테스트 기준 파일을 `app.js`에서 `js/step6.js`로 변경
+
+4. `MV_중복함수_정리계획.md`
+   - 장소 헬퍼 이관 완료 기록 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (45 checks)
+```
+
 ## 2026-05-06: MV 캐릭터 시트 생성 함수 step6.js 이관
 
 ### 작업 목적

@@ -77,9 +77,6 @@ global.fetch = async function fetchStub(url, options) {
 window.getGeminiApiKey = function getGeminiApiKeyStub() {
   return "AIza-test-key";
 };
-window.getMVLocationEnString = function getMVLocationEnStringStub() {
-  return "rainy city street";
-};
 window.extractLyricsOnly = function extractLyricsOnlyStub(text) {
   return text.replace(/\[Verse\]/g, "").trim();
 };
@@ -112,6 +109,10 @@ window.saveCurrentProject = function saveCurrentProjectStub() {
 ].forEach(([id, value]) => addElement(id, value));
 
 require("../js/step6.js");
+
+window.getMVLocationEnString = function getMVLocationEnStringStub() {
+  return "rainy city street";
+};
 
 (async () => {
   await window.regenerateSingleStylePrompt("background");

@@ -26,9 +26,6 @@ global.alert = function alertStub(message) {
   alerts.push(message);
 };
 
-window.getMVLocationEnString = function getMVLocationEnStringStub() {
-  return "neon alley";
-};
 window.showCopyIndicator = function showCopyIndicatorStub(message) {
   toasts.push(message);
 };
@@ -58,6 +55,10 @@ window.saveCurrentProject = function saveCurrentProjectStub() {
 ].forEach(([id, value]) => addElement(id, value));
 
 require("../js/step6.js");
+
+window.getMVLocationEnString = function getMVLocationEnStringStub() {
+  return "neon alley";
+};
 
 window.generateMVThumbnailPrompts = async function generateMVThumbnailPromptsStub(
   ...args

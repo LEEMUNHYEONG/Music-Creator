@@ -110,6 +110,9 @@ MV 화면/프롬프트/씬 관련 함수는 최종적으로 `js/step6.js`가 소
 17. `generateCharacterSheet`
     - 완료: Gemini/OpenAI 기반 MV 캐릭터 시트 생성 함수를 `js/step6.js` 소유로 이관했습니다.
 
+18. `pickBestLocationForScene`, `getMVLocationEnString`, `getMVLocationKoString`
+    - 완료: MV 장소 매핑 상수와 씬 가사 기반 장소 선택/문자열 변환 함수를 `js/step6.js` 소유로 이관했습니다.
+
 ## 5. 추가된 보호 테스트
 
 중복 상태를 실수로 바꾸지 않도록 다음 테스트를 추가했습니다.
