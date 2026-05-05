@@ -3,6 +3,7 @@ const assert = require("assert");
 const elements = new Map();
 let translationCalls = [];
 const alerts = [];
+const confirms = [];
 const originalConsole = {
   error: console.error,
   log: console.log,
@@ -89,6 +90,10 @@ global.document = {
 };
 global.alert = function alertStub(message) {
   alerts.push(message);
+};
+global.confirm = function confirmStub(message) {
+  confirms.push(message);
+  return false;
 };
 global.requestAnimationFrame = function requestAnimationFrameStub(callback) {
   callback();
@@ -236,6 +241,35 @@ addElement("scene_camera_work_1", "slow dolly-in");
     window.currentProject.data.marketing.mvScenes,
     window.currentScenes,
   );
+
+  const originalConfirmSceneOverviewAndGenerate =
+    window.confirmSceneOverviewAndGenerate;
+  let confirmGenerateCalls = 0;
+  window.confirmSceneOverviewAndGenerate = async function confirmGenerateStub() {
+    confirmGenerateCalls += 1;
+  };
+  window.currentScenes = [
+    {
+      time: "0:30-0:20",
+      scene: "확인 필요 장면",
+      prompt: "",
+      promptKo: "",
+    },
+  ];
+  elements.set("scene_time_start_0", { value: "0:30" });
+  elements.set("scene_time_end_0", { value: "0:20" });
+  elements.set("scene_lyrics_0", { value: "" });
+  elements.set("scene_location_0", { value: "" });
+  elements.set("scene_emotion_0", { value: "" });
+  elements.set("scene_mood_0", { value: "" });
+  elements.set("scene_lighting_0", { value: "" });
+  elements.set("scene_camera_work_0", { value: "" });
+  elements.set("scene_overview_0_en", { value: "" });
+  elements.set("scene_overview_0_ko", { value: "" });
+  await window.saveAndConfirmMVPrompts();
+  assert.ok(confirms.some((message) => message.includes("확인 필요 항목")));
+  assert.strictEqual(confirmGenerateCalls, 0);
+  window.confirmSceneOverviewAndGenerate = originalConfirmSceneOverviewAndGenerate;
 
   originalConsole.log("MV confirm scene overview smoke test: PASS");
 })().catch((error) => {

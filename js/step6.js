@@ -528,6 +528,16 @@ function getMVSceneQualitySummaryText(scenesArg) {
   ].join(" · ");
 }
 
+function getMVSceneQualityConfirmMessage(scenesArg) {
+  const stats = getMVSceneQualityStats(scenesArg);
+  if (!stats.needsReview) return "";
+  return [
+    `${stats.needsReview}개 씬에 확인 필요 항목이 남아 있습니다.`,
+    `시간 확인 ${stats.invalidTime}개, 메타데이터 없음 ${stats.missingMetadata}개, 가사 없음 ${stats.missingLyrics}개, EN 없음 ${stats.missingEnPrompt}개, KO 없음 ${stats.missingKoPrompt}개`,
+    "이 상태로 확정하고 결과 화면으로 이동할까요?",
+  ].join("\n");
+}
+
 function renderMVSceneQualitySummary(scenesArg) {
   const stats = getMVSceneQualityStats(scenesArg);
   const filters = [
@@ -5725,6 +5735,18 @@ window.saveAndConfirmMVPrompts = async function () {
       if (enEl) window.currentScenes[index].prompt = enEl.value;
       if (koEl) window.currentScenes[index].promptKo = koEl.value;
     });
+
+    const reviewMessage = getMVSceneQualityConfirmMessage(window.currentScenes);
+    if (
+      reviewMessage &&
+      typeof window.confirm === "function" &&
+      !window.confirm(reviewMessage)
+    ) {
+      if (typeof window.focusMVFirstReviewScene === "function") {
+        window.focusMVFirstReviewScene();
+      }
+      return;
+    }
 
     const mvSettings = {
       era: document.getElementById("mvEra")?.value || "",

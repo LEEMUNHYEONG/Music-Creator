@@ -196,6 +196,21 @@ assert.ok(mixedQualityText.includes("메타데이터 없음 1개"));
 assert.ok(mixedQualityText.includes("가사 없음 1개"));
 assert.ok(mixedQualityText.includes("EN 없음 1개"));
 assert.ok(mixedQualityText.includes("KO 없음 1개"));
+const confirmMessage = getMVSceneQualityConfirmMessage([
+  scene,
+  {
+    time: "0:30-0:20",
+    lyrics: "",
+    prompt: "",
+    promptKo: "",
+    location: "",
+  },
+]);
+assert.ok(confirmMessage.includes("1개 씬에 확인 필요"));
+assert.ok(confirmMessage.includes("시간 확인 1개"));
+assert.ok(confirmMessage.includes("메타데이터 없음 1개"));
+assert.ok(confirmMessage.includes("이 상태로 확정"));
+assert.strictEqual(getMVSceneQualityConfirmMessage([scene]), "");
 assert.deepStrictEqual(
   getMVSceneReviewIndexes([
     scene,
