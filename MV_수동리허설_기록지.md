@@ -26,6 +26,12 @@ http://127.0.0.1:4180/index.html
 npm run serve:local
 ```
 
+자동 테스트 통과 후 로컬 서버 실행:
+
+```text
+npm run rehearse:mv
+```
+
 자동 테스트 기준:
 
 ```text

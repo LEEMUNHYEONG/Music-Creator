@@ -22,6 +22,12 @@ MV 6단계 개선 작업은 자동 검증 기준으로 릴리스 후보 상태�
 npm run test:mv
 ```
 
+수동 리허설 시작 명령:
+
+```text
+npm run rehearse:mv
+```
+
 기대 결과:
 
 ```text

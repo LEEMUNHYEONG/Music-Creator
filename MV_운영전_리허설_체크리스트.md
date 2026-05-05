@@ -19,7 +19,12 @@
    ```
    기대값: `MV smoke test suite: PASS (75 checks)`
 
-3. 기존 백업 위치 확인
+3. 자동 테스트 통과 후 리허설 서버까지 한 번에 실행하려면 아래 명령을 사용합니다.
+   ```text
+   npm run rehearse:mv
+   ```
+
+4. 기존 백업 위치 확인
    ```text
    /Users/leemunhyeong/Music Creator Backups/backup_2026-05-06_before_mv_improvements
    ```
@@ -27,6 +32,10 @@
 ## 2. 실제 사용자 데이터 리허설 순서
 
 1. 앱을 실행하고 기존 프로젝트 하나를 엽니다.
+   ```text
+   npm run rehearse:mv
+   ```
+   앱 주소: `http://127.0.0.1:4180/index.html`
 2. 6단계 마케팅 자료 화면으로 이동합니다.
 3. `MV 프롬프트` 탭을 엽니다.
 4. MV 설정을 확인합니다.

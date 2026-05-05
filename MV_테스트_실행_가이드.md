@@ -15,6 +15,12 @@ MV 개선 작업 후 기존 기능이 깨지지 않았는지 빠르게 확인하
 npm run test:mv
 ```
 
+자동 테스트 통과 후 수동 리허설용 로컬 서버까지 바로 실행하려면 아래 명령을 사용합니다.
+
+```text
+npm run rehearse:mv
+```
+
 프로젝트 위치:
 
 ```text
@@ -26,7 +32,7 @@ npm run test:mv
 정상 통과 시 마지막 줄에 아래와 비슷한 결과가 표시됩니다.
 
 ```text
-MV smoke test suite: PASS (69 checks)
+MV smoke test suite: PASS (75 checks)
 ```
 
 이 결과는 MV 관련 핵심 보호 테스트가 모두 통과했다는 뜻입니다.
@@ -127,9 +133,15 @@ npm run test:mv
 통과하면 개선을 진행합니다.  
 개선 후 다시 같은 명령을 실행해서 결과가 계속 `PASS`인지 확인합니다.
 
+실제 프로젝트 수동 리허설을 시작할 때는 아래 명령으로 자동 테스트 통과를 먼저 확인한 뒤 앱을 엽니다.
+
+```text
+npm run rehearse:mv
+```
+
 ## 관련 파일
 
-- `package.json`: `test:mv` 명령 정의
+- `package.json`: `test:mv`, `rehearse:mv`, `serve:local` 명령 정의
 - `tests/run_mv_smoke_tests.js`: MV 통합 테스트 러너
 - `tests/mv_*.js`: MV 개별 보호 테스트
 - `MV_개선작업_이력.md`: 개선 작업 기록

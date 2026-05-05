@@ -1,5 +1,6 @@
 {
   "scripts": {
+    "rehearse:mv": "npm run test:mv && npm run serve:local",
     "serve:local": "python3 -m http.server 4180",
     "test:mv": "node tests/run_mv_smoke_tests.js"
   },
