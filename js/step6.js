@@ -278,12 +278,25 @@ function getMVSceneTimingParts(scene) {
   };
 }
 
+function escapeMVAttribute(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 window.updateMVSceneTimelineFromEditor = function (scene, index) {
   if (!scene) return scene;
 
   const startEl = document.getElementById(`scene_time_start_${index}`);
   const endEl = document.getElementById(`scene_time_end_${index}`);
   const lyricsEl = document.getElementById(`scene_lyrics_${index}`);
+  const locationEl = document.getElementById(`scene_location_${index}`);
+  const emotionEl = document.getElementById(`scene_emotion_${index}`);
+  const moodEl = document.getElementById(`scene_mood_${index}`);
+  const lightingEl = document.getElementById(`scene_lighting_${index}`);
+  const cameraWorkEl = document.getElementById(`scene_camera_work_${index}`);
   const startSeconds = parseMVTimelineSeconds(startEl?.value);
   const endSeconds = parseMVTimelineSeconds(endEl?.value);
 
@@ -300,6 +313,21 @@ window.updateMVSceneTimelineFromEditor = function (scene, index) {
 
   if (lyricsEl) {
     scene.lyrics = lyricsEl.value;
+  }
+  if (locationEl) {
+    scene.location = locationEl.value;
+  }
+  if (emotionEl) {
+    scene.emotion = emotionEl.value;
+  }
+  if (moodEl) {
+    scene.mood = moodEl.value;
+  }
+  if (lightingEl) {
+    scene.lighting = lightingEl.value;
+  }
+  if (cameraWorkEl) {
+    scene.cameraWork = cameraWorkEl.value;
   }
 
   return scene;
@@ -508,6 +536,28 @@ window.renderSceneOverview = function (scenesArg) {
                         <div>
                             <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">가사 구간</label>
                             <textarea id="scene_lyrics_${index}" class="scene-lyrics" data-index="${index}" style="width: 100%; min-height: 52px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; resize: vertical;">${scene.lyrics || ""}</textarea>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); gap: 12px; margin-bottom: 15px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">장소</label>
+                            <input id="scene_location_${index}" class="scene-location" data-index="${index}" value="${escapeMVAttribute(scene.location)}" placeholder="rainy alley" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">감정</label>
+                            <input id="scene_emotion_${index}" class="scene-emotion" data-index="${index}" value="${escapeMVAttribute(scene.emotion)}" placeholder="hopeful" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">무드</label>
+                            <input id="scene_mood_${index}" class="scene-mood" data-index="${index}" value="${escapeMVAttribute(scene.mood)}" placeholder="warm sunrise optimism" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">조명</label>
+                            <input id="scene_lighting_${index}" class="scene-lighting" data-index="${index}" value="${escapeMVAttribute(scene.lighting)}" placeholder="blue-hour side light" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">카메라</label>
+                            <input id="scene_camera_work_${index}" class="scene-camera-work" data-index="${index}" value="${escapeMVAttribute(scene.cameraWork)}" placeholder="slow dolly-in" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem;">
                         </div>
                     </div>
 

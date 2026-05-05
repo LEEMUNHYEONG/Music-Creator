@@ -2070,3 +2070,33 @@ MV smoke test suite: PASS (65 checks)
 npm run test:mv
 MV smoke test suite: PASS (67 checks)
 ```
+
+## 2026-05-06: 씬별 장소/감정/조명 메타데이터 편집 UI 추가
+
+### 작업 목적
+
+감정 기반 추천으로 자동 생성된 씬 메타데이터를 사용자가 직접 다듬을 수 있도록, 씬 개요 편집 카드에 장소, 감정, 무드, 조명, 카메라 입력 영역을 추가했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - 씬 개요 카드에 `장소`, `감정`, `무드`, `조명`, `카메라` 입력 추가
+   - 저장 시 `location`, `emotion`, `mood`, `lighting`, `cameraWork`를 씬 데이터에 반영
+   - 입력값이 따옴표나 HTML 특수문자를 포함해도 속성 값이 깨지지 않도록 보정
+
+2. `tests/mv_scene_timing_editor_smoke.js`
+   - 시간/가사 구간 편집과 함께 장소/감정/무드/조명/카메라 값 저장 확인
+   - 잘못된 시간 입력이 있어도 메타데이터는 사용자의 최신 입력으로 저장되는지 확인
+
+3. `tests/mv_confirm_scene_overview_smoke.js`
+   - 씬 개요 저장/확정 흐름에서 메타데이터가 실제 `currentScenes`에 반영되는지 추가 확인
+
+4. `MV_테스트_실행_가이드.md`
+   - 보호 범위에 씬별 장소/감정/무드/조명/카메라 메타데이터 편집 저장 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (67 checks)
+```
