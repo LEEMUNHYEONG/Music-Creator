@@ -1274,6 +1274,34 @@ npm run test:mv
 MV smoke test suite: PASS (43 checks)
 ```
 
+## 2026-05-06: MV 캐릭터 시트 생성 함수 step6.js 이관
+
+### 작업 목적
+
+AI 기반 캐릭터 시트 생성 함수 `generateCharacterSheet`를 `js/step6.js`로 옮겨, MV 캐릭터 입력 UI와 캐릭터 시트 보조 함수가 같은 소유 파일에서 관리되도록 정리했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `generateCharacterSheet` 추가
+   - Gemini 생성, OpenAI 폴백, 시트 UI 반영, 설정 저장 흐름 유지
+
+2. `app.js`
+   - `generateCharacterSheet` 중복 전역 정의 제거
+
+3. `tests/mv_generate_character_sheet_smoke.js`
+   - 테스트 기준 파일을 `app.js`에서 `js/step6.js`로 변경
+
+4. `MV_중복함수_정리계획.md`
+   - `generateCharacterSheet` 이관 완료 기록 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (43 checks)
+```
+
 ## 2026-05-06: MV 캐릭터 입력 UI 함수 step6.js 이관
 
 ### 작업 목적

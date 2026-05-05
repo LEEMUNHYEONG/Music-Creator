@@ -81,13 +81,13 @@ window.logApiUsage = function logApiUsageStub(provider) {
   apiUsage.push(provider);
 };
 
-const appSource = fs.readFileSync(path.resolve(__dirname, "../app.js"), "utf8");
-const start = appSource.indexOf("window.generateCharacterSheet = async function");
-const end = appSource.indexOf("if (typeof document !== \"undefined\")", start);
-assert.ok(start !== -1, "generateCharacterSheet should exist in app.js");
-assert.ok(end !== -1, "generateCharacterSheet block should end before DOM init");
-vm.runInThisContext(appSource.slice(start, end), {
-  filename: "app.js.generate-character-sheet-slice",
+const step6Source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
+const start = step6Source.indexOf("window.generateCharacterSheet = async function");
+const end = step6Source.indexOf("// --- Extracted character sheet helpers ---", start);
+assert.ok(start !== -1, "generateCharacterSheet should exist in js/step6.js");
+assert.ok(end !== -1, "generateCharacterSheet block should end before character sheet helpers");
+vm.runInThisContext(step6Source.slice(start, end), {
+  filename: "js/step6.js.generate-character-sheet-slice",
 });
 
 addElement("mvCharacter1_sheetBtn");

@@ -2716,6 +2716,469 @@ window.updateCharacterInputs = function () {
   }
 };
 
+/**
+ * AI를 사용하여 완전한 캐릭터 시트 프롬프트를 생성합니다.
+ * 사용자가 입력한 고정 요소는 절대 변경하지 않고,
+ * 변형 가능 요소를 보완하여 완전한 스펙을 생성합니다.
+ * @param {number} charIndex - 인물 인덱스 (1-based)
+ */
+window.generateCharacterSheet = async function (charIndex) {
+  const btn = document.getElementById(`mvCharacter${charIndex}_sheetBtn`);
+  const loadingEl = document.getElementById(`mvCharacter${charIndex}_sheetLoading`);
+  const sheetArea = document.getElementById(`mvCharacter${charIndex}_sheetArea`);
+  const sheetEl = document.getElementById(`mvCharacter${charIndex}_sheet`);
+  const toggleBtn = document.getElementById(`mvCharacter${charIndex}_sheetToggle`);
+  const copyBtn = document.getElementById(`mvCharacter${charIndex}_sheetCopy`);
+
+  // 입력값 수집
+  const gender = document.getElementById(`mvCharacter${charIndex}_gender`)?.value || "";
+  const age = document.getElementById(`mvCharacter${charIndex}_age`)?.value || "";
+  const race = document.getElementById(`mvCharacter${charIndex}_race`)?.value || "";
+  const appearance = document.getElementById(`mvCharacter${charIndex}_appearance`)?.value || "";
+  const artStyle = document.getElementById(`mvCharacter${charIndex}_artStyle`)?.value || "photorealistic";
+
+  if (!gender && !age && !race && !appearance) {
+    alert("인물 정보를 최소 1개 이상 입력해주세요.\n(성별, 나이, 인종, 외모/스타일 중 하나)");
+    return;
+  }
+
+  // Gemini API 키 확인
+  const geminiKey = window.getGeminiApiKey();
+  if (!geminiKey || !geminiKey.startsWith("AIza")) {
+    alert("Gemini API 키가 설정되지 않았습니다.\n설정 > API 키에서 Gemini API 키를 입력해주세요.");
+    return;
+  }
+
+  // UI 상태 전환: 로딩
+  if (btn) btn.disabled = true;
+  if (loadingEl) loadingEl.style.display = "block";
+
+  try {
+    // 성별/나이/인종 매핑
+    const genderMap = { male: "Male", female: "Female", "non-binary": "Non-binary" };
+    const ageMap = {
+      child: "Child (under 10)", teen: "Teenager (10-19)",
+      "20s": "Young adult (early to late 20s)", "30s": "Adult (30s)",
+      "40s": "Adult (40s)", "50s": "Mature adult (50s)", elder: "Elder (60+)"
+    };
+    // 인종 매핑 — 미드저니가 인식하는 구체적 신체 특징 키워드 포함
+    const raceMap = {
+      asian: "East Asian",
+      caucasian: "Caucasian/White",
+      african: "African/Black",
+      hispanic: "Hispanic/Latino",
+      "middle-eastern": "Middle Eastern",
+      mixed: "Mixed ethnicity"
+    };
+    // 미드저니 전용 인종 강제 키워드 맵 (OVERALL COMPOSITION 상단에 삽입용)
+    const genderSuffix = gender === "male" ? "man" : gender === "female" ? "woman" : "person";
+    const raceMJMap = {
+      asian: `East Asian ${genderSuffix}, Korean/Japanese/Chinese facial features, monolid or slightly hooded almond-shaped eyes, flat nasal bridge, high cheekbones, light to medium tan skin tone typical of East Asia, straight black hair`,
+      caucasian: `Caucasian ${genderSuffix}, White European facial features, round to oval eyes, defined nasal bridge, fair to light skin tone`,
+      african: `African/Black ${genderSuffix}, Sub-Saharan African facial features, full lips, broad nasal bridge, dark brown skin tone, tightly coiled dark hair`,
+      hispanic: `Hispanic/Latino ${genderSuffix}, Latin American facial features, warm olive to tan skin tone, dark brown eyes and hair`,
+      "middle-eastern": `Middle Eastern ${genderSuffix}, Arab/Persian facial features, strong brow ridge, prominent nose, olive to tan skin tone, dark hair`,
+      mixed: `Mixed ethnicity ${genderSuffix}, blended facial features from multiple ethnic backgrounds`
+    };
+    const artStyleMap = {
+      photorealistic: "photorealistic photography style",
+      "cinematic-photography": "cinematic photography style, dramatic film-like quality",
+      anime: "anime/Japanese animation style",
+      "3d-render": "3D rendered, Pixar-quality CG style",
+      "digital-art": "digital art illustration style",
+      watercolor: "watercolor painting style",
+      "oil-painting": "classical oil painting style",
+      "concept-art": "conceptual art style, entertainment design",
+      "comic-book": "comic book / graphic novel style",
+      "pixel-art": "pixel art / retro game style",
+      "fashion-illustration": "fashion illustration style",
+      hyperrealistic: "hyperrealistic, ultra-detailed photographic style"
+    };
+
+    // 고정 요소 목록 생성
+    const fixedTraits = [];
+    if (gender) fixedTraits.push(`Gender: ${genderMap[gender] || gender}`);
+    if (age) fixedTraits.push(`Age: ${ageMap[age] || age}`);
+    if (race) fixedTraits.push(`Ethnicity: ${raceMap[race] || race} — MANDATORY, do not change to any other ethnicity`);
+    if (appearance) fixedTraits.push(`User-described traits: "${appearance}"`);
+
+    const artStyleEn = artStyleMap[artStyle] || artStyle;
+    // 미드저니 인종 강제 키워드 (선택된 인종 또는 원문 그대로)
+    const raceMJKeywords = race ? (raceMJMap[race] || (raceMap[race] || race)) : "";
+    // 인종 강제 규칙 블록
+    const ethnicityEnforcement = race ? `
+⚠️ ETHNICITY ENFORCEMENT (MANDATORY — DO NOT IGNORE):
+- The character's ethnicity is: ${raceMap[race] || race}
+- Midjourney-specific descriptors to include: ${raceMJKeywords}
+- FORBIDDEN: rendering the character as any other ethnicity (e.g., do NOT render as Caucasian/White, African/Black, or any non-${raceMap[race] || race} appearance)
+- Every view and headshot MUST clearly show ${raceMap[race] || race} facial features
+` : "";
+
+    // MV 프롬프트 상세 설정 수집 (시대, 국가, 조명 등)
+    const mvEra = document.getElementById("mvEra")?.value || "";
+    const mvCountry = document.getElementById("mvCountry")?.value || "";
+    const mvLocation = typeof window.getMVLocationEnString === "function" ? window.getMVLocationEnString() : document.getElementById("mvLocation")?.value || "";
+    const mvLighting = document.getElementById("mvLighting")?.value || "";
+    const mvCameraWork = document.getElementById("mvCameraWork")?.value || "";
+    const mvMood = document.getElementById("mvMood")?.value || "";
+    const mvCustomSettings = document.getElementById("mvCustomSettings")?.value || "";
+    const mvCharacterCount = document.getElementById("mvCharacterCount")?.value || "1";
+
+    const mvContextParts = [];
+    if (mvEra) mvContextParts.push(`Era: ${mvEra}`);
+    if (mvCountry) mvContextParts.push(`Country/Region: ${mvCountry}`);
+    if (mvLocation) mvContextParts.push(`Location: ${mvLocation}`);
+    if (mvLighting) mvContextParts.push(`Lighting: ${mvLighting}`);
+    if (mvCameraWork) mvContextParts.push(`Camera Work: ${mvCameraWork}`);
+    if (mvMood) mvContextParts.push(`Mood/Atmosphere: ${mvMood}`);
+    if (mvCharacterCount) mvContextParts.push(`Total Characters in MV: ${mvCharacterCount} (Design this character to fit well in a group of ${mvCharacterCount})`);
+    if (mvCustomSettings) mvContextParts.push(`Additional Settings: "${mvCustomSettings}"`);
+    
+    const mvContextStr = mvContextParts.length > 0 ? mvContextParts.join(" | ") : "Not specified";
+
+    // 최종 가사 (수노용) 정보 수집
+    const finalLyricsEl = document.getElementById("finalLyrics");
+    const finalLyrics = finalLyricsEl ? finalLyricsEl.innerText.trim() : "";
+
+    // 실사 계열 스타일 여부 판별 (만화/애니 방지 규칙 적용 대상)
+    const photoRealisticStyles = ["photorealistic", "cinematic-photography", "hyperrealistic"];
+    const isPhotoRealistic = photoRealisticStyles.includes(artStyle);
+
+    // 실사 스타일 강제 규칙 블록
+    const photoRealismRule = isPhotoRealistic
+      ? `⚠️ ABSOLUTE PHOTO-REALISM ENFORCEMENT (HIGHEST PRIORITY — OVERRIDES ALL OTHER STYLE DECISIONS):
+- This character MUST be rendered as a REAL HUMAN PHOTOGRAPH, NOT illustration, cartoon, anime, manga, 3D animation, or any drawn/painted style.
+- REQUIRED: ultra-photorealistic, shot on high-end DSLR/mirrorless camera, visible skin pores, subsurface skin scattering, natural hair strands, real fabric texture, lens bokeh, 8K RAW photo quality.
+- FORBIDDEN: anime, manga, cartoon, illustration, cel-shading, flat color, stylized, toon, animated, drawn, painted, digital art, 3D render.
+- Skin: natural imperfections, pores, subtle veins — NOT airbrushed, plastic, or smooth.
+- Eyes: iris detail, natural moisture/catchlights, realistic proportions — NOT oversized anime-style eyes.
+`
+      : "";
+
+    // 가사 기반 인물 분석 블록
+    const lyricsAnalysisBlock = finalLyrics
+      ? `MANDATORY LYRICS-BASED CHARACTER ANALYSIS:
+Analyze the song lyrics below and determine:
+- CORE EMOTION (e.g., longing, heartbreak, euphoria, nostalgia, melancholy)
+- CHARACTER'S NARRATIVE ROLE (who is this person? what are they experiencing?)
+- IMPLIED RELATIONSHIP (lover, lost connection, self-reflection, stranger)
+- AESTHETIC ATMOSPHERE (e.g., rainy city night, empty room, neon-lit alley)
+
+Reflect ALL of the above into the design:
+- FACIAL EXPRESSION: convey the song's core emotion (NOT a blank neutral face)
+- CLOTHING & COLOR PALETTE: match the song's era, mood, and atmosphere
+- HAIR & MAKEUP: reinforce the emotional state
+- BODY LANGUAGE: subtle cues to the character's inner world
+- PROPS/ACCESSORIES: hint at the song's story
+
+SONG LYRICS:
+"""
+${finalLyrics}
+"""`
+      : "";
+
+    // AI 프롬프트 구성 (실사 강제 + 가사 분석 강화)
+
+    const prompt = `You are a professional character designer${isPhotoRealistic ? " and portrait photographer" : ""}. Generate a COMPLETE, highly detailed character design sheet. The output will be used as a prompt for an AI image generator.
+
+${photoRealismRule}
+${ethnicityEnforcement}
+**CRITICAL RULES (OBEY IN THIS EXACT PRIORITY ORDER):**
+1. ${isPhotoRealistic ? "⚠️ PHOTO-REALISM FIRST: See the ABSOLUTE PHOTO-REALISM ENFORCEMENT block above. NO cartoons, NO anime, NO illustration — ONLY real human photography quality at 8K or higher." : `Art Style: ${artStyleEn} — All details must faithfully reflect this style.`}
+2. CORE CHARACTERISTICS (USER INPUTS - ABSOLUTE MANDATORY): ${fixedTraits.join("; ")} 
+   -> You MUST strictly follow these traits. They are the core identity of the character. Do not change or alter them under any circumstances.
+3. Art Style Technical Spec: ${artStyleEn}${isPhotoRealistic ? ", 8K ultra-resolution, RAW photo quality, professional studio lighting" : ""}
+4. MV PRODUCTION CONTEXT: The character must naturally fit the following music video settings: ${mvContextStr}.
+${lyricsAnalysisBlock ? `5. ${lyricsAnalysisBlock}\n6. VARIABLE ELEMENTS: Fill in ALL remaining details not specified by the user, guided by the lyrics analysis above.` : "5. VARIABLE ELEMENTS: Fill in ALL remaining details that the user did NOT specify."}
+
+**INPUT INTERPRETATION RULES:**
+- Explicit Traits (physical descriptions like hair color, height, body type): keep EXACTLY as stated
+- Implicit Traits (mood, personality, aura like "cold feeling", "mysterious"): Do NOT write these abstractly. Convert them into PHYSICAL/VISUAL elements (e.g., "cold feeling" → sharp angular jawline, cool-toned eye color, minimal makeup, sleek straight hair)
+- If explicit and implicit traits conflict, explicit traits ALWAYS take priority
+
+**OUTPUT RULES:**
+- Every spec must be defined with Position, Size, Shape, Material, and State where applicable
+- NO vague or abstract expressions allowed - everything must be concrete and physical
+- Character must stand in a natural, upright A-pose (no dramatic poses)
+- Arms relaxed at sides unless holding a prop
+- Fill in EVERY field in the template - leave nothing empty
+- THE VERY FIRST SECTION you output MUST be a labeled Midjourney prompt block. It must look exactly like this:
+  
+  MIDJOURNEY PROMPT (COPY THIS):
+  ${'```'}
+  [single-line prompt following the rules below]
+  ${'```'}
+
+- Rules for the simple Midjourney prompt:
+  * Start with: "character sheet, turnaround, full body, [ethnicity] [gender], [age],"
+  * Add layout: "4 body views (front, 3/4, side, back) and 3 close-up headshots on right,"
+  * Add style: ${isPhotoRealistic ? "ultra photographic, 8K resolution, high detail," : artStyleEn + ","}
+  * End with: "neutral grey background"
+  * CRITICAL: Do NOT include "--ar" or any other parameters. Keep it under 150 characters if possible.
+  * Keep it in a single line inside the code block.
+
+**OUTPUT THE COMPLETE CHARACTER SHEET BELOW. Use ONLY the following template structure. Do NOT add or remove any sections:**
+
+MIDJOURNEY PROMPT (COPY THIS):
+${'```'}
+(Generate the simplified single-line prompt here)
+${'```'}
+
+**[OVERALL COMPOSITION - FIXED LAYOUT]**
+${raceMJKeywords ? raceMJKeywords + "," : ""} ${genderMap[gender] || "character"}, character reference sheet, character turnaround, split view, 4 full body views arranged horizontally (front, 3/4 angle, profile, back), 3 vertical close-up headshot portraits on the right side showing different expressions, ${artStyleEn}${isPhotoRealistic ? ", 8K resolution, real photograph, professional lighting, visible skin texture, natural hair strands, absolutely no cartoon elements" : ", high-quality, 4K resolution"}, neutral grey studio background, wide aspect ratio, symmetrical layout.
+
+[SECTION 1 - FULL BODY 1]
+- Full body view, 3/4 angle
+
+[SECTION 2 - FULL BODY 2]
+- Full body view, opposite 3/4 angle
+
+[SECTION 3 - FULL BODY 3]
+- Full body view, from behind (back view)
+
+[SECTION 4 - HEADSHOTS AND EXPRESSIONS]
+- Multiple close-up portrait headshots
+- Showing different facial angles (front view, side profile) and subtle expressions
+
+[GLOBAL LAYOUT RULES]
+- Character turnaround sheet format
+- All views aligned on the same neutral backdrop
+- Consistent character proportions and design across all angles
+- Professional concept art layout with clean spacing
+
+**[CHARACTER SPECIFICATION - FULL DEFINITION]**
+
+[Identity]
+- Gender: (fill based on fixed elements)
+- Age: (fill based on fixed elements)
+- Ethnicity: (fill based on fixed elements)
+
+[Body]
+- Height:
+- Proportion:
+- Build:
+- Shoulder width:
+- Waist:
+- Hip:
+- Posture:
+
+[Pose]
+- A-pose
+- Arms:
+- Elbows:
+- Hands:
+- Legs:
+- Weight distribution:
+
+[Face]
+- Shape:
+- Jaw:
+- Chin:
+- Eyes:
+- Eye color:
+- Eye size:
+- Brows:
+- Nose:
+- Lips:
+- Skin:
+- Expression:
+
+[Makeup]
+- Base:
+- Blush:
+- Eyeshadow:
+- Eyeliner:
+- Mascara:
+- Lips:
+
+[Hair]
+- Length:
+- Part:
+- Structure:
+- Strand thickness:
+- Layering:
+- Volume:
+- Flow:
+- Color:
+- Surface:
+- State:
+
+[Outfit] Top:
+- Type:
+- Length:
+- Fit:
+- Neckline:
+- Sleeve:
+- Fabric:
+- Wrinkles:
+
+Skirt:
+- Type:
+- Waist position:
+- Length:
+- Shape:
+- Structure:
+- Pleats:
+- Fabric:
+- Movement:
+
+[Footwear]
+- Type:
+- Heel height:
+- Sole thickness:
+- Shape:
+- Coverage:
+- Material:
+- Color:
+- Fit:
+- State:
+
+[Accessories / Wear Position] Earrings:
+- Type:
+- Length:
+- Material:
+- Position:
+- Movement:
+
+Necklace:
+- Type:
+- Lengths:
+- Position:
+- Material:
+
+Rings:
+- Count:
+- Placement:
+- Material:
+
+Bracelet:
+- Wrist:
+- Fit:
+- Material:
+
+[Props]
+- (specify if any, based on character concept)
+
+**[TECHNICAL SPECIFICATIONS]**
+
+[Lighting]
+- Key:
+- Fill:
+- Rim:
+- Shadow:
+${isPhotoRealistic ? "- Camera: (specify lens focal length, f-stop, ISO, shutter speed for realistic photography look)\n- Resolution: 8K minimum, ultra-sharp detail, no AI-generation artifacts" : ""}
+
+[Rendering Style]
+- (specify based on art style: ${artStyleEn}${isPhotoRealistic ? " — STRICTLY photo-realistic, zero tolerance for any illustration, cartoon, or anime rendering" : ""})
+
+[Color Control]
+- (specify color palette and grading${isPhotoRealistic ? " — natural color grading consistent with professional studio photography; no painterly, watercolor, or heavy filter effects" : ""})
+
+[Consistency Rules]
+- (specify rules to maintain visual consistency across all sections)
+
+[Final Constraint]
+- (specify any final rendering constraints)
+${isPhotoRealistic ? `
+[⚠️ ANTI-CARTOON ABSOLUTE CONSTRAINT]
+- EXPLICITLY FORBIDDEN: anime-style eyes, manga features, cel-shading, flat color fills, illustration outlines, toon rendering, stylized proportions, cartoon skin smoothness.
+- The character MUST be INDISTINGUISHABLE from a real photograph of a real human being.
+- Minimum output quality: 8K, ultra-sharp, visible real-world detail in every element.` : ""}
+
+**IMPORTANT: Output ONLY the completed character sheet. No explanations, no commentary, no markdown code blocks. Just the character sheet text.**`;
+
+    let aiResponse = "";
+    try {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+      const response = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.75,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 8192,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Gemini API 오류: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      if (window.logApiUsage) window.logApiUsage("gemini");
+      aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    } catch (geminiError) {
+      console.warn("⚠️ Gemini 캐릭터 시트 생성 실패, ChatGPT로 전환하여 재시도합니다:", geminiError.message);
+      const openaiKey = window.getOpenAIApiKey ? window.getOpenAIApiKey() : "";
+      if (!openaiKey) {
+        throw new Error(`Gemini 캐릭터 시트 생성 실패 (${geminiError.message}) 후 ChatGPT 폴백을 시도했으나 OpenAI API 키가 없습니다.`);
+      }
+
+      const chatGPTResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: "You are an AI character concept artist." },
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.75,
+        }),
+      });
+
+      if (!chatGPTResponse.ok) {
+        const errorData = await chatGPTResponse.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `ChatGPT API 오류: ${chatGPTResponse.status}`);
+      }
+
+      const chatGPTData = await chatGPTResponse.json();
+      if (window.logApiUsage) window.logApiUsage("openai");
+      aiResponse = chatGPTData.choices?.[0]?.message?.content || "";
+    }
+
+    if (!aiResponse.trim()) {
+      throw new Error("AI 응답이 비어있습니다.");
+    }
+
+    // 마크다운 코드 블록 제거 (있는 경우)
+    let cleanSheet = aiResponse.trim();
+    if (cleanSheet.startsWith("```")) {
+      cleanSheet = cleanSheet.replace(/^```[\w]*\n?/, "").replace(/\n?```$/, "");
+    }
+
+    // textarea에 표시
+    if (sheetEl) sheetEl.value = cleanSheet;
+    if (sheetArea) sheetArea.style.display = "block";
+    if (toggleBtn) toggleBtn.style.display = "inline-flex";
+    if (copyBtn) copyBtn.style.display = "inline-flex";
+
+    // 설정 저장
+    if (typeof window.saveMVSettings === "function") {
+      window.saveMVSettings();
+    }
+
+    console.log(`✅ 캐릭터 시트 생성 완료 (인물 ${charIndex})`);
+
+    if (typeof window.showCopyIndicator === "function") {
+      window.showCopyIndicator(`✅ 인물 ${charIndex} 캐릭터 시트가 생성되었습니다!`);
+    }
+  } catch (error) {
+    console.error(`❌ 캐릭터 시트 생성 실패 (인물 ${charIndex}):`, error);
+    alert(`캐릭터 시트 생성 중 오류가 발생했습니다:\n\n${error.message}`);
+  } finally {
+    if (btn) btn.disabled = false;
+    if (loadingEl) loadingEl.style.display = "none";
+  }
+};
+
 // --- Extracted character sheet helpers ---
 window.toggleCharacterSheet = function (charIndex) {
   const sheetArea = document.getElementById(`mvCharacter${charIndex}_sheetArea`);

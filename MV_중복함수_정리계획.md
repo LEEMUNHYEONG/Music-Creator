@@ -107,6 +107,9 @@ MV 화면/프롬프트/씬 관련 함수는 최종적으로 `js/step6.js`가 소
 16. `updateCharacterInputs`
     - 완료: MV 캐릭터 입력 UI 생성 및 기존 입력/시트 복원 함수를 `js/step6.js` 소유로 이관했습니다.
 
+17. `generateCharacterSheet`
+    - 완료: Gemini/OpenAI 기반 MV 캐릭터 시트 생성 함수를 `js/step6.js` 소유로 이관했습니다.
+
 ## 5. 추가된 보호 테스트
 
 중복 상태를 실수로 바꾸지 않도록 다음 테스트를 추가했습니다.
