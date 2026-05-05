@@ -1274,6 +1274,34 @@ npm run test:mv
 MV smoke test suite: PASS (43 checks)
 ```
 
+## 2026-05-06: MV 장소 헬퍼 보호 테스트 추가
+
+### 작업 목적
+
+`pickBestLocationForScene`, `getMVLocationEnString`, `getMVLocationKoString`을 향후 `js/step6.js`로 이관하기 전에 장소 매핑과 씬 가사 기반 장소 선택 동작을 테스트로 고정했습니다.
+
+### 변경 내용
+
+1. `tests/mv_location_helpers_smoke.js`
+   - 선택된 장소 태그의 영어 문자열 변환 확인
+   - 선택된 장소 태그의 한글 문자열 변환 확인
+   - 씬 가사 키워드 기반 최적 장소 선택 확인
+   - 키워드가 없을 때 씬 인덱스 기반 순환 선택 확인
+   - 선택 장소가 없거나 1개만 있는 경우의 경계값 확인
+
+2. `tests/run_mv_smoke_tests.js`
+   - 장소 헬퍼 보호 테스트를 통합 실행 목록에 추가
+
+3. `MV_테스트_실행_가이드.md`
+   - 현재 보호 범위에 MV 장소 헬퍼 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (45 checks)
+```
+
 ## 2026-05-06: MV 캐릭터 시트 생성 함수 step6.js 이관
 
 ### 작업 목적
