@@ -1330,6 +1330,36 @@ npm run test:mv
 MV smoke test suite: PASS (47 checks)
 ```
 
+## 2026-05-06: MV 씬 개요 저장/확정 함수 step6.js 이관
+
+### 작업 목적
+
+MV 씬 개요 저장과 결과 화면 렌더링을 담당하는 `saveSceneOverview`, `confirmSceneOverviewAndGenerate`를 `js/step6.js`로 옮겨 씬 생성 이후 흐름의 소유권을 정리했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `saveSceneOverview` 추가
+   - `confirmSceneOverviewAndGenerate` 추가
+
+2. `app.js`
+   - 위 2개 함수의 중복 전역 정의 제거
+
+3. `tests/mv_confirm_scene_overview_smoke.js`
+   - 테스트 기준 파일을 `app.js`에서 `js/step6.js`로 변경
+   - 씬 개요 설명/영어/한글 프롬프트 저장 검증 추가
+   - 저장된 씬 개요가 결과 화면 textarea에 반영되는지 확인
+
+4. `MV_중복함수_정리계획.md`
+   - 씬 개요 저장/확정 함수 이관 완료 기록 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS
+```
+
 ## 2026-05-06: MV 프롬프트 보조 함수 step6.js 이관
 
 ### 작업 목적

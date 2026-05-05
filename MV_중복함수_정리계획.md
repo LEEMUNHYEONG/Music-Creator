@@ -116,6 +116,9 @@ MV 화면/프롬프트/씬 관련 함수는 최종적으로 `js/step6.js`가 소
 19. `updateMVPromptTranslation`, `saveMVPrompt`, `copyMVPromptSection`
     - 완료: MV 프롬프트 간단 번역, 로컬 저장, 섹션 복사 함수를 `js/step6.js` 소유로 이관했습니다.
 
+20. `saveSceneOverview`, `confirmSceneOverviewAndGenerate`
+    - 완료: MV 씬 개요 저장과 결과 화면 렌더링/확정 함수를 `js/step6.js` 소유로 이관했습니다.
+
 ## 5. 추가된 보호 테스트
 
 중복 상태를 실수로 바꾸지 않도록 다음 테스트를 추가했습니다.

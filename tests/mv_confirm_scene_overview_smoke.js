@@ -2,6 +2,7 @@ const assert = require("assert");
 
 const elements = new Map();
 let translationCalls = [];
+const alerts = [];
 const originalConsole = {
   error: console.error,
   log: console.log,
@@ -70,7 +71,13 @@ global.window = global;
 global.document = {
   readyState: "loading",
   addEventListener() {},
-  querySelectorAll() {
+  querySelectorAll(selector) {
+    if (selector === ".scene-description") {
+      return [
+        { value: "수정된 첫 번째 장면" },
+        { value: "수정된 두 번째 장면" },
+      ];
+    }
     return [];
   },
   querySelector() {
@@ -81,7 +88,7 @@ global.document = {
   },
 };
 global.alert = function alertStub(message) {
-  throw new Error(`Unexpected alert: ${message}`);
+  alerts.push(message);
 };
 global.requestAnimationFrame = function requestAnimationFrameStub(callback) {
   callback();
@@ -118,9 +125,6 @@ elements.get("mvCharacterCount").value = "1";
 addElement("mvCharacter1_gender", "female");
 addElement("mvCharacter1_appearance", "black coat");
 
-window.getMVLocationEnString = function getMVLocationEnStringStub() {
-  return "neon alley";
-};
 global.translateEnglishToKoreanForScene = async function translateEnToKo(
   field,
   text,
@@ -129,7 +133,7 @@ global.translateEnglishToKoreanForScene = async function translateEnToKo(
   return `자동 번역: ${text}`;
 };
 
-require("../app.js");
+require("../js/step6.js");
 
 window.getMVLocationValues = function getMVLocationValuesStub() {
   return ["city"];
@@ -153,7 +157,22 @@ window.currentScenes = [
 ];
 window.currentProject = { data: { marketing: {} } };
 
+addElement("scene_overview_0_en", "overview scene one en");
+addElement("scene_overview_0_ko", "개요 씬 1 한글");
+addElement("scene_overview_1_en", "overview scene two en");
+addElement("scene_overview_1_ko", "개요 씬 2 한글");
+
 (async () => {
+  window.saveSceneOverview();
+
+  assert.strictEqual(window.currentScenes[0].scene, "수정된 첫 번째 장면");
+  assert.strictEqual(window.currentScenes[1].scene, "수정된 두 번째 장면");
+  assert.strictEqual(window.currentScenes[0].prompt, "overview scene one en");
+  assert.strictEqual(window.currentScenes[0].promptKo, "개요 씬 1 한글");
+  assert.strictEqual(window.currentScenes[1].prompt, "overview scene two en");
+  assert.strictEqual(window.currentScenes[1].promptKo, "개요 씬 2 한글");
+  assert.ok(alerts.some((message) => message.includes("씬 개요가 저장")));
+
   await window.confirmSceneOverviewAndGenerate(true);
   await new Promise((resolve) => setImmediate(resolve));
 
@@ -170,16 +189,14 @@ window.currentProject = { data: { marketing: {} } };
 
   assert.ok(container.innerHTML.includes("regenerateScenePrompt(0)"));
   assert.ok(container.innerHTML.includes("saveScenePrompt(1)"));
-  assert.strictEqual(elements.get("scene_0_en").value, "existing scene one prompt");
-  assert.strictEqual(elements.get("scene_0_ko").value, "기존 한글 프롬프트");
-  assert.strictEqual(elements.get("scene_1_en").value, "existing scene two prompt");
+  assert.strictEqual(elements.get("scene_0_en").value, "overview scene one en");
+  assert.strictEqual(elements.get("scene_0_ko").value, "개요 씬 1 한글");
+  assert.strictEqual(elements.get("scene_1_en").value, "overview scene two en");
   assert.strictEqual(
     elements.get("scene_1_ko").value,
-    "자동 번역: existing scene two prompt",
+    "개요 씬 2 한글",
   );
-  assert.deepStrictEqual(translationCalls, [
-    { field: "prompt", text: "existing scene two prompt" },
-  ]);
+  assert.deepStrictEqual(translationCalls, []);
   assert.strictEqual(
     window.currentProject.data.marketing.mvScenes,
     window.currentScenes,
