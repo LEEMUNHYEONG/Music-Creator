@@ -1360,6 +1360,34 @@ npm run test:mv
 MV smoke test suite: PASS (49 checks)
 ```
 
+## 2026-05-06: MV SRT 내보내기 보호 테스트 추가
+
+### 작업 목적
+
+`copySRTContent`, `downloadSRT`를 향후 `js/step6.js`로 이관하기 전에 SRT 복사/다운로드 동작을 테스트로 고정했습니다.
+
+### 변경 내용
+
+1. `tests/mv_srt_export_smoke.js`
+   - SRT 클립보드 복사 성공 흐름 확인
+   - 클립보드 실패 시 textarea 폴백 복사 확인
+   - SRT 다운로드 파일명 정리 확인
+   - 윈도우용 CRLF 줄바꿈 변환 확인
+   - 빈 SRT 콘텐츠 다운로드 차단 확인
+
+2. `tests/run_mv_smoke_tests.js`
+   - SRT 내보내기 보호 테스트를 통합 실행 목록에 추가
+
+3. `MV_테스트_실행_가이드.md`
+   - 현재 보호 범위에 SRT 자막 복사/다운로드 항목 추가
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (51 checks)
+```
+
 ## 2026-05-06: MV 프롬프트 다운로드 함수 step6.js 이관
 
 ### 작업 목적
