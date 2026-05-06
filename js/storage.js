@@ -437,6 +437,163 @@ window.showMarketingMVDiagnostics = function () {
   return diagnostics;
 };
 
+window.sanitizeProjectFilename = function (title) {
+  return String(title || "music-creator-project")
+    .replace(/[^a-zA-Z0-9가-힣\s_-]/g, "")
+    .trim()
+    .replace(/\s+/g, "_")
+    .slice(0, 80) || "music-creator-project";
+};
+
+window.normalizeSingleProjectImportPayload = function (input) {
+  const payload = typeof input === "string" ? JSON.parse(input) : input;
+  const project = payload?.project || payload;
+  if (!project || typeof project !== "object") {
+    throw new Error("프로젝트 JSON 형식이 올바르지 않습니다.");
+  }
+
+  const normalized = cloneData(project, {});
+  if (!normalized.id) {
+    normalized.id = `imported_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  }
+  if (!normalized.title) {
+    normalized.title = normalized.data?.songTitle || "가져온 프로젝트";
+  }
+  if (!normalized.data) {
+    normalized.data = cloneData(normalized, {});
+  }
+  if (!normalized.data.songTitle) {
+    normalized.data.songTitle = normalized.title;
+  }
+  if (normalized.data.marketing && typeof window.syncMarketingMVModel === "function") {
+    window.syncMarketingMVModel(normalized.data.marketing);
+  }
+  normalized.importedAt = new Date().toISOString();
+  return normalized;
+};
+
+window.buildSingleProjectJSONExport = function (projectArg) {
+  const project = cloneData(projectArg || window.currentProject, null);
+  if (!project) {
+    throw new Error("내보낼 현재 프로젝트가 없습니다.");
+  }
+  if (project.data?.marketing && typeof window.syncMarketingMVModel === "function") {
+    window.syncMarketingMVModel(project.data.marketing);
+  }
+
+  return JSON.stringify(
+    {
+      type: "music-creator-single-project",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      project,
+    },
+    null,
+    2,
+  );
+};
+
+window.downloadSingleProjectJSON = function (projectArg) {
+  const project = projectArg || window.currentProject;
+  const json = window.buildSingleProjectJSONExport(project);
+  const title = project?.title || project?.data?.songTitle || "music-creator-project";
+  const date = new Date().toISOString().slice(0, 10);
+  const blob = new Blob([json], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${window.sanitizeProjectFilename(title)}-${date}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  return a.download;
+};
+
+window.exportCurrentProjectJSON = function () {
+  if (typeof window.saveCurrentProject === "function") {
+    const saved = window.saveCurrentProject();
+    if (saved === false) {
+      alert("프로젝트 저장 후 내보내기를 다시 시도해주세요.");
+      return null;
+    }
+  }
+  if (!window.currentProject) {
+    alert("내보낼 현재 프로젝트가 없습니다.");
+    return null;
+  }
+
+  const filename = window.downloadSingleProjectJSON(window.currentProject);
+  if (typeof window.showCopyIndicator === "function") {
+    window.showCopyIndicator(`✅ 단일 프로젝트 JSON이 저장되었습니다: ${filename}`);
+  }
+  return filename;
+};
+
+window.upsertSingleProjectToLocalStores = function (project) {
+  const keys = ["musicCreatorProjects", "savedProjects"];
+  keys.forEach((key) => {
+    let list = [];
+    try {
+      const stored = localStorage.getItem(key);
+      const parsed = stored ? JSON.parse(stored) : [];
+      list = Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.warn(`${key} 읽기 실패:`, error);
+    }
+
+    const index = list.findIndex((item) => item?.id === project.id);
+    if (index >= 0) {
+      list[index] = project;
+    } else {
+      list.push(project);
+    }
+    localStorage.setItem(key, JSON.stringify(list));
+  });
+  return project;
+};
+
+window.importSingleProjectJSONFromText = function (jsonText, options = {}) {
+  const project = window.normalizeSingleProjectImportPayload(jsonText);
+  window.upsertSingleProjectToLocalStores(project);
+  window.currentProject = project;
+  window.currentProjectId = project.id;
+  if (typeof window.loadProjectList === "function") {
+    window.loadProjectList(true);
+  }
+  if (options.load !== false && typeof window.loadProject === "function") {
+    window.loadProject(project.id);
+  }
+  if (typeof window.showCopyIndicator === "function") {
+    window.showCopyIndicator(`✅ 단일 프로젝트를 가져왔습니다: ${project.title}`);
+  }
+  return project;
+};
+
+window.importSingleProjectJSON = function () {
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = ".json,application/json";
+  fileInput.style.display = "none";
+  fileInput.onchange = function (event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function (loadEvent) {
+      try {
+        window.importSingleProjectJSONFromText(loadEvent.target.result);
+      } catch (error) {
+        console.error("단일 프로젝트 가져오기 오류:", error);
+        alert(`단일 프로젝트 가져오기 중 오류가 발생했습니다:\n\n${error.message}`);
+      }
+    };
+    reader.readAsText(file);
+  };
+  document.body.appendChild(fileInput);
+  fileInput.click();
+  document.body.removeChild(fileInput);
+};
+
 /**
  * 프로젝트 정보를 비교하여 더 최신이거나 데이터가 많은 프로젝트를 반환하기 위한 유틸리티
  */

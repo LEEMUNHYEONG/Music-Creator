@@ -1,5 +1,35 @@
 # MV 개선작업 이력
 
+## 2026-05-06: MV 2차 고도화 - 단일 프로젝트 JSON 내보내기/가져오기
+
+### 작업 목적
+
+장기 MV 제작 프로젝트를 파일 하나로 백업하고 다시 가져올 수 있도록 단일 프로젝트 JSON 내보내기/가져오기 흐름을 정리했습니다.
+
+### 변경 내용
+
+1. `js/storage.js`
+   - `buildSingleProjectJSONExport()`로 현재 프로젝트를 `music-creator-single-project` JSON 포맷으로 생성
+   - `downloadSingleProjectJSON()`과 `exportCurrentProjectJSON()`으로 파일명 정리, 저장 전 저장 시도, 완료 안내 지원
+   - `normalizeSingleProjectImportPayload()`와 `importSingleProjectJSONFromText()`로 가져오기 데이터 정규화, `marketing.mv` 보존, 로컬 프로젝트 저장소 반영
+   - `importSingleProjectJSON()`로 파일 선택 기반 가져오기 흐름 지원
+
+2. 테스트
+   - `tests/mv_single_project_json_smoke.js`에서 JSON 내보내기, 파일명 정리, 저장 호출, 가져오기 저장소 반영 보호
+   - `tests/mv_chrome_runtime_check.js`에서 새 전역 함수 노출 보호
+   - `tests/run_mv_smoke_tests.js`에 단일 프로젝트 JSON 보호 테스트 추가
+
+3. 문서
+   - `MV_2차_고도화_로드맵.md`의 3단계 완료 상태와 다음 후보 갱신
+   - `MV_테스트_실행_가이드.md`와 `MV_운영_인계_요약.md`의 자동 테스트 기준을 `PASS (97 checks)`로 갱신
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (97 checks)
+```
+
 ## 2026-05-06: MV 2차 고도화 - 저장 전후 씬 비교
 
 ### 작업 목적

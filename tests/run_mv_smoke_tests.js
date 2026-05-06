@@ -44,6 +44,7 @@ const tests = [
   "tests/mv_model_storage_smoke.js",
   "tests/mv_scene_model_normalization_smoke.js",
   "tests/mv_marketing_diagnostics_smoke.js",
+  "tests/mv_single_project_json_smoke.js",
   "tests/mv_restore_step6_smoke.js",
   "tests/mv_step6_section_order_check.js",
   "tests/mv_copy_prompts_smoke.js",

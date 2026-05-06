@@ -12,7 +12,7 @@
 체크리스트 기준 커밋: 98acbe6 Update MV rehearsal checklist baseline
 마감 기록 커밋: 3116aff Record MV stabilization release closeout
 저장/복원 수정 커밋: dd33517 Fix MV scene prompt restore persistence
-자동 테스트: npm run test:mv -> PASS (95 checks)
+자동 테스트: npm run test:mv -> PASS (97 checks)
 ```
 
 ## 2. 완료된 핵심 범위
@@ -29,7 +29,8 @@
 10. 썸네일/배경/인물/통합/씬별 이미지 생성 프롬프트 번들 복사와 TXT 다운로드 지원
 11. TXT/SRT 내보내기 결과에 프로젝트 제목과 릴리스 기준 정보 포함
 12. 프로젝트 저장 전 `marketing.mv` 진단 요약 로그, 수동 진단 버튼, 저장 전/후 씬 비교 제공
-13. 자동 테스트, Chrome 런타임, 샘플 프로젝트 리허설 문서화 완료
+13. 단일 프로젝트 JSON 내보내기/가져오기와 `marketing.mv` 정규화 보존 지원
+14. 자동 테스트, Chrome 런타임, 샘플 프로젝트 리허설 문서화 완료
 
 ## 3. 바로 쓰는 실행 명령
 
