@@ -33,7 +33,7 @@ npm run rehearse:mv
 기대 결과:
 
 ```text
-MV smoke test suite: PASS (77 checks)
+MV smoke test suite: PASS (79 checks)
 ```
 
 수동 리허설 사전 실행 확인:
@@ -79,6 +79,16 @@ MV smoke test suite: PASS (77 checks)
 자동 테스트: PASS (77 checks)
 현재 차단: 샘플 프로젝트에 5단계 최종 가사가 없어 마케팅/MV 생성 중단
 남은 작업: 최종 가사 포함 프로젝트로 MV 프롬프트 탭과 씬 편집 리허설
+```
+
+5→6단계 대체 가사 처리 확인:
+
+```text
+2026-05-06 11:07 KST
+수정: 최종 가사가 없을 때 2단계 sunoLyrics를 6단계 입력으로 사용
+수정: 최종 스타일이 없을 때 2단계 stylePrompt를 6단계 입력으로 사용
+자동 테스트: PASS (79 checks)
+남은 작업: MV 프롬프트 탭 내 씬 편집/저장/복원 실제 화면 리허설
 ```
 
 현재 보호 범위에는 다음 항목이 포함됩니다.

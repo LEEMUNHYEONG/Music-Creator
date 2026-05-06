@@ -2924,12 +2924,19 @@ window.goToMarketingStep = function () {
       document.getElementById("finalLyrics")?.textContent ||
       window.currentFinalLyrics ||
       document.getElementById("finalizedLyrics")?.value ||
+      document.getElementById("sunoLyrics")?.value ||
+      window.currentProject?.data?.finalLyrics ||
+      window.currentProject?.data?.finalizedLyrics ||
+      window.currentProject?.data?.sunoLyrics ||
       "";
 
     const finalStyle =
       document.getElementById("finalStyle")?.textContent ||
       window.currentFinalStyle ||
       document.getElementById("finalizedStyle")?.value ||
+      document.getElementById("stylePrompt")?.value ||
+      window.currentProject?.data?.finalStyle ||
+      window.currentProject?.data?.stylePrompt ||
       "";
 
     // ═══════════════════════════════════════════════════════════════

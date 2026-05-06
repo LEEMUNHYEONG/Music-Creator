@@ -1,5 +1,30 @@
 # MV 개선작업 이력
 
+## 2026-05-06: MV 5→6단계 대체 가사 처리 추가
+
+### 작업 목적
+
+샘플 프로젝트처럼 5단계 최종 가사가 아직 확정되지 않은 상태에서도 2단계 수노 가사를 사용해 6단계 마케팅/MV 생성 흐름으로 넘어갈 수 있도록 보강했습니다.
+
+### 변경 내용
+
+1. `app.js`
+   - `goToMarketingStep()`의 가사 수집 우선순위에 `sunoLyrics`와 저장 프로젝트의 `sunoLyrics` 추가
+   - 최종 스타일이 없을 때 `stylePrompt`와 저장 프로젝트의 `stylePrompt`를 대체 입력으로 사용
+
+2. `tests/mv_marketing_step_fallback_smoke.js`, `tests/run_mv_smoke_tests.js`
+   - 5→6단계 이동 함수가 수노 가사/스타일 대체 입력을 유지하는지 확인
+
+3. 리허설 문서
+   - 최종 가사 부재로 인한 6단계 생성 중단 원인과 대체 입력 처리 기록
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (79 checks)
+```
+
 ## 2026-05-06: MV 6단계 진행바 클릭 차단 수정
 
 ### 작업 목적

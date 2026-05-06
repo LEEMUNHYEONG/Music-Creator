@@ -36,7 +36,7 @@ npm run rehearse:mv
 
 ```text
 npm run test:mv
-MV smoke test suite: PASS (77 checks)
+MV smoke test suite: PASS (79 checks)
 ```
 
 ## 2. 사전 실행 확인 기록
@@ -142,4 +142,17 @@ MV smoke test suite: PASS (77 checks)
 현재 차단: 샘플 프로젝트에 5단계 최종 가사가 없어 마케팅/MV 생성 중단
 앱 메시지: 마케팅 자료를 생성할 가사가 없습니다. 5단계에서 최종 가사를 확인한 후 다시 시도해주세요.
 남은 확인: 최종 가사 포함 프로젝트로 MV 프롬프트 탭과 씬 편집/저장/복원 리허설
+```
+
+## 9. 5→6단계 대체 가사 처리 기록
+
+2026-05-06 11:07 KST 기준으로 5단계 최종 가사가 없는 샘플 프로젝트도 2단계 수노 가사를 6단계 생성 입력으로 넘길 수 있도록 보강했습니다.
+
+```text
+발견 문제: goToMarketingStep()이 finalLyrics가 없으면 marketingData.lyrics를 빈 값으로 고정
+영향: generateMarketingMaterials()의 sunoLyrics 대체 입력이 가려져 6단계 생성이 중단됨
+조치: 5→6단계 이동 시 sunoLyrics와 저장 프로젝트의 sunoLyrics를 대체 가사로 사용
+조치: stylePrompt도 최종 스타일이 없을 때 대체 스타일로 사용
+자동 테스트: PASS (79 checks)
+남은 확인: MV 프롬프트 탭 내 씬 편집/저장/복원 실제 화면 리허설
 ```

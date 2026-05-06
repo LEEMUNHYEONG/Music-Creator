@@ -32,7 +32,7 @@ npm run rehearse:mv
 정상 통과 시 마지막 줄에 아래와 비슷한 결과가 표시됩니다.
 
 ```text
-MV smoke test suite: PASS (77 checks)
+MV smoke test suite: PASS (79 checks)
 ```
 
 이 결과는 MV 관련 핵심 보호 테스트가 모두 통과했다는 뜻입니다.
@@ -86,6 +86,7 @@ MV smoke test suite: PASS (77 checks)
 43. 실제 Chrome localStorage 대표 프로젝트 기준 MV 6단계 운영 전 리허설 런타임
 44. MV 6단계 사용자 시나리오 기준 편집 확정, 프로젝트 저장, 복원 통합 흐름
 45. 상단 진행바 1~6단계의 `data-step`과 `goToStep` 클릭 연결 유지
+46. 5→6단계 이동 시 최종 가사가 없으면 수노 가사/저장 프로젝트 가사를 대체 입력으로 사용하는 흐름
 
 ## 실패했을 때 확인 순서
 
