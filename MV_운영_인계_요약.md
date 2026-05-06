@@ -7,6 +7,7 @@
 ```text
 상태: 릴리스 가능
 브랜치: codex/mv-data-model-stabilize
+운영 기준 태그: mv-stabilization-2026-05-06
 최신 문서 기준 커밋: 6edb6f3 Refresh MV rehearsal documentation baseline
 체크리스트 기준 커밋: 98acbe6 Update MV rehearsal checklist baseline
 마감 기록 커밋: 3116aff Record MV stabilization release closeout
@@ -66,6 +67,7 @@ http://127.0.0.1:4180/index.html
 최근 안정 기준:
 
 ```text
+mv-stabilization-2026-05-06
 6edb6f3 Refresh MV rehearsal documentation baseline
 98acbe6 Update MV rehearsal checklist baseline
 3116aff Record MV stabilization release closeout
