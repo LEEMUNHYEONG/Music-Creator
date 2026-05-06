@@ -4,16 +4,17 @@
 
 ## 1. 판정 요약
 
-MV 6단계 개선 작업은 자동 검증 기준으로 릴리스 후보 상태입니다.
+MV 6단계 개선 작업은 자동 검증과 샘플 프로젝트 실제 화면 리허설 기준으로 릴리스 가능 상태입니다.
 
 현재 판정:
 
 ```text
 릴리스 후보: 가능
+릴리스 판정: 가능
 자동 검증: 통과
 리허설 서버: 실행 확인
-인앱 화면 확인: 앱 로드 확인, 저장 프로젝트 없음
-남은 작업: 실제 사용자 저장 프로젝트 1개 확보 후 화면 수동 리허설
+인앱 화면 확인: 앱 로드, 샘플 프로젝트 저장/재로드, MV 탭 씬 편집 저장/복원 확인
+남은 작업: 실제 사용자 저장 프로젝트 1개로 장시간 사용 전 추가 확인 권장
 ```
 
 ## 2. 자동 검증 결과
@@ -33,7 +34,7 @@ npm run rehearse:mv
 기대 결과:
 
 ```text
-MV smoke test suite: PASS (79 checks)
+MV smoke test suite: PASS (85 checks)
 ```
 
 수동 리허설 사전 실행 확인:
@@ -91,6 +92,20 @@ MV smoke test suite: PASS (79 checks)
 남은 작업: MV 프롬프트 탭 내 씬 편집/저장/복원 실제 화면 리허설
 ```
 
+API 키 없음 및 저장/복원 최종 리허설 확인:
+
+```text
+2026-05-06 11:35 KST
+브랜치: codex/mv-data-model-stabilize
+최신 커밋: dd33517 Fix MV scene prompt restore persistence
+확인: Gemini API 키가 없어도 MV 프롬프트 탭 작업공간 접근 가능
+확인: API 키 없이 로컬 기본 방식으로 27개 씬 카드 생성
+확인: 씬 5 영어 프롬프트 편집 후 개별 저장 토스트 표시
+확인: 새로고침 후 최신 샘플 프로젝트 재로드 시 편집한 씬 5 프롬프트 복원
+자동 테스트: PASS (85 checks)
+판정: 샘플 프로젝트 기준 핵심 릴리스 리허설 통과
+```
+
 현재 보호 범위에는 다음 항목이 포함됩니다.
 
 1. MV 함수 소유권 중복 재발 방지
@@ -115,9 +130,9 @@ MV smoke test suite: PASS (79 checks)
 
 ## 4. 릴리스 전 반드시 남은 수동 확인
 
-자동 테스트가 실제 사용자 프로젝트 파일 자체를 선택할 수는 없으므로, 아래 1회 수동 리허설은 남아 있습니다.
+핵심 릴리스 차단 항목은 해소됐습니다.
 
-현재 샘플 프로젝트 기준으로 6단계 화면 진입은 확인했지만, 5단계 최종 가사가 없어 아래 MV 생성 이후 항목은 아직 완료하지 않았습니다.
+다만 샘플 프로젝트가 아닌 실제 사용자 장기 작업 프로젝트는 데이터량, 작성 이력, 중간 저장 상태가 다를 수 있으므로 배포 또는 장시간 사용 전 아래 확인을 권장합니다.
 
 1. 앱 화면에서 사용자가 실제 저장 프로젝트 1개를 엽니다.
 2. `MV_운영전_리허설_체크리스트.md` 순서대로 6단계 MV 탭을 확인합니다.
@@ -131,7 +146,7 @@ MV smoke test suite: PASS (79 checks)
 
 1. 마지막 자동 검증 성공 커밋:
    ```text
-   e268699 Add MV preflight rehearsal runtime check
+   dd33517 Fix MV scene prompt restore persistence
    ```
 
 2. 운영 전 문서화 기준 커밋:
@@ -140,15 +155,26 @@ MV smoke test suite: PASS (79 checks)
    2039845 Document MV preflight rehearsal
    ```
 
-3. 원본 백업 폴더:
+3. API 키 없음 및 씬 fallback 기준 커밋:
+   ```text
+   51b354f Add MV no-key scene fallback
+   426c9a7 Keep MV workspace accessible without Gemini key
+   4225d0a Add MV marketing fallback inputs
+   ```
+
+4. 원본 백업 폴더:
    ```text
    /Users/leemunhyeong/Music Creator Backups/backup_2026-05-06_before_mv_improvements
    ```
 
 ## 6. 최종 결론
 
-현재 상태는 자동화된 릴리스 후보 기준을 충족합니다.
+현재 상태는 자동화된 릴리스 후보 기준과 샘플 프로젝트 실제 화면 리허설 기준을 충족합니다.
 
-실제 배포 또는 장시간 사용 전에 해야 할 마지막 일은 실제 사용자 프로젝트 1개로 수동 리허설을 완료하고, 문제가 없으면 이 문서의 판정을 `릴리스 가능`으로 확정하는 것입니다.
+최신 기준 커밋은 다음과 같습니다.
 
-수동 리허설 결과는 `MV_수동리허설_기록지.md`에 남깁니다.
+```text
+dd33517 Fix MV scene prompt restore persistence
+```
+
+실제 사용자 프로젝트 1개로 추가 리허설을 수행하면 그 결과는 `MV_수동리허설_기록지.md`에 이어서 남깁니다.

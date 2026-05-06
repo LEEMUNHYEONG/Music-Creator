@@ -1,5 +1,40 @@
 # MV 개선작업 이력
 
+## 2026-05-06: MV 안정화 마감 및 씬 저장/복원 확정
+
+### 작업 목적
+
+MV 프롬프트 탭에서 씬별 프롬프트를 편집하고 저장한 뒤, 새로고침과 프로젝트 재로드를 거쳐도 편집값이 유지되는지 최종 리허설로 확인했습니다.
+
+### 변경 내용
+
+1. `js/storage.js`
+   - `setMarketingMVScenes()`를 추가해 기존 `mvScenes`와 신규 `marketing.mv.scenes`를 같은 정규화 데이터로 동시에 갱신
+   - 프로젝트 저장 시 현재 씬 데이터가 stale `marketing.mv.scenes`에 덮이지 않도록 보강
+
+2. `js/step6.js`
+   - 씬 개요 확정, 전체 MV 프롬프트 저장, 개별 씬 저장 경로에서 `setMarketingMVScenes()`를 사용
+   - 씬 5 개별 저장 후 새로고침/재로드 복원 리허설 통과
+
+3. `tests/mv_model_storage_smoke.js`
+   - stale `marketing.mv.scenes`가 있어도 최신 `window.currentScenes`가 저장 모델에 반영되는지 보호
+
+4. 리허설/판정 문서
+   - `MV_릴리스후보_판정.md`, `MV_수동리허설_기록지.md`, `MV_중복함수_정리계획.md`에 최종 결과 반영
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (85 checks)
+```
+
+### 기준 커밋
+
+```text
+dd33517 Fix MV scene prompt restore persistence
+```
+
 ## 2026-05-06: MV 5→6단계 대체 가사 처리 추가
 
 ### 작업 목적
