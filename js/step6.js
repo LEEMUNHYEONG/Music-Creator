@@ -2635,6 +2635,104 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
       }
     }
 
+    if (scenes.length === 0 && cleanLyrics && cleanLyrics.trim()) {
+      console.log("📝 API 키 없이 로컬 기본 방식으로 씬 생성합니다.");
+      let currentTime = 0;
+
+      for (let i = 0; i < imageCount; i++) {
+        const startTime = currentTime;
+        const endTime = Math.min(currentTime + interval, totalSeconds);
+        const startMin = Math.floor(startTime / 60);
+        const startSec = Math.floor(startTime % 60);
+        const endMin = Math.floor(endTime / 60);
+        const endSec = Math.floor(endTime % 60);
+        const timeStr = `${startMin}:${String(startSec).padStart(2, "0")}-${endMin}:${String(endSec).padStart(2, "0")}`;
+        const sceneLyrics =
+          preAllocatedLyrics[i] ||
+          lyricsLines[Math.floor((i / imageCount) * lyricsLines.length)] ||
+          lyricsLines[0] ||
+          `씬 ${i + 1}`;
+        let chosenLoc =
+          (typeof window.pickBestLocationForScene === "function"
+            ? window.pickBestLocationForScene(sceneLyrics, i, imageCount)
+            : null) ||
+          (location ? (location.split(",")[0] || location).trim() : null);
+        const selectedLocationValues =
+          typeof window.getMVLocationValues === "function"
+            ? window.getMVLocationValues()
+            : [];
+        const visualTone =
+          typeof window.recommendMVSceneVisualTone === "function"
+            ? window.recommendMVSceneVisualTone(sceneLyrics, selectedLocationValues)
+            : null;
+        if (visualTone?.locationHint) {
+          chosenLoc = visualTone.locationHint;
+        }
+        const characterInfo = characters
+          .map((c) => `${c.gender || ""} ${c.appearance || ""}`.trim())
+          .filter(Boolean)
+          .join(", ");
+        const locationEn =
+          chosenLoc &&
+          typeof MV_LOCATION_MAP !== "undefined" &&
+          MV_LOCATION_MAP[chosenLoc]
+            ? MV_LOCATION_MAP[chosenLoc].en
+            : chosenLoc || location || "cinematic music video location";
+        const locationKo =
+          chosenLoc &&
+          typeof MV_LOCATION_MAP !== "undefined" &&
+          MV_LOCATION_MAP[chosenLoc]
+            ? MV_LOCATION_MAP[chosenLoc].ko
+            : chosenLoc || location || "뮤직비디오 배경";
+        const promptParts = [
+          sceneLyrics ? `scene depicting: "${sceneLyrics.trim()}"` : "",
+          characterInfo,
+          locationEn,
+          country ? `${country} setting` : "",
+          era ? `${era} era` : "",
+          `${visualTone?.lighting || lighting || "cinematic"} lighting`,
+          visualTone?.cameraWork || cameraWork || "slow cinematic camera movement",
+          `${visualTone?.mood || mood || "emotional"} mood`,
+          visualTone?.emotion ? `${visualTone.emotion} emotion` : "",
+          getArtisticKeywords(visualTone?.emotion || mood || ""),
+        ].filter(Boolean);
+        const promptEn = `/* Scene ${i + 1} */ ${promptParts.join(", ")}.`;
+        const promptKo = [
+          sceneLyrics,
+          characterInfo || "인물",
+          locationKo,
+          visualTone?.lighting || lighting || "시네마틱 조명",
+          visualTone?.cameraWork || cameraWork || "느린 카메라 움직임",
+          visualTone?.mood || mood || "감성적인 분위기",
+          "초고화질, 8k 해상도, 시네마틱 구도",
+        ]
+          .filter(Boolean)
+          .join(", ");
+
+        scenes.push({
+          time: timeStr,
+          scene: sceneLyrics,
+          prompt: promptEn,
+          promptKo,
+          runwayPrompt:
+            promptEn.replace(/\/\*\s*Scene\s+\d+\s*\//gi, "").trim() +
+            " cinematic motion, fluid movement, photorealistic, highly detailed, 8k.",
+          runwayPromptKo: `${promptKo}, 자연스러운 움직임과 카메라 모션`,
+          location: locationKo,
+          emotion: visualTone?.emotion || "",
+          mood: visualTone?.mood || mood || "",
+          lighting: visualTone?.lighting || lighting || "",
+          characterAction: "",
+          cameraWork: visualTone?.cameraWork || cameraWork || "",
+          _isLocalFallback: true,
+        });
+
+        currentTime = endTime;
+      }
+
+      console.log(`✅ 로컬 기본 방식 씬 생성 완료: ${scenes.length}개`);
+    }
+
     // 씬 중복 검증 및 개선
     scenes = ensureSceneDiversity(scenes);
 

@@ -3605,8 +3605,12 @@ function renderVocalPartAssignments() {
   let html = "";
   parts.forEach((part) => {
     const style = assignments[part];
+    const styleText =
+      typeof style === "string"
+        ? style
+        : style?.style || style?.label || style?.name || "";
     // 이모지 제거 (표시용)
-    const displayStyle = style
+    const displayStyle = styleText
       .replace(/[👩👨👫🎵👥🎤💨👩‍🎤👨‍🎤👩‍🦰👩‍💼👨‍🎨]/g, "")
       .trim();
 
