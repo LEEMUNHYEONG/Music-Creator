@@ -4578,25 +4578,147 @@ window.copyMVPromptSection = function (type) {
     });
 };
 
+window.formatMVSceneExportMetadata = function (scene) {
+  const lines = [];
+  if (scene.lyrics) lines.push(`가사 구간: ${scene.lyrics}`);
+  if (scene.location) lines.push(`장소: ${scene.location}`);
+  if (scene.emotion) lines.push(`감정: ${scene.emotion}`);
+  if (scene.mood) lines.push(`무드: ${scene.mood}`);
+  if (scene.lighting) lines.push(`조명: ${scene.lighting}`);
+  if (scene.cameraWork) lines.push(`카메라: ${scene.cameraWork}`);
+  if (typeof scene.durationSeconds === "number") {
+    lines.push(`길이: ${scene.durationSeconds}초`);
+  }
+  return lines.length ? `[씬 메타데이터]\n${lines.join("\n")}\n` : "";
+};
+
+window.getMVScenePromptForExport = function (scene, index, field = "prompt") {
+  const textareaId = field === "promptKo" ? `scene_${index}_ko` : `scene_${index}_en`;
+  const textareaValue = document.getElementById(textareaId)?.value || "";
+  return textareaValue || scene[field] || "";
+};
+
+window.getMVVideoToolConfig = function (tool) {
+  const toolKey = String(tool || "runway").toLowerCase();
+  const configs = {
+    runway: {
+      key: "runway",
+      label: "Runway",
+      filename: "mv-runway-prompts.txt",
+      suffix:
+        "cinematic motion, fluid movement, photorealistic, highly detailed, 8k, no text overlays, no watermark",
+    },
+    pika: {
+      key: "pika",
+      label: "Pika",
+      filename: "mv-pika-prompts.txt",
+      suffix:
+        "animate as a polished music video shot, smooth subject motion, consistent character identity, no subtitles, no watermark",
+    },
+    kling: {
+      key: "kling",
+      label: "Kling",
+      filename: "mv-kling-prompts.txt",
+      suffix:
+        "high-detail cinematic video, natural movement, stable subject identity, realistic camera motion, no text overlays, no watermark",
+    },
+  };
+  return configs[toolKey] || configs.runway;
+};
+
+window.buildMVVideoToolScenePrompt = function (scene, index, tool) {
+  const config = window.getMVVideoToolConfig(tool);
+  const fallbackPrompt = window.getMVScenePromptForExport(scene, index, "prompt");
+  const basePrompt =
+    config.key === "runway" && scene.runwayPrompt
+      ? scene.runwayPrompt
+      : fallbackPrompt || scene.runwayPrompt || scene.scene || "cinematic music video scene";
+  const promptParts = [basePrompt];
+
+  if (scene.cameraWork) promptParts.push(`Camera: ${scene.cameraWork}`);
+  if (scene.mood) promptParts.push(`Mood: ${scene.mood}`);
+  if (scene.lighting) promptParts.push(`Lighting: ${scene.lighting}`);
+  if (typeof scene.durationSeconds === "number") {
+    promptParts.push(`Duration: ${scene.durationSeconds} seconds`);
+  }
+  promptParts.push(config.suffix);
+
+  return promptParts.filter(Boolean).join(". ");
+};
+
+window.buildMVVideoToolPrompts = function (tool = "runway") {
+  const config = window.getMVVideoToolConfig(tool);
+  const scenes = Array.isArray(window.currentScenes) ? window.currentScenes : [];
+  if (scenes.length === 0) return "";
+
+  let text = `MV ${config.label} 영상 생성 프롬프트\n\n`;
+  text += "공통 규칙: 같은 인물과 의상 정체성을 유지하고, 자막/워터마크/로고/왜곡된 손가락을 피합니다.\n\n";
+
+  scenes.forEach((scene, index) => {
+    text += `=== 씬 ${index + 1} (${scene.time || "시간 미정"}) ===\n`;
+    text += `장면: ${scene.scene || ""}\n`;
+    text += window.formatMVSceneExportMetadata(scene);
+    text += `[${config.label} 프롬프트]\n`;
+    text += `${window.buildMVVideoToolScenePrompt(scene, index, config.key)}\n\n`;
+
+    const koPrompt = window.getMVScenePromptForExport(scene, index, "promptKo");
+    if (koPrompt) {
+      text += `[참고 한글]\n${koPrompt}\n\n`;
+    }
+  });
+
+  return text;
+};
+
+window.copyMVVideoToolPrompts = function (tool = "runway") {
+  const config = window.getMVVideoToolConfig(tool);
+  const text = window.buildMVVideoToolPrompts(config.key);
+  if (!text) {
+    alert("복사할 영상 생성 프롬프트가 없습니다.");
+    return;
+  }
+
+  navigator.clipboard
+    .writeText(text)
+    .then(() => {
+      if (typeof window.showCopyIndicator === "function") {
+        window.showCopyIndicator(
+          `✅ ${config.label} 영상 생성 프롬프트가 클립보드에 복사되었습니다!`,
+        );
+      } else {
+        alert(`${config.label} 영상 생성 프롬프트가 클립보드에 복사되었습니다.`);
+      }
+    })
+    .catch((err) => {
+      console.error("영상 생성 프롬프트 복사 오류:", err);
+      alert("영상 생성 프롬프트 복사 중 오류가 발생했습니다.");
+    });
+};
+
+window.downloadMVVideoToolPrompts = function (tool = "runway") {
+  const config = window.getMVVideoToolConfig(tool);
+  const text = window.buildMVVideoToolPrompts(config.key);
+  if (!text) {
+    alert("다운로드할 영상 생성 프롬프트가 없습니다.");
+    return;
+  }
+
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = config.filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
 window.downloadMVPrompts = function () {
   if (!window.currentScenes || window.currentScenes.length === 0) {
     alert("다운로드할 프롬프트가 없습니다.");
     return;
   }
-
-  const formatSceneExportMetadata = (scene) => {
-    const lines = [];
-    if (scene.lyrics) lines.push(`가사 구간: ${scene.lyrics}`);
-    if (scene.location) lines.push(`장소: ${scene.location}`);
-    if (scene.emotion) lines.push(`감정: ${scene.emotion}`);
-    if (scene.mood) lines.push(`무드: ${scene.mood}`);
-    if (scene.lighting) lines.push(`조명: ${scene.lighting}`);
-    if (scene.cameraWork) lines.push(`카메라: ${scene.cameraWork}`);
-    if (typeof scene.durationSeconds === "number") {
-      lines.push(`길이: ${scene.durationSeconds}초`);
-    }
-    return lines.length ? `[씬 메타데이터]\n${lines.join("\n")}\n` : "";
-  };
 
   let text = "MV 프롬프트\n\n";
 
@@ -4638,7 +4760,7 @@ window.downloadMVPrompts = function () {
 
     text += `씬 ${index + 1} (${scene.time})\n`;
     text += `장면: ${scene.scene || ""}\n`;
-    text += formatSceneExportMetadata(scene);
+    text += window.formatMVSceneExportMetadata(scene);
     if (enEl && enEl.value) {
       text += `[영어 프롬프트]\n${enEl.value}\n\n`;
     } else if (scene.prompt) {
@@ -5730,6 +5852,25 @@ window.confirmSceneOverviewAndGenerate = async function (isSilent = false) {
           ? window.renderMVSceneTimelinePreview(window.currentScenes)
           : "";
 
+      html += `
+                    <div class="mv-video-tool-export-actions" style="margin: 0 0 18px; padding: 14px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center;">
+                            <div>
+                                <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">영상 생성 도구별 내보내기</div>
+                                <div style="font-size: 0.84rem; color: var(--text-secondary);">Runway, Pika, Kling용 씬별 프롬프트를 복사하거나 TXT로 저장합니다.</div>
+                            </div>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                                <button class="btn btn-small btn-primary" onclick="copyMVVideoToolPrompts('runway')" style="padding: 6px 10px; font-size: 0.78rem;">Runway 복사</button>
+                                <button class="btn btn-small btn-secondary" onclick="downloadMVVideoToolPrompts('runway')" style="padding: 6px 10px; font-size: 0.78rem;">TXT</button>
+                                <button class="btn btn-small btn-primary" onclick="copyMVVideoToolPrompts('pika')" style="padding: 6px 10px; font-size: 0.78rem;">Pika 복사</button>
+                                <button class="btn btn-small btn-secondary" onclick="downloadMVVideoToolPrompts('pika')" style="padding: 6px 10px; font-size: 0.78rem;">TXT</button>
+                                <button class="btn btn-small btn-primary" onclick="copyMVVideoToolPrompts('kling')" style="padding: 6px 10px; font-size: 0.78rem;">Kling 복사</button>
+                                <button class="btn btn-small btn-secondary" onclick="downloadMVVideoToolPrompts('kling')" style="padding: 6px 10px; font-size: 0.78rem;">TXT</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
       window.currentScenes.forEach((scene, index) => {
         const sceneId = `scene_${index}`;
         html += `
@@ -6416,20 +6557,6 @@ window.copyAllMVPrompts = function (event) {
     return;
   }
 
-  const formatSceneExportMetadata = (scene) => {
-    const lines = [];
-    if (scene.lyrics) lines.push(`가사 구간: ${scene.lyrics}`);
-    if (scene.location) lines.push(`장소: ${scene.location}`);
-    if (scene.emotion) lines.push(`감정: ${scene.emotion}`);
-    if (scene.mood) lines.push(`무드: ${scene.mood}`);
-    if (scene.lighting) lines.push(`조명: ${scene.lighting}`);
-    if (scene.cameraWork) lines.push(`카메라: ${scene.cameraWork}`);
-    if (typeof scene.durationSeconds === "number") {
-      lines.push(`길이: ${scene.durationSeconds}초`);
-    }
-    return lines.length ? `[씬 메타데이터]\n${lines.join("\n")}\n` : "";
-  };
-
   let text = "";
 
   // 통합/배경/인물 프롬프트 추가
@@ -6516,7 +6643,7 @@ window.copyAllMVPrompts = function (event) {
 
     text += `씬 ${index + 1} (${scene.time})\n`;
     text += `장면: ${scene.scene || ""}\n`;
-    text += formatSceneExportMetadata(scene);
+    text += window.formatMVSceneExportMetadata(scene);
     if (enEl && enEl.value) {
       text += `[영어 프롬프트]\n${enEl.value}\n\n`;
     } else if (scene.prompt) {

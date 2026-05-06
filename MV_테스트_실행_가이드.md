@@ -32,7 +32,7 @@ npm run rehearse:mv
 정상 통과 시 마지막 줄에 아래와 비슷한 결과가 표시됩니다.
 
 ```text
-MV smoke test suite: PASS (87 checks)
+MV smoke test suite: PASS (89 checks)
 ```
 
 이 결과는 MV 관련 핵심 보호 테스트가 모두 통과했다는 뜻입니다.
@@ -92,6 +92,7 @@ MV smoke test suite: PASS (87 checks)
 49. 프로젝트 복원 중 객체형 보컬 파트 지정값 렌더링 오류 방지
 50. 씬 프롬프트 개별 저장값이 새로고침/프로젝트 재로드 후에도 `marketing.mv.scenes`와 `mvScenes` 양쪽에서 유지되는 흐름
 51. MV 결과 씬 카드의 미저장 표시와 `Ctrl+S`/`Cmd+S` 현재 씬 저장 단축키
+52. Runway/Pika/Kling 영상 생성 도구별 프롬프트 템플릿 복사와 TXT 다운로드
 
 ## 실패했을 때 확인 순서
 

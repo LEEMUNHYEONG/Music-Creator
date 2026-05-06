@@ -46,6 +46,7 @@ const tests = [
   "tests/mv_restore_step6_smoke.js",
   "tests/mv_step6_section_order_check.js",
   "tests/mv_copy_prompts_smoke.js",
+  "tests/mv_video_tool_export_templates_smoke.js",
   "tests/mv_save_scene_prompt_smoke.js",
   "tests/mv_scene_dirty_shortcut_smoke.js",
   "tests/mv_tag_buttons_smoke.js",

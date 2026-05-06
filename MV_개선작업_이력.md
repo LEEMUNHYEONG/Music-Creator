@@ -1,5 +1,36 @@
 # MV 개선작업 이력
 
+## 2026-05-06: MV 2차 고도화 - 영상 생성 도구별 내보내기 템플릿
+
+### 작업 목적
+
+MV 씬 프롬프트를 Runway, Pika, Kling 같은 영상 생성 도구로 옮길 때 매번 수동으로 문구를 다듬지 않아도 되도록 도구별 템플릿 복사와 TXT 다운로드 기능을 추가했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - 씬 메타데이터 포맷을 공용 `formatMVSceneExportMetadata()`로 정리
+   - `buildMVVideoToolPrompts()`로 Runway/Pika/Kling별 영상 생성 프롬프트 본문 생성
+   - `copyMVVideoToolPrompts()`와 `downloadMVVideoToolPrompts()` 추가
+   - MV 결과 프롬프트 화면 상단에 Runway/Pika/Kling 복사 및 TXT 저장 버튼 추가
+
+2. `tests/mv_video_tool_export_templates_smoke.js`
+   - 도구별 템플릿, 씬 메타데이터, textarea 편집값 우선 반영, 복사/다운로드 파일명을 보호
+
+3. `tests/mv_download_prompts_smoke.js`, `tests/mv_chrome_runtime_check.js`, `tests/run_mv_smoke_tests.js`
+   - 공용 내보내기 헬퍼와 새 전역 함수 보호 범위 추가
+
+4. 문서
+   - `MV_2차_고도화_로드맵.md`의 2단계 진행 상태 갱신
+   - `MV_테스트_실행_가이드.md`와 `MV_운영_인계_요약.md`의 자동 테스트 기준을 `PASS (89 checks)`로 갱신
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (89 checks)
+```
+
 ## 2026-05-06: MV 2차 고도화 - 씬 미저장 표시와 저장 단축키
 
 ### 작업 목적

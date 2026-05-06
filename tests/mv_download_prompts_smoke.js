@@ -62,9 +62,9 @@ global.URL = {
 };
 
 const step6Source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
-const start = step6Source.indexOf("window.downloadMVPrompts = function () {");
+const start = step6Source.indexOf("window.formatMVSceneExportMetadata = function");
 const end = step6Source.indexOf("// --- Extracted generateSRTPreview ---", start);
-assert.ok(start !== -1, "downloadMVPrompts should exist in js/step6.js");
+assert.ok(start !== -1, "MV prompt export helpers should exist in js/step6.js");
 assert.ok(end !== -1, "downloadMVPrompts block should end before SRT helpers");
 vm.runInThisContext(step6Source.slice(start, end), {
   filename: "js/step6.js.download-mv-prompts-slice",
