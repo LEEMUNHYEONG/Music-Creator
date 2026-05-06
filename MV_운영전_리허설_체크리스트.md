@@ -17,7 +17,7 @@
    ```text
    npm run test:mv
    ```
-   기대값: `MV smoke test suite: PASS (75 checks)`
+   기대값: `MV smoke test suite: PASS (85 checks)`
 
 3. 자동 테스트 통과 후 리허설 서버까지 한 번에 실행하려면 아래 명령을 사용합니다.
    ```text
@@ -83,7 +83,7 @@
 
 리허설은 아래 조건을 모두 만족하면 통과로 봅니다.
 
-1. `npm run test:mv`가 `PASS (75 checks)`로 끝납니다.
+1. `npm run test:mv`가 `PASS (85 checks)`로 끝납니다.
 2. 실제 프로젝트에서 MV 6단계 화면이 열립니다.
 3. 씬 편집값을 저장/확정해도 데이터가 사라지지 않습니다.
 4. 프로젝트 재진입 후 `marketing.mv` 기준 데이터가 복원됩니다.
@@ -95,8 +95,8 @@
 1. 자동 테스트 실패 시 마지막 실패 테스트 파일명을 먼저 확인합니다.
 2. 실제 화면에서만 실패하면 이 문서의 리허설 단계 번호를 기록합니다.
 3. 최근 성공 커밋으로 되돌릴 수 있는 기준점:
-   - `6810126 Add MV user flow integration check`
-   - `30e8054 Add MV step6 visual sanity check`
+   - `3116aff Record MV stabilization release closeout`
+   - `dd33517 Fix MV scene prompt restore persistence`
 4. 필요 시 전체 백업 폴더에서 원본을 비교합니다.
 
 ## 5. 이번 리허설 자동 검증 결과
@@ -105,7 +105,9 @@
 
 ```text
 npm run test:mv
-MV smoke test suite: PASS (75 checks)
+MV smoke test suite: PASS (85 checks)
 ```
 
-운영 전 남은 확인은 실제 사용자가 선택한 프로젝트 1개로 위 수동 리허설을 한 번 수행하는 것입니다.
+2026-05-06 11:35 KST 기준으로 샘플 프로젝트 `Codex MV 리허설 샘플`에서는 MV 탭 진입, API 키 없음 로컬 씬 생성, 씬 5 편집 저장, 새로고침 후 프로젝트 재로드 복원까지 통과했습니다.
+
+운영 전 남은 확인은 실제 사용자가 선택한 장기 작업 프로젝트 1개로 위 수동 리허설을 한 번 수행하는 것입니다.
