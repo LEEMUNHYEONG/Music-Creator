@@ -75,6 +75,9 @@ global.alert = function alertStub(message) {
 window.showCopyIndicator = function showCopyIndicator(message) {
   toastMessage = message;
 };
+window.currentProject = {
+  title: "Image Bundle Project",
+};
 window.currentScenes = [
   {
     time: "00:00-00:08",
@@ -111,6 +114,8 @@ require("../js/step6.js");
 const bundleText = window.buildMVImagePromptBundle();
 
 assert.ok(bundleText.includes("MV 이미지 생성 프롬프트 번들"));
+assert.ok(bundleText.includes("프로젝트: Image Bundle Project"));
+assert.ok(bundleText.includes("릴리스 기준: mv-stabilization-2026-05-06"));
 assert.ok(bundleText.includes("=== 대표 썸네일 이미지 프롬프트 ==="));
 assert.ok(bundleText.includes("hero thumbnail image prompt"));
 assert.ok(bundleText.includes("=== 배경 이미지 프롬프트 ==="));

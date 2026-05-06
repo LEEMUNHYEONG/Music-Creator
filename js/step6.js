@@ -4592,6 +4592,39 @@ window.formatMVSceneExportMetadata = function (scene) {
   return lines.length ? `[씬 메타데이터]\n${lines.join("\n")}\n` : "";
 };
 
+window.MV_RELEASE_BASELINE = "mv-stabilization-2026-05-06";
+
+window.getMVProjectTitleForExport = function () {
+  const projectData = window.currentProject?.data || window.currentProject || {};
+  const titleFromProject =
+    projectData.title || window.currentProject?.title || projectData.songTitle || "";
+  if (titleFromProject) return titleFromProject;
+
+  const titleEl =
+    document.getElementById("finalTitleText") ||
+    document.getElementById("songTitle") ||
+    document.getElementById("sunoTitle");
+  return titleEl?.textContent || titleEl?.value || "제목 없음";
+};
+
+window.buildMVExportMetadataHeader = function (format = "text") {
+  const projectTitle = window.getMVProjectTitleForExport();
+  const releaseBaseline = window.MV_RELEASE_BASELINE;
+  if (format === "srt") {
+    return [
+      `NOTE Project: ${projectTitle}`,
+      `NOTE Release Baseline: ${releaseBaseline}`,
+      "",
+    ].join("\n");
+  }
+
+  return [
+    `프로젝트: ${projectTitle}`,
+    `릴리스 기준: ${releaseBaseline}`,
+    "",
+  ].join("\n");
+};
+
 window.getMVScenePromptForExport = function (scene, index, field = "prompt") {
   const textareaId = field === "promptKo" ? `scene_${index}_ko` : `scene_${index}_en`;
   const textareaValue = document.getElementById(textareaId)?.value || "";
@@ -4714,7 +4747,7 @@ window.buildMVImagePromptBundle = function () {
   }
 
   if (sections.length === 0) return "";
-  return `MV 이미지 생성 프롬프트 번들\n\n${sections.join("\n\n")}\n`;
+  return `MV 이미지 생성 프롬프트 번들\n\n${window.buildMVExportMetadataHeader()}${sections.join("\n\n")}\n`;
 };
 
 window.copyMVImagePromptBundle = function () {
@@ -4813,6 +4846,7 @@ window.buildMVVideoToolPrompts = function (tool = "runway") {
   if (scenes.length === 0) return "";
 
   let text = `MV ${config.label} 영상 생성 프롬프트\n\n`;
+  text += window.buildMVExportMetadataHeader();
   text += "공통 규칙: 같은 인물과 의상 정체성을 유지하고, 자막/워터마크/로고/왜곡된 손가락을 피합니다.\n\n";
 
   scenes.forEach((scene, index) => {
@@ -4882,6 +4916,7 @@ window.downloadMVPrompts = function () {
   }
 
   let text = "MV 프롬프트\n\n";
+  text += window.buildMVExportMetadataHeader();
 
   // 통합/배경/인물 프롬프트 추가
   const combinedKo = document.getElementById("mvCombinedPromptKo")?.value || "";
@@ -5065,7 +5100,8 @@ window.downloadSRT = function (platform) {
     const lineEnding = platform === "win" ? "\r\n" : "\n";
 
     // 줄바꿈 문자 변환
-    let srtContent = window.currentSRTContent;
+    let srtContent =
+      window.buildMVExportMetadataHeader("srt") + window.currentSRTContent;
     if (platform === "win") {
       srtContent = srtContent.replace(/\n/g, "\r\n");
     }

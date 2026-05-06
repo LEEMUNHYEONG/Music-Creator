@@ -18,6 +18,9 @@ console.log = function logStub() {};
 console.error = function errorStub() {};
 
 global.window = global;
+window.currentProject = {
+  title: "Project Title From State",
+};
 global.document = {
   getElementById(id) {
     if (id === "finalTitleText") {
@@ -87,9 +90,9 @@ window.showCopyIndicator = function showCopyIndicatorStub(message) {
 };
 
 const step6Source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
-const start = step6Source.indexOf("window.copySRTContent = function");
+const start = step6Source.indexOf("window.MV_RELEASE_BASELINE =");
 const end = step6Source.indexOf("// --- Extracted generateSRTPreview ---", start);
-assert.ok(start !== -1, "copySRTContent should exist in js/step6.js");
+assert.ok(start !== -1, "MV export metadata helpers should exist in js/step6.js");
 assert.ok(end !== -1, "SRT export block should end before SRT preview");
 vm.runInThisContext(step6Source.slice(start, end), {
   filename: "js/step6.js.srt-export-slice",
@@ -123,6 +126,9 @@ setImmediate(() => {
     window.downloadSRT("win");
     assert.strictEqual(clickedDownload, "My_Song_2026.srt");
     assert.ok(blobText.includes("\r\n"));
+    assert.ok(blobText.includes("NOTE Project: Project Title From State"));
+    assert.ok(blobText.includes("NOTE Release Baseline: mv-stabilization-2026-05-06"));
+    assert.ok(blobText.includes("1\r\n00:00:00,000 --> 00:00:02,000\r\nHello"));
     assert.strictEqual(revokedUrl, "blob:srt");
     assert.ok(toasts.some((message) => message.includes("윈도우용")));
 

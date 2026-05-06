@@ -1,5 +1,36 @@
 # MV 개선작업 이력
 
+## 2026-05-06: MV 2차 고도화 - 내보내기 기준 헤더
+
+### 작업 목적
+
+TXT/SRT 내보내기 파일만 따로 전달되더라도 어떤 프로젝트와 릴리스 기준에서 나온 산출물인지 확인할 수 있도록 프로젝트 제목과 릴리스 기준 정보를 포함했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `MV_RELEASE_BASELINE`와 `buildMVExportMetadataHeader()` 추가
+   - TXT 계열 내보내기 본문에 프로젝트 제목과 `mv-stabilization-2026-05-06` 릴리스 기준 표시
+   - SRT 다운로드 결과에는 `NOTE Project`, `NOTE Release Baseline` 헤더 추가
+   - 프로젝트 제목은 저장 프로젝트 정보, 최종 제목, 노래 제목 입력 순서로 가져오도록 정리
+
+2. 테스트
+   - `tests/mv_download_prompts_smoke.js`에서 TXT 헤더 보호
+   - `tests/mv_srt_export_smoke.js`에서 SRT NOTE 헤더와 줄바꿈 변환 보호
+   - `tests/mv_image_prompt_bundle_smoke.js`, `tests/mv_video_tool_export_templates_smoke.js`에서 이미지/영상 TXT 헤더 보호
+   - `tests/mv_chrome_runtime_check.js`에서 새 전역 헬퍼 노출 보호
+
+3. 문서
+   - `MV_2차_고도화_로드맵.md`의 2단계 내보내기 품질 강화 완료 상태 갱신
+   - `MV_테스트_실행_가이드.md`와 `MV_운영_인계_요약.md`의 보호 범위 갱신
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (93 checks)
+```
+
 ## 2026-05-06: MV 2차 고도화 - 이미지 생성 프롬프트 번들
 
 ### 작업 목적

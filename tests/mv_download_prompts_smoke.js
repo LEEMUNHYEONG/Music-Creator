@@ -19,6 +19,9 @@ function addElement(id, value = "") {
 }
 
 global.window = global;
+window.currentProject = {
+  title: "Codex Export Song",
+};
 global.document = {
   getElementById(id) {
     return elements.get(id) || null;
@@ -108,6 +111,8 @@ assert.strictEqual(appended, true);
 assert.strictEqual(removed, true);
 assert.strictEqual(revokedUrl, createdUrl);
 assert.ok(blobText.includes("MV 프롬프트"));
+assert.ok(blobText.includes("프로젝트: Codex Export Song"));
+assert.ok(blobText.includes("릴리스 기준: mv-stabilization-2026-05-06"));
 assert.ok(blobText.includes("=== 통합 프롬프트 ==="));
 assert.ok(blobText.includes("combined english"));
 assert.ok(blobText.includes("=== 씬별 개별 프롬프트 ==="));

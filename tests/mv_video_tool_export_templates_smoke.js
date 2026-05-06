@@ -75,6 +75,9 @@ global.alert = function alertStub(message) {
 window.showCopyIndicator = function showCopyIndicator(message) {
   toastMessage = message;
 };
+window.currentProject = {
+  title: "Video Tool Project",
+};
 window.currentScenes = [
   {
     time: "00:00-00:07",
@@ -106,6 +109,8 @@ require("../js/step6.js");
 
 const runwayText = window.buildMVVideoToolPrompts("runway");
 assert.ok(runwayText.includes("MV Runway 영상 생성 프롬프트"));
+assert.ok(runwayText.includes("프로젝트: Video Tool Project"));
+assert.ok(runwayText.includes("릴리스 기준: mv-stabilization-2026-05-06"));
 assert.ok(runwayText.includes("A lonely hero walks through a rain-soaked alley"));
 assert.ok(runwayText.includes("cinematic motion"));
 assert.ok(runwayText.includes("가사 구간: 멈춰 선 밤의 끝"));
