@@ -1,5 +1,38 @@
 # MV 개선작업 이력
 
+## 2026-05-06: MV 2차 고도화 - marketing.mv 진단 요약
+
+### 작업 목적
+
+장기 프로젝트 저장 전 `marketing.mv` 구조가 정상인지 빠르게 확인할 수 있도록 자동 진단 로그와 수동 진단 버튼을 추가했습니다.
+
+### 변경 내용
+
+1. `js/storage.js`
+   - `buildMarketingMVDiagnostics()`로 프로젝트 제목, 스키마, 씬 수, 설정 키, 프롬프트 섹션, 첫/마지막 씬, 확인 사항을 구조화
+   - `formatMarketingMVDiagnostics()`로 사람이 읽는 진단 요약 생성
+   - `logMarketingMVDiagnostics()`를 저장 직전 호출해 콘솔에 `marketing.mv` 상태 기록
+   - `showMarketingMVDiagnostics()`로 수동 진단 확인 지원
+
+2. `js/step6.js`
+   - MV 결과 프롬프트 화면 상단 내보내기 영역에 `MV 진단` 버튼 추가
+
+3. 테스트
+   - `tests/mv_marketing_diagnostics_smoke.js` 추가
+   - `tests/mv_model_storage_smoke.js`에서 저장 전 진단 로그 보호
+   - `tests/mv_chrome_runtime_check.js`, `tests/run_mv_smoke_tests.js`에 새 보호 범위 추가
+
+4. 문서
+   - `MV_2차_고도화_로드맵.md`의 3단계 진행 상태 갱신
+   - `MV_테스트_실행_가이드.md`와 `MV_운영_인계_요약.md`의 자동 테스트 기준을 `PASS (95 checks)`로 갱신
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (95 checks)
+```
+
 ## 2026-05-06: MV 2차 고도화 - 내보내기 기준 헤더
 
 ### 작업 목적

@@ -151,6 +151,8 @@ async function cleanup() {
           "buildMVImagePromptBundle",
           "copyMVImagePromptBundle",
           "downloadMVImagePromptBundle",
+          "buildMarketingMVDiagnostics",
+          "showMarketingMVDiagnostics",
           "buildMVScenePromptTableText",
           "copyMVScenePromptTable",
           "buildMVVideoToolPrompts",

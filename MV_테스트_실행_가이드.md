@@ -32,7 +32,7 @@ npm run rehearse:mv
 정상 통과 시 마지막 줄에 아래와 비슷한 결과가 표시됩니다.
 
 ```text
-MV smoke test suite: PASS (93 checks)
+MV smoke test suite: PASS (95 checks)
 ```
 
 이 결과는 MV 관련 핵심 보호 테스트가 모두 통과했다는 뜻입니다.
@@ -96,6 +96,7 @@ MV smoke test suite: PASS (93 checks)
 53. 씬 번호, 시간, 가사, EN 프롬프트, KO 설명의 TSV 표 복사
 54. 썸네일/배경/인물/통합/씬별 이미지 생성 프롬프트 번들 복사와 TXT 다운로드
 55. TXT/SRT 내보내기 결과의 프로젝트 제목과 릴리스 기준 정보 포함
+56. 프로젝트 저장 전 `marketing.mv` 진단 요약 로그와 수동 진단 버튼
 
 ## 실패했을 때 확인 순서
 

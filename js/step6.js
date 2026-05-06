@@ -6059,6 +6059,7 @@ window.confirmSceneOverviewAndGenerate = async function (isSilent = false) {
                             <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
                                 <button class="btn btn-small btn-primary" onclick="copyMVImagePromptBundle()" style="padding: 6px 10px; font-size: 0.78rem;">이미지 복사</button>
                                 <button class="btn btn-small btn-secondary" onclick="downloadMVImagePromptBundle()" style="padding: 6px 10px; font-size: 0.78rem;">이미지 TXT</button>
+                                <button class="btn btn-small btn-secondary" onclick="showMarketingMVDiagnostics()" style="padding: 6px 10px; font-size: 0.78rem;">MV 진단</button>
                                 <button class="btn btn-small btn-success" onclick="copyMVScenePromptTable()" style="padding: 6px 10px; font-size: 0.78rem;">표 복사</button>
                                 <button class="btn btn-small btn-primary" onclick="copyMVVideoToolPrompts('runway')" style="padding: 6px 10px; font-size: 0.78rem;">Runway 복사</button>
                                 <button class="btn btn-small btn-secondary" onclick="downloadMVVideoToolPrompts('runway')" style="padding: 6px 10px; font-size: 0.78rem;">TXT</button>

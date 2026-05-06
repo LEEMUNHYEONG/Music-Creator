@@ -20,6 +20,7 @@ const calls = {
 };
 
 console.log = function logStub() {};
+console.info = function infoStub() {};
 console.error = function errorStub() {};
 console.warn = function warnStub() {};
 

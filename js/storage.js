@@ -263,6 +263,121 @@ window.syncMarketingMVModel = function (marketing) {
   return marketing.mv;
 };
 
+window.buildMarketingMVDiagnostics = function (marketingArg, context = "manual") {
+  const projectData = window.currentProject?.data || window.currentProject || {};
+  const marketing =
+    marketingArg || projectData.marketing || window.currentProject?.marketing || {};
+  const mv =
+    typeof window.getMarketingMVData === "function"
+      ? window.getMarketingMVData(marketing)
+      : {
+          settings: marketing.mvSettings || {},
+          prompts: marketing.mvPrompts || {},
+          scenes: Array.isArray(marketing.mvScenes) ? marketing.mvScenes : [],
+          schemaVersion: marketing.mv?.schemaVersion || 1,
+        };
+  const scenes = Array.isArray(mv.scenes) ? mv.scenes : [];
+  const canonicalScenes = Array.isArray(marketing.mv?.scenes)
+    ? marketing.mv.scenes
+    : [];
+  const legacyScenes = Array.isArray(marketing.mvScenes)
+    ? marketing.mvScenes
+    : [];
+  const promptSections = Object.entries(mv.prompts || {}).filter(([, value]) => {
+    if (!value || typeof value !== "object") return false;
+    return Boolean(value.en || value.ko);
+  });
+  const issues = [];
+
+  if (scenes.length === 0) issues.push("씬 데이터 없음");
+  if (canonicalScenes.length !== legacyScenes.length) {
+    issues.push(
+      `canonical/legacy 씬 수 불일치 (${canonicalScenes.length}/${legacyScenes.length})`,
+    );
+  }
+  if (scenes.some((scene) => !scene.prompt && !scene.promptKo)) {
+    issues.push("프롬프트가 비어 있는 씬 있음");
+  }
+
+  return {
+    context,
+    projectTitle:
+      projectData.title || projectData.songTitle || window.currentProject?.title || "제목 없음",
+    schemaVersion: mv.schemaVersion || marketing.mv?.schemaVersion || 1,
+    sceneCount: scenes.length,
+    canonicalSceneCount: canonicalScenes.length,
+    legacySceneCount: legacyScenes.length,
+    settingsKeys: Object.keys(mv.settings || {}).sort(),
+    promptSections: promptSections.map(([key]) => key).sort(),
+    firstScene: scenes[0]
+      ? {
+          time: scenes[0].time || "",
+          scene: scenes[0].scene || "",
+          hasPrompt: Boolean(scenes[0].prompt || scenes[0].promptKo),
+        }
+      : null,
+    lastScene: scenes.length
+      ? {
+          time: scenes[scenes.length - 1].time || "",
+          scene: scenes[scenes.length - 1].scene || "",
+          hasPrompt: Boolean(
+            scenes[scenes.length - 1].prompt ||
+              scenes[scenes.length - 1].promptKo,
+          ),
+        }
+      : null,
+    updatedAt: marketing.mv?.updatedAt || "",
+    issues,
+  };
+};
+
+window.formatMarketingMVDiagnostics = function (diagnostics) {
+  if (!diagnostics) return "MV 진단 데이터가 없습니다.";
+  const lines = [
+    "MV marketing.mv 진단 요약",
+    `프로젝트: ${diagnostics.projectTitle}`,
+    `컨텍스트: ${diagnostics.context}`,
+    `스키마: v${diagnostics.schemaVersion}`,
+    `씬 수: ${diagnostics.sceneCount} (canonical ${diagnostics.canonicalSceneCount}, legacy ${diagnostics.legacySceneCount})`,
+    `설정 키: ${diagnostics.settingsKeys.length ? diagnostics.settingsKeys.join(", ") : "없음"}`,
+    `프롬프트 섹션: ${diagnostics.promptSections.length ? diagnostics.promptSections.join(", ") : "없음"}`,
+  ];
+
+  if (diagnostics.firstScene) {
+    lines.push(
+      `첫 씬: ${diagnostics.firstScene.time || "시간 없음"} / ${diagnostics.firstScene.scene || "장면 없음"} / 프롬프트 ${diagnostics.firstScene.hasPrompt ? "있음" : "없음"}`,
+    );
+  }
+  if (diagnostics.lastScene) {
+    lines.push(
+      `마지막 씬: ${diagnostics.lastScene.time || "시간 없음"} / ${diagnostics.lastScene.scene || "장면 없음"} / 프롬프트 ${diagnostics.lastScene.hasPrompt ? "있음" : "없음"}`,
+    );
+  }
+  lines.push(
+    `확인 사항: ${diagnostics.issues.length ? diagnostics.issues.join("; ") : "없음"}`,
+  );
+  return lines.join("\n");
+};
+
+window.logMarketingMVDiagnostics = function (
+  marketingArg,
+  context = "pre-save",
+) {
+  const diagnostics = window.buildMarketingMVDiagnostics(marketingArg, context);
+  console.info("MV marketing.mv diagnostics:", diagnostics);
+  return diagnostics;
+};
+
+window.showMarketingMVDiagnostics = function () {
+  const diagnostics = window.buildMarketingMVDiagnostics(null, "manual");
+  const text = window.formatMarketingMVDiagnostics(diagnostics);
+  if (typeof window.showCopyIndicator === "function") {
+    window.showCopyIndicator("✅ MV 진단 요약이 준비되었습니다.");
+  }
+  alert(text);
+  return diagnostics;
+};
+
 /**
  * 프로젝트 정보를 비교하여 더 최신이거나 데이터가 많은 프로젝트를 반환하기 위한 유틸리티
  */
@@ -563,6 +678,12 @@ window.saveCurrentProject = function () {
     // 신규 MV 통합 모델 병행 저장 (기존 mvSettings/mvPrompts/mvScenes 보존)
     if (typeof window.syncMarketingMVModel === "function") {
       window.syncMarketingMVModel(m);
+    }
+    if (
+      typeof window.logMarketingMVDiagnostics === "function" &&
+      (m.mv || (Array.isArray(m.mvScenes) && m.mvScenes.length > 0))
+    ) {
+      window.logMarketingMVDiagnostics(m, "pre-save");
     }
 
     // 로컬 스토리지 업데이트

@@ -3,8 +3,14 @@ const assert = require("assert");
 const originalConsole = { ...console };
 const store = new Map();
 const elements = new Map();
+let diagnosticsLog = null;
 
 console.log = function logStub() {};
+console.info = function infoStub(label, payload) {
+  if (label === "MV marketing.mv diagnostics:") {
+    diagnosticsLog = payload;
+  }
+};
 
 function addElement(id, value = "") {
   const el = {
@@ -169,6 +175,12 @@ assert.strictEqual(marketing.mvPrompts.thumbnail.en, "thumbnail prompt en");
 assert.strictEqual(marketing.mvScenes[0].prompt, "rainy alley cinematic still");
 assert.strictEqual(marketing.mv.scenes[0].prompt, "rainy alley cinematic still");
 assert.notStrictEqual(marketing.mv.scenes[0].prompt, "stale canonical prompt");
+assert.ok(diagnosticsLog, "save should log MV diagnostics before persistence");
+assert.strictEqual(diagnosticsLog.context, "pre-save");
+assert.strictEqual(diagnosticsLog.sceneCount, 1);
+assert.strictEqual(diagnosticsLog.canonicalSceneCount, 1);
+assert.strictEqual(diagnosticsLog.legacySceneCount, 1);
+assert.deepStrictEqual(diagnosticsLog.issues, []);
 
 originalConsole.log("MV storage smoke test: PASS");
 process.exit(0);
