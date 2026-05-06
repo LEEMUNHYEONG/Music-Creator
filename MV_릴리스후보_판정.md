@@ -33,7 +33,7 @@ npm run rehearse:mv
 기대 결과:
 
 ```text
-MV smoke test suite: PASS (75 checks)
+MV smoke test suite: PASS (77 checks)
 ```
 
 수동 리허설 사전 실행 확인:
@@ -55,6 +55,19 @@ MV smoke test suite: PASS (75 checks)
 앱 버전 표시: Music Creator v1.2.190
 프로젝트 사이드바: 저장된 프로젝트가 없습니다.
 판정: 실제 사용자 프로젝트 수동 리허설 보류
+```
+
+샘플 프로젝트 리허설 보강 확인:
+
+```text
+2026-05-06 10:40 KST
+샘플 프로젝트: Codex MV 리허설 샘플
+확인: 프로젝트 저장 및 사이드바 표시
+확인: 1단계 다음 버튼으로 2단계 이동
+확인: 2단계 제목/가사 전달
+조치: 진행바 2단계 마크업 보호 테스트 추가
+자동 테스트: PASS (77 checks)
+남은 작업: 6단계 MV 탭 실제 화면 리허설
 ```
 
 현재 보호 범위에는 다음 항목이 포함됩니다.
