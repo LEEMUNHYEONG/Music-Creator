@@ -12,7 +12,7 @@
 체크리스트 기준 커밋: 98acbe6 Update MV rehearsal checklist baseline
 마감 기록 커밋: 3116aff Record MV stabilization release closeout
 저장/복원 수정 커밋: dd33517 Fix MV scene prompt restore persistence
-자동 테스트: npm run test:mv -> PASS (91 checks)
+자동 테스트: npm run test:mv -> PASS (93 checks)
 ```
 
 ## 2. 완료된 핵심 범위
@@ -26,7 +26,8 @@
 7. 씬 5 프롬프트 개별 저장 후 새로고침/프로젝트 재로드 복원 실제 화면 확인
 8. Runway/Pika/Kling 영상 생성 도구별 프롬프트 복사와 TXT 다운로드 지원
 9. 씬 번호, 시간, 가사, EN 프롬프트, KO 설명을 TSV 표로 복사 가능
-10. 자동 테스트, Chrome 런타임, 샘플 프로젝트 리허설 문서화 완료
+10. 썸네일/배경/인물/통합/씬별 이미지 생성 프롬프트 번들 복사와 TXT 다운로드 지원
+11. 자동 테스트, Chrome 런타임, 샘플 프로젝트 리허설 문서화 완료
 
 ## 3. 바로 쓰는 실행 명령
 

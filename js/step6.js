@@ -4650,6 +4650,115 @@ window.copyMVScenePromptTable = function () {
     });
 };
 
+window.getMVPromptInputValue = function (id) {
+  return document.getElementById(id)?.value || "";
+};
+
+window.buildMVImagePromptBundle = function () {
+  const scenes = Array.isArray(window.currentScenes) ? window.currentScenes : [];
+  const sections = [];
+
+  const addPromptSection = (title, ko, en) => {
+    if (!ko && !en) return;
+    let section = `=== ${title} ===\n`;
+    if (en) section += `[EN]\n${en}\n\n`;
+    if (ko) section += `[KO]\n${ko}\n\n`;
+    sections.push(section.trim());
+  };
+
+  addPromptSection(
+    "대표 썸네일 이미지 프롬프트",
+    window.getMVPromptInputValue("mvThumbnailPromptKo"),
+    window.getMVPromptInputValue("mvThumbnailPromptEn"),
+  );
+  addPromptSection(
+    "배경 이미지 프롬프트",
+    window.getMVPromptInputValue("mvBackgroundDetailPromptKo") ||
+      window.getMVPromptInputValue("mvBackgroundPromptKo"),
+    window.getMVPromptInputValue("mvBackgroundDetailPromptEn") ||
+      window.getMVPromptInputValue("mvBackgroundPromptEn"),
+  );
+  addPromptSection(
+    "인물 이미지 프롬프트",
+    window.getMVPromptInputValue("mvCharacterDetailPromptKo") ||
+      window.getMVPromptInputValue("mvCharacterPromptKo"),
+    window.getMVPromptInputValue("mvCharacterDetailPromptEn") ||
+      window.getMVPromptInputValue("mvCharacterPromptEn"),
+  );
+  addPromptSection(
+    "통합 이미지 스타일 프롬프트",
+    window.getMVPromptInputValue("mvCombinedPromptKo"),
+    window.getMVPromptInputValue("mvCombinedPromptEn"),
+  );
+
+  if (scenes.length > 0) {
+    let sceneSection = "=== 씬별 이미지 생성 프롬프트 ===\n\n";
+    sceneSection +=
+      "공통 규칙: 16:9 aspect ratio, cinematic composition, consistent character identity, no text, no watermark, high detail.\n\n";
+
+    scenes.forEach((scene, index) => {
+      const enPrompt = window.getMVScenePromptForExport(scene, index, "prompt");
+      const koPrompt = window.getMVScenePromptForExport(scene, index, "promptKo");
+      sceneSection += `--- 씬 ${index + 1} (${scene.time || "시간 미정"}) ---\n`;
+      sceneSection += `장면: ${scene.scene || ""}\n`;
+      sceneSection += window.formatMVSceneExportMetadata(scene);
+      if (enPrompt) {
+        sceneSection += `[이미지 생성 EN]\n${enPrompt}, 16:9 aspect ratio, cinematic composition, high detail, no text, no watermark\n\n`;
+      }
+      if (koPrompt) {
+        sceneSection += `[참고 KO]\n${koPrompt}\n\n`;
+      }
+    });
+
+    sections.push(sceneSection.trim());
+  }
+
+  if (sections.length === 0) return "";
+  return `MV 이미지 생성 프롬프트 번들\n\n${sections.join("\n\n")}\n`;
+};
+
+window.copyMVImagePromptBundle = function () {
+  const text = window.buildMVImagePromptBundle();
+  if (!text) {
+    alert("복사할 이미지 생성 프롬프트가 없습니다.");
+    return;
+  }
+
+  navigator.clipboard
+    .writeText(text)
+    .then(() => {
+      if (typeof window.showCopyIndicator === "function") {
+        window.showCopyIndicator(
+          "✅ 이미지 생성 프롬프트 번들이 클립보드에 복사되었습니다!",
+        );
+      } else {
+        alert("이미지 생성 프롬프트 번들이 클립보드에 복사되었습니다.");
+      }
+    })
+    .catch((err) => {
+      console.error("이미지 생성 프롬프트 번들 복사 오류:", err);
+      alert("이미지 생성 프롬프트 번들 복사 중 오류가 발생했습니다.");
+    });
+};
+
+window.downloadMVImagePromptBundle = function () {
+  const text = window.buildMVImagePromptBundle();
+  if (!text) {
+    alert("다운로드할 이미지 생성 프롬프트가 없습니다.");
+    return;
+  }
+
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "mv-image-prompts.txt";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
 window.getMVVideoToolConfig = function (tool) {
   const toolKey = String(tool || "runway").toLowerCase();
   const configs = {
@@ -5909,9 +6018,11 @@ window.confirmSceneOverviewAndGenerate = async function (isSilent = false) {
                         <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center;">
                             <div>
                                 <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">영상 생성 도구별 내보내기</div>
-                                <div style="font-size: 0.84rem; color: var(--text-secondary);">Runway, Pika, Kling용 씬별 프롬프트와 씬 표를 복사하거나 TXT로 저장합니다.</div>
+                                <div style="font-size: 0.84rem; color: var(--text-secondary);">이미지 번들, Runway/Pika/Kling용 씬별 프롬프트와 씬 표를 복사하거나 TXT로 저장합니다.</div>
                             </div>
                             <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                                <button class="btn btn-small btn-primary" onclick="copyMVImagePromptBundle()" style="padding: 6px 10px; font-size: 0.78rem;">이미지 복사</button>
+                                <button class="btn btn-small btn-secondary" onclick="downloadMVImagePromptBundle()" style="padding: 6px 10px; font-size: 0.78rem;">이미지 TXT</button>
                                 <button class="btn btn-small btn-success" onclick="copyMVScenePromptTable()" style="padding: 6px 10px; font-size: 0.78rem;">표 복사</button>
                                 <button class="btn btn-small btn-primary" onclick="copyMVVideoToolPrompts('runway')" style="padding: 6px 10px; font-size: 0.78rem;">Runway 복사</button>
                                 <button class="btn btn-small btn-secondary" onclick="downloadMVVideoToolPrompts('runway')" style="padding: 6px 10px; font-size: 0.78rem;">TXT</button>

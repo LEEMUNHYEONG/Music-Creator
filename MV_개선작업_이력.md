@@ -1,5 +1,36 @@
 # MV 개선작업 이력
 
+## 2026-05-06: MV 2차 고도화 - 이미지 생성 프롬프트 번들
+
+### 작업 목적
+
+썸네일, 배경, 인물, 통합 스타일, 씬별 이미지 생성 프롬프트를 한 번에 외부 이미지 생성기로 옮길 수 있도록 이미지 생성용 전체 프롬프트 번들 복사와 TXT 다운로드 기능을 추가했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `buildMVImagePromptBundle()`로 이미지 생성용 전체 프롬프트 묶음 생성
+   - `copyMVImagePromptBundle()`와 `downloadMVImagePromptBundle()` 추가
+   - 대표 썸네일, 배경, 인물, 통합 스타일, 씬별 이미지 프롬프트와 씬 메타데이터를 같은 번들에 포함
+   - MV 결과 프롬프트 화면 상단 내보내기 영역에 이미지 번들 복사/TXT 버튼 추가
+
+2. `tests/mv_image_prompt_bundle_smoke.js`
+   - 프롬프트 섹션 구성, 씬 메타데이터, textarea 편집값 우선 반영, 복사/다운로드 파일명을 보호
+
+3. `tests/mv_chrome_runtime_check.js`, `tests/run_mv_smoke_tests.js`
+   - 새 전역 함수와 통합 테스트 러너에 보호 범위 추가
+
+4. 문서
+   - `MV_2차_고도화_로드맵.md`의 2단계 진행 상태 갱신
+   - `MV_테스트_실행_가이드.md`와 `MV_운영_인계_요약.md`의 자동 테스트 기준을 `PASS (93 checks)`로 갱신
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (93 checks)
+```
+
 ## 2026-05-06: MV 2차 고도화 - 씬 프롬프트 표 복사
 
 ### 작업 목적
