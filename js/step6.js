@@ -5739,7 +5739,8 @@ window.confirmSceneOverviewAndGenerate = async function (isSilent = false) {
                             <div style="display: flex; gap: 8px; align-items: center;">
                                 <span style="color: var(--accent); font-weight: 600; font-size: 0.9rem;">${scene.time}</span>
                                 <button class="btn btn-small btn-primary" onclick="regenerateScenePrompt(${index})" style="padding: 4px 8px; font-size: 0.75rem;">재생성</button>
-                                <button class="btn btn-small btn-success" onclick="saveScenePrompt(${index})" style="padding: 4px 8px; font-size: 0.75rem;">저장</button>
+                                <span id="scene_${index}_dirty" class="mv-scene-unsaved-badge" data-scene-index="${index}" data-dirty="false" style="display: none; padding: 3px 8px; border-radius: 999px; background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.45); color: #f59e0b; font-size: 0.72rem; font-weight: 700;">미저장</span>
+                                <button id="saveScenePromptBtn_${index}" class="btn btn-small btn-success" onclick="saveScenePrompt(${index})" style="padding: 4px 8px; font-size: 0.75rem;">저장</button>
                                 </div>
                             </div>
                         <div style="margin-bottom: 15px; padding: 12px; background: var(--bg-input); border-radius: 6px;">
@@ -5775,6 +5776,9 @@ window.confirmSceneOverviewAndGenerate = async function (isSilent = false) {
                             `;
       });
       container.innerHTML = html;
+      if (typeof window.bindMVScenePromptDirtyTracking === "function") {
+        window.bindMVScenePromptDirtyTracking(container);
+      }
 
       // 각 씬의 한글 프롬프트 자동 생성 (영어가 있으면)
       window.currentScenes.forEach((scene, index) => {
@@ -6778,6 +6782,10 @@ window.saveScenePrompt = function (sceneIndex) {
       window.saveCurrentProject(true);
     }
 
+    if (typeof window.markMVScenePromptDirty === "function") {
+      window.markMVScenePromptDirty(sceneIndex, false);
+    }
+
     if (typeof window.showCopyIndicator === "function") {
       window.showCopyIndicator(
         `✅ 씬 ${sceneIndex + 1} 프롬프트가 저장되었습니다.`,
@@ -6787,6 +6795,101 @@ window.saveScenePrompt = function (sceneIndex) {
     console.error("씬 프롬프트 저장 오류:", error);
   }
 };
+
+window.markMVScenePromptDirty = function (sceneIndex, isDirty = true) {
+  const badge = document.getElementById(`scene_${sceneIndex}_dirty`);
+  const saveButton = document.getElementById(`saveScenePromptBtn_${sceneIndex}`);
+  const card = document.querySelector?.(
+    `.mv-prompt-item[data-result-scene-index="${sceneIndex}"]`,
+  );
+
+  if (badge) {
+    badge.dataset.dirty = isDirty ? "true" : "false";
+    badge.style.display = isDirty ? "inline-flex" : "none";
+    badge.textContent = isDirty ? "미저장" : "";
+  }
+
+  if (saveButton) {
+    saveButton.dataset.dirty = isDirty ? "true" : "false";
+    saveButton.title = isDirty
+      ? "이 씬에 저장되지 않은 변경이 있습니다"
+      : "이 씬 프롬프트 저장";
+  }
+
+  if (card?.classList) {
+    card.classList.toggle("mv-scene-dirty", !!isDirty);
+  }
+};
+
+window.bindMVScenePromptDirtyTracking = function (containerArg) {
+  const container = containerArg || document;
+  if (!container?.querySelectorAll) return;
+
+  container
+    .querySelectorAll(".scene-prompt-en,.scene-prompt-ko")
+    .forEach((field) => {
+      if (field.dataset.mvDirtyTrackingBound === "true") return;
+      field.dataset.mvDirtyTrackingBound = "true";
+
+      const markDirty = (event) => {
+        const index = Number(event.target?.dataset?.sceneIndex);
+        if (!Number.isInteger(index)) return;
+        window.markMVScenePromptDirty(index, true);
+      };
+
+      field.addEventListener("input", markDirty);
+      field.addEventListener("change", markDirty);
+    });
+};
+
+window.saveFocusedMVScenePrompt = function () {
+  const active = document.activeElement;
+  const activeIndex = Number(active?.dataset?.sceneIndex);
+
+  if (
+    Number.isInteger(activeIndex) &&
+    active?.classList &&
+    (active.classList.contains("scene-prompt-en") ||
+      active.classList.contains("scene-prompt-ko"))
+  ) {
+    window.saveScenePrompt(activeIndex);
+    return true;
+  }
+
+  const dirtyBadge = document.querySelector?.(
+    '.mv-scene-unsaved-badge[data-dirty="true"]',
+  );
+  const dirtyIndex = Number(dirtyBadge?.dataset?.sceneIndex);
+  if (Number.isInteger(dirtyIndex)) {
+    window.saveScenePrompt(dirtyIndex);
+    return true;
+  }
+
+  return false;
+};
+
+if (
+  typeof document !== "undefined" &&
+  typeof document.addEventListener === "function" &&
+  !window.__mvScenePromptShortcutBound
+) {
+  window.__mvScenePromptShortcutBound = true;
+  document.addEventListener(
+    "keydown",
+    function handleMVScenePromptShortcut(event) {
+      if (!(event.ctrlKey || event.metaKey) || event.key?.toLowerCase() !== "s") {
+        return;
+      }
+
+      if (typeof window.saveFocusedMVScenePrompt !== "function") return;
+      if (!window.saveFocusedMVScenePrompt()) return;
+
+      event.preventDefault?.();
+      event.stopImmediatePropagation?.();
+    },
+    true,
+  );
+}
 
 // --- Restored Scene Prompt Regeneration Functions ---
 window.regenerateScenePrompt = async function (sceneIndex) {

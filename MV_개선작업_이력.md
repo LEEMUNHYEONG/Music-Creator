@@ -1,5 +1,36 @@
 # MV 개선작업 이력
 
+## 2026-05-06: MV 2차 고도화 - 씬 미저장 표시와 저장 단축키
+
+### 작업 목적
+
+MV 결과 씬 카드에서 EN/KO 프롬프트를 수정했을 때 저장 전 상태를 바로 알 수 있도록 `미저장` 표시를 추가하고, 편집 중 `Ctrl+S` 또는 `Cmd+S`가 현재 씬 저장으로 동작하도록 보강했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - 결과 씬 카드 헤더에 씬별 `미저장` 배지 추가
+   - 씬 프롬프트 textarea 입력/변경 이벤트에서 미저장 상태 표시
+   - `saveScenePrompt()` 완료 후 미저장 상태 해제
+   - MV 씬 프롬프트에 포커스가 있거나 미저장 씬이 있을 때 `Ctrl+S`/`Cmd+S`로 해당 씬 저장
+
+2. `tests/mv_scene_dirty_shortcut_smoke.js`
+   - 미저장 표시/해제와 현재 씬 저장 단축키 동작 보호
+
+3. `tests/mv_chrome_runtime_check.js`, `tests/run_mv_smoke_tests.js`
+   - 새 전역 헬퍼와 통합 테스트 러너에 보호 범위 추가
+
+4. 문서
+   - `MV_2차_고도화_로드맵.md`의 1단계 진행 상태 갱신
+   - `MV_테스트_실행_가이드.md`와 `MV_운영_인계_요약.md`의 자동 테스트 기준을 `PASS (87 checks)`로 갱신
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (87 checks)
+```
+
 ## 2026-05-06: MV 안정화 마감 및 씬 저장/복원 확정
 
 ### 작업 목적

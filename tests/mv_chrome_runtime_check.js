@@ -144,6 +144,8 @@ async function cleanup() {
           "syncScenePromptTranslation",
           "regenerateMVPrompt",
           "saveScenePrompt",
+          "markMVScenePromptDirty",
+          "saveFocusedMVScenePrompt",
           "initializeTagButtons",
           "getMVLocationValues",
         ];
