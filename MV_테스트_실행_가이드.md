@@ -152,6 +152,7 @@ npm run rehearse:mv
 - `package.json`: `test:mv`, `rehearse:mv`, `serve:local` 명령 정의
 - `tests/run_mv_smoke_tests.js`: MV 통합 테스트 러너
 - `tests/mv_*.js`: MV 개별 보호 테스트
+- `MV_운영_인계_요약.md`: 현재 운영 기준과 되돌림 기준 한 장 요약
 - `MV_개선작업_이력.md`: 개선 작업 기록
 - `MV_중복함수_정리계획.md`: 중복 함수 정리 계획
 - `MV_운영전_리허설_체크리스트.md`: 실제 사용자 데이터 기준 운영 전 리허설 절차
