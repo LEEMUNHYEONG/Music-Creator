@@ -4961,6 +4961,41 @@ window.buildMVExportMetadataHeader = function (format = "text") {
   ].join("\n");
 };
 
+window.buildMVExportQualityChecklist = function (scenesArg) {
+  const scenes = Array.isArray(scenesArg)
+    ? scenesArg
+    : Array.isArray(window.currentScenes)
+      ? window.currentScenes
+      : [];
+  if (!scenes.length || typeof getMVSceneQualityStats !== "function") {
+    return "";
+  }
+
+  const stats = getMVSceneQualityStats(scenes);
+  const status = stats.needsReview ? "확인 필요" : "내보내기 준비 완료";
+  const items = [
+    ["시간", stats.invalidTime],
+    ["장소", stats.missingLocation],
+    ["카메라", stats.missingCamera],
+    ["가사", stats.missingLyrics],
+    ["EN 프롬프트", stats.missingEnPrompt],
+    ["KO 설명", stats.missingKoPrompt],
+    ["프롬프트 길이", stats.promptLength],
+    ["금지어", stats.blockedTerms],
+    ["중복 표현", stats.duplicatePrompt],
+    ["반복 패턴", stats.repeatedVisualPattern],
+    ["인물 일관성", stats.characterConsistency],
+  ];
+
+  return [
+    "=== MV 최종 품질 체크리스트 ===",
+    `내보내기 판정: ${status}`,
+    `전체 씬: ${stats.total}개 / 준비 완료: ${stats.ready}개 / 확인 필요: ${stats.needsReview}개`,
+    ...items.map(([label, count]) => `- ${label}: ${count ? `확인 필요 ${count}개` : "통과"}`),
+    "",
+  ].join("\n");
+};
+
 window.getMVScenePromptForExport = function (scene, index, field = "prompt") {
   const textareaId = field === "promptKo" ? `scene_${index}_ko` : `scene_${index}_en`;
   const textareaValue = document.getElementById(textareaId)?.value || "";
@@ -5083,7 +5118,7 @@ window.buildMVImagePromptBundle = function () {
   }
 
   if (sections.length === 0) return "";
-  return `MV 이미지 생성 프롬프트 번들\n\n${window.buildMVExportMetadataHeader()}${sections.join("\n\n")}\n`;
+  return `MV 이미지 생성 프롬프트 번들\n\n${window.buildMVExportMetadataHeader()}${window.buildMVExportQualityChecklist(scenes)}${sections.join("\n\n")}\n`;
 };
 
 window.copyMVImagePromptBundle = function () {
@@ -5183,6 +5218,7 @@ window.buildMVVideoToolPrompts = function (tool = "runway") {
 
   let text = `MV ${config.label} 영상 생성 프롬프트\n\n`;
   text += window.buildMVExportMetadataHeader();
+  text += window.buildMVExportQualityChecklist(scenes);
   text += "공통 규칙: 같은 인물과 의상 정체성을 유지하고, 자막/워터마크/로고/왜곡된 손가락을 피합니다.\n\n";
 
   scenes.forEach((scene, index) => {
@@ -5253,6 +5289,7 @@ window.downloadMVPrompts = function () {
 
   let text = "MV 프롬프트\n\n";
   text += window.buildMVExportMetadataHeader();
+  text += window.buildMVExportQualityChecklist(window.currentScenes);
 
   // 통합/배경/인물 프롬프트 추가
   const combinedKo = document.getElementById("mvCombinedPromptKo")?.value || "";

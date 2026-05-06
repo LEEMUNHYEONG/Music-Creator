@@ -148,6 +148,7 @@ async function cleanup() {
           "saveFocusedMVScenePrompt",
           "buildMVExportMetadataHeader",
           "getMVProjectTitleForExport",
+          "buildMVExportQualityChecklist",
           "buildMVImagePromptBundle",
           "copyMVImagePromptBundle",
           "downloadMVImagePromptBundle",

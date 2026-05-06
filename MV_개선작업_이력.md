@@ -1,5 +1,33 @@
 # MV 개선작업 이력
 
+## 2026-05-06: MV 2차 고도화 - 내보내기 최종 품질 체크리스트
+
+### 작업 목적
+
+MV 프롬프트를 외부 이미지/영상 생성 도구로 넘길 때 현재 품질 점검 상태가 함께 남도록, 내보내기 결과에 최종 품질 체크리스트를 포함했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `buildMVExportQualityChecklist()`로 시간, 장소, 카메라, 가사, EN/KO, 길이, 금지어, 중복, 반복 패턴, 인물 일관성 점검 요약 생성
+   - 이미지 프롬프트 번들, 영상 도구별 프롬프트, 일반 MV 프롬프트 TXT에 최종 품질 체크리스트 포함
+
+2. 테스트
+   - `tests/mv_image_prompt_bundle_smoke.js`에서 이미지 번들 체크리스트 포함 보호
+   - `tests/mv_video_tool_export_templates_smoke.js`에서 영상 도구별 프롬프트 체크리스트 포함 보호
+   - `tests/mv_chrome_runtime_check.js`에서 새 체크리스트 전역 함수 노출 보호
+
+3. 문서
+   - `MV_2차_고도화_로드맵.md`의 4단계 4번 완료 상태와 다음 후보 갱신
+   - `MV_테스트_실행_가이드.md`와 `MV_운영_인계_요약.md`의 보호 범위 갱신
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (97 checks)
+```
+
 ## 2026-05-06: MV 2차 고도화 - 인물 일관성 키워드 누락 경고
 
 ### 작업 목적
