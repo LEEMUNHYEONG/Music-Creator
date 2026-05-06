@@ -89,6 +89,9 @@ window.currentProject = {
       mvSettings: { minutes: "2" },
       mvPrompts: { thumbnail: { en: "old thumb", ko: "기존 썸네일" } },
       mvScenes: [{ scene: "old scene", prompt: "old prompt" }],
+      mv: {
+        scenes: [{ scene: "stale canonical scene", prompt: "stale canonical prompt" }],
+      },
     },
   },
 };
@@ -164,6 +167,8 @@ assert.strictEqual(marketing.mv.scenes[0].sceneNumber, 1);
 assert.strictEqual(marketing.mvSettings.minutes, "3");
 assert.strictEqual(marketing.mvPrompts.thumbnail.en, "thumbnail prompt en");
 assert.strictEqual(marketing.mvScenes[0].prompt, "rainy alley cinematic still");
+assert.strictEqual(marketing.mv.scenes[0].prompt, "rainy alley cinematic still");
+assert.notStrictEqual(marketing.mv.scenes[0].prompt, "stale canonical prompt");
 
 originalConsole.log("MV storage smoke test: PASS");
 process.exit(0);

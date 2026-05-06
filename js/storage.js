@@ -197,6 +197,15 @@ window.normalizeMVScenes = function (scenes) {
   return scenes.map((scene, index) => normalizeMVScene(scene, index));
 };
 
+window.setMarketingMVScenes = function (marketing, scenes) {
+  if (!marketing) return [];
+  const normalizedScenes = window.normalizeMVScenes(scenes);
+  marketing.mvScenes = cloneData(normalizedScenes, []);
+  if (!marketing.mv) marketing.mv = {};
+  marketing.mv.scenes = cloneData(normalizedScenes, []);
+  return marketing.mvScenes;
+};
+
 /**
  * MV 데이터의 신규 구조(marketing.mv)와 기존 구조를 함께 지원합니다.
  * 기존 프로젝트가 깨지지 않도록 legacy 필드는 유지하고, 새 필드만 병행 생성합니다.
@@ -544,7 +553,11 @@ window.saveCurrentProject = function () {
 
     // 씬 데이터 (window.currentScenes가 업데이트되어 있어야 함)
     if (window.currentScenes && window.currentScenes.length > 0) {
-      m.mvScenes = JSON.parse(JSON.stringify(window.currentScenes));
+      if (typeof window.setMarketingMVScenes === "function") {
+        window.setMarketingMVScenes(m, window.currentScenes);
+      } else {
+        m.mvScenes = JSON.parse(JSON.stringify(window.currentScenes));
+      }
     }
 
     // 신규 MV 통합 모델 병행 저장 (기존 mvSettings/mvPrompts/mvScenes 보존)

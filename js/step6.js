@@ -5807,7 +5807,14 @@ window.confirmSceneOverviewAndGenerate = async function (isSilent = false) {
     if (!window.currentProject.data.marketing) {
       window.currentProject.data.marketing = {};
     }
-    window.currentProject.data.marketing.mvScenes = window.currentScenes;
+    if (typeof window.setMarketingMVScenes === "function") {
+      window.setMarketingMVScenes(
+        window.currentProject.data.marketing,
+        window.currentScenes,
+      );
+    } else {
+      window.currentProject.data.marketing.mvScenes = window.currentScenes;
+    }
   }
 };
 
@@ -5901,9 +5908,16 @@ window.saveAndConfirmMVPrompts = async function () {
     window.currentProject.data.marketing.mvPrompts = JSON.parse(
       JSON.stringify(mvPrompts),
     );
-    window.currentProject.data.marketing.mvScenes = JSON.parse(
-      JSON.stringify(window.currentScenes),
-    );
+    if (typeof window.setMarketingMVScenes === "function") {
+      window.setMarketingMVScenes(
+        window.currentProject.data.marketing,
+        window.currentScenes,
+      );
+    } else {
+      window.currentProject.data.marketing.mvScenes = JSON.parse(
+        JSON.stringify(window.currentScenes),
+      );
+    }
     if (typeof window.syncMarketingMVModel === "function") {
       window.syncMarketingMVModel(window.currentProject.data.marketing);
     }
@@ -6746,6 +6760,19 @@ window.saveScenePrompt = function (sceneIndex) {
 
     if (enEl) window.currentScenes[sceneIndex].prompt = enEl.value;
     if (koEl) window.currentScenes[sceneIndex].promptKo = koEl.value;
+
+    if (window.currentProject?.data?.marketing) {
+      if (typeof window.setMarketingMVScenes === "function") {
+        window.setMarketingMVScenes(
+          window.currentProject.data.marketing,
+          window.currentScenes,
+        );
+      } else {
+        window.currentProject.data.marketing.mvScenes = JSON.parse(
+          JSON.stringify(window.currentScenes),
+        );
+      }
+    }
 
     if (typeof window.saveCurrentProject === "function") {
       window.saveCurrentProject(true);
