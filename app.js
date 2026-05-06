@@ -3988,6 +3988,18 @@ function translateStylePromptBasic(stylePrompt) {
     </div>`;
 }
 
+function showMarketingMVWorkspace() {
+  const marketingResult = document.getElementById("marketingResult");
+  if (marketingResult) {
+    marketingResult.style.display = "block";
+    marketingResult.classList.remove("hidden");
+  }
+
+  if (typeof window.showMarketingTab === "function") {
+    window.showMarketingTab("mv");
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // 6단계: 마케팅 자료 생성 함수
 // ═══════════════════════════════════════════════════════════════
@@ -4039,11 +4051,12 @@ window.generateMarketingMaterials = async function () {
     // Gemini API 키 확인 (공용 키 포함)
     const geminiKey = (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || "";
     if (!geminiKey || !geminiKey.startsWith("AIza")) {
+      showMarketingMVWorkspace();
       marketingLoading.innerHTML = `
                 <div style="text-align: center; padding: 40px;">
                     <div style="font-size: 3rem; margin-bottom: 15px;">⚠️</div>
                     <h4 style="margin-bottom: 10px; color: var(--error);">Gemini API 키가 필요합니다</h4>
-                    <p style="color: var(--text-secondary); margin-bottom: 20px;">마케팅 자료 작성을 위한 Gemini API 키가 설정되어 있지 않습니다.<br>본인의 API 키를 설정하거나 관리자에게 공용 키 설정을 요청해 주세요.</p>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">마케팅 설명 자동 생성에는 Gemini API 키가 필요합니다.<br>MV 프롬프트 탭은 계속 사용할 수 있으니 씬 구성과 프롬프트 작업을 먼저 진행할 수 있습니다.</p>
                     <button class="btn btn-primary" onclick="if(typeof window.openAPISettings === 'function') { window.openAPISettings(); }">
                         <i class="fas fa-key"></i> API 키 설정
                     </button>

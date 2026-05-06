@@ -13,6 +13,7 @@ const tests = [
   "tests/mv_step6_visual_sanity_check.js",
   "tests/mv_progress_steps_smoke.js",
   "tests/mv_marketing_step_fallback_smoke.js",
+  "tests/mv_marketing_no_key_mv_access_smoke.js",
   "tests/mv_preflight_rehearsal_runtime_check.js",
   "tests/mv_user_flow_integration_smoke.js",
   "tests/mv_confirm_scene_overview_smoke.js",
