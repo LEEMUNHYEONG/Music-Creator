@@ -10,8 +10,9 @@
 
 1. 현재 프로젝트 폴더와 백업 폴더에서 JSON/문서 파일을 확인했습니다.
 2. 코드와 문서 안에는 `musicCreatorProjects`, `savedProjects`, `marketing.mv`, `mvScenes` 관련 구조가 존재합니다.
-3. 하지만 실제 사용자가 저장한 프로젝트 데이터 JSON 파일은 현재 작업 폴더나 백업 폴더 안에서 별도로 발견되지 않았습니다.
-4. 실제 프로젝트 데이터는 앱 브라우저의 `localStorage` 또는 클라우드 동기화 데이터에 들어 있을 가능성이 높습니다.
+3. 초기 확인 당시 실제 사용자가 저장한 프로젝트 데이터 JSON 파일은 현재 작업 폴더나 백업 폴더 안에서 별도로 발견되지 않았습니다.
+4. 이후 인앱 브라우저에서 샘플 프로젝트 `Codex MV 리허설 샘플`을 생성해 저장 목록, 6단계 진입, MV 탭, 씬 저장/복원 흐름을 검증했습니다.
+5. 실제 장기 작업 프로젝트 데이터는 앱 브라우저의 `localStorage` 또는 클라우드 동기화 데이터에 들어 있을 가능성이 높습니다.
 
 ## 3. 자동 사전점검
 
@@ -24,7 +25,15 @@ npm run test:mv
 기대 결과:
 
 ```text
-MV smoke test suite: PASS (73 checks)
+MV smoke test suite: PASS (85 checks)
+```
+
+최신 기준 커밋:
+
+```text
+98acbe6 Update MV rehearsal checklist baseline
+3116aff Record MV stabilization release closeout
+dd33517 Fix MV scene prompt restore persistence
 ```
 
 ## 4. 실제 화면 리허설을 진행하는 방법
@@ -42,5 +51,7 @@ MV smoke test suite: PASS (73 checks)
 
 자동 보호 테스트와 리허설 절차 준비는 완료됐습니다.
 
-실제 사용자 데이터 기반 리허설은 사용자가 앱 화면에서 기존 프로젝트를 선택한 뒤 수행해야 합니다.  
-현재 코드 기준으로는 그 리허설을 안전하게 수행할 수 있는 자동 보호 장치가 준비되어 있습니다.
+샘플 프로젝트 기준 핵심 MV 저장/복원 리허설은 통과했습니다.
+
+실제 사용자 장기 작업 프로젝트 기반 리허설은 사용자가 앱 화면에서 기존 프로젝트를 선택한 뒤 수행해야 합니다.
+현재 코드 기준으로는 그 리허설을 안전하게 수행할 수 있는 자동 보호 장치와 되돌림 기준이 준비되어 있습니다.
