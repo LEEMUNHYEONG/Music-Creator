@@ -56,6 +56,7 @@ elements.set("mv_scene_quality_focus_btn", { disabled: false });
   "promptLength",
   "blockedTerms",
   "duplicatePrompt",
+  "repeatedVisualPattern",
 ].forEach((key) => {
   elements.set(`mv_scene_quality_filter_${key}`, {
     disabled: false,
@@ -107,6 +108,7 @@ assert.strictEqual(elements.get("mv_scene_quality_filter_missingKoPrompt").disab
 assert.strictEqual(elements.get("mv_scene_quality_filter_promptLength").disabled, true);
 assert.strictEqual(elements.get("mv_scene_quality_filter_blockedTerms").disabled, true);
 assert.strictEqual(elements.get("mv_scene_quality_filter_duplicatePrompt").disabled, true);
+assert.strictEqual(elements.get("mv_scene_quality_filter_repeatedVisualPattern").disabled, true);
 
 elements.set("scene_time_start_1", { value: "0:30" });
 elements.set("scene_time_end_1", { value: "0:20" });
@@ -208,6 +210,7 @@ assert.ok(mixedQualityText.includes("카메라 없음 1개"));
 assert.ok(mixedQualityText.includes("가사 없음 1개"));
 assert.ok(mixedQualityText.includes("EN 없음 1개"));
 assert.ok(mixedQualityText.includes("KO 없음 1개"));
+assert.ok(mixedQualityText.includes("반복 패턴 0개"));
 const confirmMessage = getMVSceneQualityConfirmMessage([
   scene,
   {
@@ -258,6 +261,36 @@ assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "missingKoPrompt"), [
 assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "promptLength"), []);
 assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "blockedTerms"), []);
 assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "duplicatePrompt"), []);
+assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "repeatedVisualPattern"), []);
+
+elements.set("scene_overview_1_en", { value: completePrompt });
+elements.set("scene_overview_1_ko", { value: "반복되는 옥상 장면" });
+const repeatedVisualScenes = [
+  {
+    time: "0:00-0:08",
+    lyrics: "첫 장면",
+    location: "sunrise rooftop",
+    cameraWork: "slow crane-up",
+    prompt: completePrompt,
+    promptKo: "희망적인 옥상 장면",
+  },
+  {
+    time: "0:08-0:16",
+    lyrics: "둘째 장면",
+    location: "sunrise rooftop",
+    cameraWork: "slow crane-up",
+    prompt: completePrompt,
+    promptKo: "반복되는 옥상 장면",
+  },
+];
+const repeatedQualityText = getMVSceneQualitySummaryText(repeatedVisualScenes);
+assert.ok(repeatedQualityText.includes("반복 패턴 2개"));
+assert.ok(repeatedQualityText.includes("확인 필요 2개"));
+assert.deepStrictEqual(
+  getMVSceneIssueIndexes(repeatedVisualScenes, "repeatedVisualPattern"),
+  [0, 1],
+);
+assert.deepStrictEqual(getMVSceneReviewIndexes(repeatedVisualScenes), [0, 1]);
 let focusedReviewIndex = null;
 window.currentScenes = issueScenes;
 elements.set("scene_editor_summary_1", { textContent: "" });
@@ -271,5 +304,13 @@ focusedReviewIndex = null;
 assert.strictEqual(window.focusMVSceneIssue("missingLocation"), true);
 assert.strictEqual(focusedReviewIndex, 1);
 assert.ok(elements.get("scene_editor_summary_1").textContent.includes("선택 필터: 장소 확인"));
+focusedReviewIndex = null;
+window.currentScenes = repeatedVisualScenes;
+elements.set("scene_editor_summary_0", { textContent: "" });
+elements.set("scene_editor_summary_1", { textContent: "" });
+assert.strictEqual(window.focusMVSceneIssue("repeatedVisualPattern"), true);
+assert.strictEqual(focusedReviewIndex, 0);
+assert.ok(elements.get("scene_editor_summary_0").textContent.includes("선택 필터: 반복 패턴 확인"));
+assert.ok(elements.get("scene_editor_summary_1").textContent.includes("배경/구도/카메라 반복"));
 
 console.log("MV scene timing editor smoke test: PASS");

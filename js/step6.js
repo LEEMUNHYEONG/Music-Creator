@@ -347,6 +347,9 @@ function getMVSceneEditorSummaryText(scene, index) {
   const koPrompt = String(koEl?.value || scene?.promptKo || "").trim();
   const lyrics = String(scene?.lyrics || "").trim();
   const promptQuality = getMVScenePromptQualityIssues(scene, index);
+  const repeatedVisualPatternIndexes = Array.isArray(window.currentScenes)
+    ? getMVRepeatedVisualPatternIndexes(window.currentScenes)
+    : [];
   const qualityNotes = [];
   if (promptQuality.missingLocation) qualityNotes.push("장소 없음");
   if (promptQuality.missingCamera) qualityNotes.push("카메라 없음");
@@ -358,6 +361,9 @@ function getMVSceneEditorSummaryText(scene, index) {
   }
   if (promptQuality.duplicatePrompt) {
     qualityNotes.push(`중복 ${promptQuality.details.repeatedExpressions.join(", ")}`);
+  }
+  if (repeatedVisualPatternIndexes.includes(index)) {
+    qualityNotes.push("배경/구도/카메라 반복");
   }
 
   const summaryParts = [
@@ -372,7 +378,10 @@ function getMVSceneEditorSummaryText(scene, index) {
   }
   if (
     window.currentMVSceneQualityFilter &&
-    getMVSceneIssueIndexes([scene], window.currentMVSceneQualityFilter).length
+    getMVSceneIssueIndexes(
+      Array.isArray(window.currentScenes) ? window.currentScenes : [scene],
+      window.currentMVSceneQualityFilter,
+    ).includes(index)
   ) {
     summaryParts.push(
       `선택 필터: ${getMVSceneIssueLabel(window.currentMVSceneQualityFilter)} 확인`,
@@ -394,6 +403,7 @@ function getMVSceneIssueLabel(issueType) {
       promptLength: "프롬프트 길이",
       blockedTerms: "금지어",
       duplicatePrompt: "중복 표현",
+      repeatedVisualPattern: "반복 패턴",
       review: "확인 필요",
     }[issueType] || "확인 필요"
   );
@@ -478,8 +488,77 @@ function getMVScenePromptQualityIssues(scene, index) {
   };
 }
 
+function normalizeMVVisualPatternValue(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getMVSceneCompositionPattern(scene, index) {
+  const getElementById =
+    typeof document.getElementById === "function"
+      ? document.getElementById.bind(document)
+      : () => null;
+  const enEl = getElementById(`scene_overview_${index}_en`);
+  const prompt = normalizeMVVisualPatternValue(enEl?.value || scene?.prompt || "");
+  const patterns = [
+    ["extreme close-up", "extreme close-up"],
+    ["close-up", "close-up"],
+    ["medium close-up", "medium close-up"],
+    ["medium shot", "medium shot"],
+    ["wide shot", "wide shot"],
+    ["long shot", "long shot"],
+    ["overhead shot", "overhead shot"],
+    ["low angle", "low angle"],
+    ["high angle", "high angle"],
+    ["profile shot", "profile shot"],
+    ["centered composition", "centered composition"],
+    ["symmetrical composition", "symmetrical composition"],
+  ];
+  const found = patterns.find(([keyword]) => prompt.includes(keyword));
+  return found ? found[1] : "";
+}
+
+function getMVRepeatedVisualPatternIndexes(scenesArg) {
+  const scenes = Array.isArray(scenesArg) ? scenesArg : [];
+  if (scenes.length < 2) {
+    return [];
+  }
+
+  const buckets = {};
+  const addPattern = (type, value, index) => {
+    const normalized = normalizeMVVisualPatternValue(value);
+    if (!normalized) return;
+    const key = `${type}:${normalized}`;
+    if (!buckets[key]) {
+      buckets[key] = { type, value: normalized, indexes: [] };
+    }
+    buckets[key].indexes.push(index);
+  };
+
+  scenes.forEach((scene, index) => {
+    addPattern("background", scene?.location, index);
+    addPattern("camera", scene?.cameraWork, index);
+    addPattern("composition", getMVSceneCompositionPattern(scene, index), index);
+  });
+
+  const repeatedIndexes = new Set();
+  const threshold = scenes.length <= 3 ? 2 : Math.ceil(scenes.length * 0.5);
+  Object.values(buckets).forEach((bucket) => {
+    const uniqueIndexes = [...new Set(bucket.indexes)];
+    if (uniqueIndexes.length >= threshold) {
+      uniqueIndexes.forEach((index) => repeatedIndexes.add(index));
+    }
+  });
+
+  return [...repeatedIndexes].sort((a, b) => a - b);
+}
+
 function getMVSceneQualityStats(scenesArg) {
   const scenes = Array.isArray(scenesArg) ? scenesArg : [];
+  const repeatedVisualPatternIndexes = getMVRepeatedVisualPatternIndexes(scenes);
   const stats = {
     total: scenes.length,
     ready: 0,
@@ -494,6 +573,7 @@ function getMVSceneQualityStats(scenesArg) {
     promptLength: 0,
     blockedTerms: 0,
     duplicatePrompt: 0,
+    repeatedVisualPattern: repeatedVisualPatternIndexes.length,
   };
 
   scenes.forEach((scene, index) => {
@@ -519,6 +599,7 @@ function getMVSceneQualityStats(scenesArg) {
     const hasEnPrompt = Boolean(String(enEl?.value || scene?.prompt || "").trim());
     const hasKoPrompt = Boolean(String(koEl?.value || scene?.promptKo || "").trim());
     const promptQuality = getMVScenePromptQualityIssues(scene, index);
+    const hasRepeatedVisualPattern = repeatedVisualPatternIndexes.includes(index);
 
     if (!hasValidTime) stats.invalidTime += 1;
     if (metadataCount === 0) stats.missingMetadata += 1;
@@ -541,7 +622,8 @@ function getMVSceneQualityStats(scenesArg) {
       hasKoPrompt &&
       !promptQuality.promptLength &&
       !promptQuality.blockedTerms &&
-      !promptQuality.duplicatePrompt
+      !promptQuality.duplicatePrompt &&
+      !hasRepeatedVisualPattern
     ) {
       stats.ready += 1;
     }
@@ -553,6 +635,7 @@ function getMVSceneQualityStats(scenesArg) {
 
 function getMVSceneReviewIndexes(scenesArg) {
   const scenes = Array.isArray(scenesArg) ? scenesArg : [];
+  const repeatedVisualPatternIndexes = getMVRepeatedVisualPatternIndexes(scenes);
   const getElementById =
     typeof document.getElementById === "function"
       ? document.getElementById.bind(document)
@@ -578,6 +661,7 @@ function getMVSceneReviewIndexes(scenesArg) {
       const hasEnPrompt = Boolean(String(enEl?.value || scene?.prompt || "").trim());
       const hasKoPrompt = Boolean(String(koEl?.value || scene?.promptKo || "").trim());
       const promptQuality = getMVScenePromptQualityIssues(scene, index);
+      const hasRepeatedVisualPattern = repeatedVisualPatternIndexes.includes(index);
 
       return hasValidTime &&
         hasMetadata &&
@@ -588,7 +672,8 @@ function getMVSceneReviewIndexes(scenesArg) {
         hasKoPrompt &&
         !promptQuality.promptLength &&
         !promptQuality.blockedTerms &&
-        !promptQuality.duplicatePrompt
+        !promptQuality.duplicatePrompt &&
+        !hasRepeatedVisualPattern
         ? null
         : index;
     })
@@ -597,6 +682,7 @@ function getMVSceneReviewIndexes(scenesArg) {
 
 function getMVSceneIssueIndexes(scenesArg, issueType) {
   const scenes = Array.isArray(scenesArg) ? scenesArg : [];
+  const repeatedVisualPatternIndexes = getMVRepeatedVisualPatternIndexes(scenes);
   const getElementById =
     typeof document.getElementById === "function"
       ? document.getElementById.bind(document)
@@ -622,6 +708,7 @@ function getMVSceneIssueIndexes(scenesArg, issueType) {
       const hasEnPrompt = Boolean(String(enEl?.value || scene?.prompt || "").trim());
       const hasKoPrompt = Boolean(String(koEl?.value || scene?.promptKo || "").trim());
       const promptQuality = getMVScenePromptQualityIssues(scene, index);
+      const hasRepeatedVisualPattern = repeatedVisualPatternIndexes.includes(index);
 
       const issueMap = {
         invalidTime: !hasValidTime,
@@ -634,6 +721,7 @@ function getMVSceneIssueIndexes(scenesArg, issueType) {
         promptLength: promptQuality.promptLength,
         blockedTerms: promptQuality.blockedTerms,
         duplicatePrompt: promptQuality.duplicatePrompt,
+        repeatedVisualPattern: hasRepeatedVisualPattern,
         review:
           !hasValidTime ||
           !hasMetadata ||
@@ -644,7 +732,8 @@ function getMVSceneIssueIndexes(scenesArg, issueType) {
           !hasKoPrompt ||
           promptQuality.promptLength ||
           promptQuality.blockedTerms ||
-          promptQuality.duplicatePrompt,
+          promptQuality.duplicatePrompt ||
+          hasRepeatedVisualPattern,
       };
       return issueMap[issueType] ? index : null;
     })
@@ -667,6 +756,7 @@ function getMVSceneQualitySummaryText(scenesArg) {
     `길이 확인 ${stats.promptLength}개`,
     `금지어 ${stats.blockedTerms}개`,
     `중복 표현 ${stats.duplicatePrompt}개`,
+    `반복 패턴 ${stats.repeatedVisualPattern}개`,
   ].join(" · ");
 }
 
@@ -676,7 +766,7 @@ function getMVSceneQualityConfirmMessage(scenesArg) {
   return [
     `${stats.needsReview}개 씬에 확인 필요 항목이 남아 있습니다.`,
     `시간 확인 ${stats.invalidTime}개, 장소 없음 ${stats.missingLocation}개, 카메라 없음 ${stats.missingCamera}개, 가사 없음 ${stats.missingLyrics}개, EN 없음 ${stats.missingEnPrompt}개, KO 없음 ${stats.missingKoPrompt}개`,
-    `프롬프트 길이 확인 ${stats.promptLength}개, 금지어 ${stats.blockedTerms}개, 중복 표현 ${stats.duplicatePrompt}개`,
+    `프롬프트 길이 확인 ${stats.promptLength}개, 금지어 ${stats.blockedTerms}개, 중복 표현 ${stats.duplicatePrompt}개, 반복 패턴 ${stats.repeatedVisualPattern}개`,
     "취소하면 첫 확인 필요 씬으로 이동합니다.",
     "이 상태로 확정하고 결과 화면으로 이동하려면 확인을 누르세요.",
   ].join("\n");
@@ -694,6 +784,7 @@ function renderMVSceneQualitySummary(scenesArg) {
     ["promptLength", "길이", stats.promptLength],
     ["blockedTerms", "금지어", stats.blockedTerms],
     ["duplicatePrompt", "중복", stats.duplicatePrompt],
+    ["repeatedVisualPattern", "반복", stats.repeatedVisualPattern],
   ];
   return `
     <div id="mv_scene_quality_summary" class="mv-scene-quality-summary" role="status" aria-live="polite" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 10px 0 18px 0; padding: 12px 14px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.24); border-radius: 8px; color: var(--text-secondary); font-size: 0.84rem; line-height: 1.5;">
@@ -741,6 +832,7 @@ function updateMVSceneQualitySummary() {
     ["promptLength", stats.promptLength],
     ["blockedTerms", stats.blockedTerms],
     ["duplicatePrompt", stats.duplicatePrompt],
+    ["repeatedVisualPattern", stats.repeatedVisualPattern],
   ].forEach(([key, count]) => {
     const btn = document.getElementById(`mv_scene_quality_filter_${key}`);
     if (btn) {
@@ -756,6 +848,7 @@ function updateMVSceneQualitySummary() {
           promptLength: "길이",
           blockedTerms: "금지어",
           duplicatePrompt: "중복",
+          repeatedVisualPattern: "반복",
         }[key] + ` ${count}`;
     }
   });
