@@ -12,9 +12,9 @@ const sceneDescriptions = [
   { value: "수정된 둘째 장면: 새벽 루프탑에서 후렴이 열린다." },
 ];
 const completeScenePrompt1 =
-  "rainy neon alley at blue hour, lonely vocalist walking through reflective pavement, consistent black coat and bob hair, soft side light, slow dolly-in camera movement, cinematic motion, photorealistic detail, 16:9 aspect ratio, sharp focus, emotional music video frame";
+  "rainy neon alley at blue hour, lonely vocalist with black bob hair wearing a long coat walking through reflective pavement, soft side light, slow dolly-in camera movement, cinematic motion, photorealistic detail, 16:9 aspect ratio, sharp focus, emotional music video frame";
 const completeScenePrompt2 =
-  "misty rooftop at sunrise, hopeful vocalist looking toward the opening sky, warm rim light across the face, crane-up reveal from medium shot to wide city skyline, cinematic motion, photorealistic detail, 16:9 aspect ratio, sharp focus, emotional music video frame";
+  "misty rooftop at sunrise, hopeful vocalist with black bob hair wearing a long coat looking toward the opening sky, warm rim light across the face, crane-up reveal from medium shot to wide city skyline, cinematic motion, photorealistic detail, 16:9 aspect ratio, sharp focus, emotional music video frame";
 const calls = {
   indicators: [],
   alerts: [],

@@ -57,6 +57,7 @@ elements.set("mv_scene_quality_focus_btn", { disabled: false });
   "blockedTerms",
   "duplicatePrompt",
   "repeatedVisualPattern",
+  "characterConsistency",
 ].forEach((key) => {
   elements.set(`mv_scene_quality_filter_${key}`, {
     disabled: false,
@@ -109,6 +110,7 @@ assert.strictEqual(elements.get("mv_scene_quality_filter_promptLength").disabled
 assert.strictEqual(elements.get("mv_scene_quality_filter_blockedTerms").disabled, true);
 assert.strictEqual(elements.get("mv_scene_quality_filter_duplicatePrompt").disabled, true);
 assert.strictEqual(elements.get("mv_scene_quality_filter_repeatedVisualPattern").disabled, true);
+assert.strictEqual(elements.get("mv_scene_quality_filter_characterConsistency").disabled, true);
 
 elements.set("scene_time_start_1", { value: "0:30" });
 elements.set("scene_time_end_1", { value: "0:20" });
@@ -211,6 +213,7 @@ assert.ok(mixedQualityText.includes("가사 없음 1개"));
 assert.ok(mixedQualityText.includes("EN 없음 1개"));
 assert.ok(mixedQualityText.includes("KO 없음 1개"));
 assert.ok(mixedQualityText.includes("반복 패턴 0개"));
+assert.ok(mixedQualityText.includes("인물 누락 0개"));
 const confirmMessage = getMVSceneQualityConfirmMessage([
   scene,
   {
@@ -262,6 +265,7 @@ assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "promptLength"), []);
 assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "blockedTerms"), []);
 assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "duplicatePrompt"), []);
 assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "repeatedVisualPattern"), []);
+assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "characterConsistency"), []);
 
 elements.set("scene_overview_1_en", { value: completePrompt });
 elements.set("scene_overview_1_ko", { value: "반복되는 옥상 장면" });
@@ -291,6 +295,37 @@ assert.deepStrictEqual(
   [0, 1],
 );
 assert.deepStrictEqual(getMVSceneReviewIndexes(repeatedVisualScenes), [0, 1]);
+
+elements.set("mvCharacterCount", { value: "1" });
+elements.set("mvCharacter1_appearance", { value: "silver hair, red jacket" });
+const characterScenes = [
+  {
+    time: "0:00-0:08",
+    lyrics: "첫 인물 장면",
+    location: "subway platform",
+    cameraWork: "slow dolly-in",
+    prompt:
+      "subway platform music video frame with vocalist walking through cool fluorescent light, slow dolly-in camera movement, photorealistic cinematic detail, emotional performance, 16:9 aspect ratio, sharp focus, detailed lighting, cohesive color palette",
+    promptKo: "지하철 플랫폼 인물 장면",
+  },
+  {
+    time: "0:08-0:16",
+    lyrics: "둘째 인물 장면",
+    location: "rainy street",
+    cameraWork: "wide handheld tracking",
+    prompt:
+      "rainy street music video frame with silver hair vocalist wearing a red jacket, wide handheld tracking shot, photorealistic cinematic detail, emotional performance, 16:9 aspect ratio, sharp focus, detailed lighting, cohesive color palette",
+    promptKo: "빗속 거리 인물 장면",
+  },
+];
+const characterQualityText = getMVSceneQualitySummaryText(characterScenes);
+assert.ok(characterQualityText.includes("인물 누락 1개"));
+assert.deepStrictEqual(
+  getMVSceneIssueIndexes(characterScenes, "characterConsistency"),
+  [0],
+);
+assert.deepStrictEqual(getMVSceneReviewIndexes(characterScenes), [0]);
+elements.set("mvCharacterCount", { value: "0" });
 let focusedReviewIndex = null;
 window.currentScenes = issueScenes;
 elements.set("scene_editor_summary_1", { textContent: "" });
@@ -312,5 +347,14 @@ assert.strictEqual(window.focusMVSceneIssue("repeatedVisualPattern"), true);
 assert.strictEqual(focusedReviewIndex, 0);
 assert.ok(elements.get("scene_editor_summary_0").textContent.includes("선택 필터: 반복 패턴 확인"));
 assert.ok(elements.get("scene_editor_summary_1").textContent.includes("배경/구도/카메라 반복"));
+focusedReviewIndex = null;
+window.currentScenes = characterScenes;
+elements.set("mvCharacterCount", { value: "1" });
+elements.set("scene_editor_summary_0", { textContent: "" });
+elements.set("scene_editor_summary_1", { textContent: "" });
+assert.strictEqual(window.focusMVSceneIssue("characterConsistency"), true);
+assert.strictEqual(focusedReviewIndex, 0);
+assert.ok(elements.get("scene_editor_summary_0").textContent.includes("선택 필터: 인물 일관성 확인"));
+assert.ok(elements.get("scene_editor_summary_0").textContent.includes("인물 키워드 누락"));
 
 console.log("MV scene timing editor smoke test: PASS");

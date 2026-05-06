@@ -350,6 +350,7 @@ function getMVSceneEditorSummaryText(scene, index) {
   const repeatedVisualPatternIndexes = Array.isArray(window.currentScenes)
     ? getMVRepeatedVisualPatternIndexes(window.currentScenes)
     : [];
+  const missingCharacterKeywords = getMVMissingCharacterConsistencyKeywords(scene, index);
   const qualityNotes = [];
   if (promptQuality.missingLocation) qualityNotes.push("장소 없음");
   if (promptQuality.missingCamera) qualityNotes.push("카메라 없음");
@@ -364,6 +365,9 @@ function getMVSceneEditorSummaryText(scene, index) {
   }
   if (repeatedVisualPatternIndexes.includes(index)) {
     qualityNotes.push("배경/구도/카메라 반복");
+  }
+  if (missingCharacterKeywords.length) {
+    qualityNotes.push(`인물 키워드 누락 ${missingCharacterKeywords.join(", ")}`);
   }
 
   const summaryParts = [
@@ -404,6 +408,7 @@ function getMVSceneIssueLabel(issueType) {
       blockedTerms: "금지어",
       duplicatePrompt: "중복 표현",
       repeatedVisualPattern: "반복 패턴",
+      characterConsistency: "인물 일관성",
       review: "확인 필요",
     }[issueType] || "확인 필요"
   );
@@ -556,9 +561,59 @@ function getMVRepeatedVisualPatternIndexes(scenesArg) {
   return [...repeatedIndexes].sort((a, b) => a - b);
 }
 
+function getMVCharacterConsistencyKeywords() {
+  const getElementById =
+    typeof document.getElementById === "function"
+      ? document.getElementById.bind(document)
+      : () => null;
+  const characterCount = parseInt(getElementById("mvCharacterCount")?.value || "0", 10);
+  const phrases = [];
+
+  for (let i = 1; i <= characterCount; i += 1) {
+    const appearance = String(getElementById(`mvCharacter${i}_appearance`)?.value || "");
+    appearance
+      .split(/[,;/\n]+/)
+      .map((value) => normalizeMVVisualPatternValue(value))
+      .filter((value) => value.length >= 3)
+      .forEach((value) => phrases.push(value));
+  }
+
+  return [...new Set(phrases)].slice(0, 8);
+}
+
+function getMVMissingCharacterConsistencyKeywords(scene, index, keywordsArg) {
+  const keywords = Array.isArray(keywordsArg)
+    ? keywordsArg
+    : getMVCharacterConsistencyKeywords();
+  if (!keywords.length) return [];
+
+  const getElementById =
+    typeof document.getElementById === "function"
+      ? document.getElementById.bind(document)
+      : () => null;
+  const enEl = getElementById(`scene_overview_${index}_en`);
+  const koEl = getElementById(`scene_overview_${index}_ko`);
+  const prompt = normalizeMVVisualPatternValue(
+    [
+      enEl?.value,
+      koEl?.value,
+      scene?.prompt,
+      scene?.promptKo,
+      scene?.characterAction,
+    ].join(" "),
+  );
+
+  return keywords.filter((keyword) => {
+    const words = keyword.split(" ").filter((word) => word.length > 1);
+    if (!words.length) return false;
+    return !words.every((word) => prompt.includes(word));
+  });
+}
+
 function getMVSceneQualityStats(scenesArg) {
   const scenes = Array.isArray(scenesArg) ? scenesArg : [];
   const repeatedVisualPatternIndexes = getMVRepeatedVisualPatternIndexes(scenes);
+  const characterKeywords = getMVCharacterConsistencyKeywords();
   const stats = {
     total: scenes.length,
     ready: 0,
@@ -574,6 +629,7 @@ function getMVSceneQualityStats(scenesArg) {
     blockedTerms: 0,
     duplicatePrompt: 0,
     repeatedVisualPattern: repeatedVisualPatternIndexes.length,
+    characterConsistency: 0,
   };
 
   scenes.forEach((scene, index) => {
@@ -600,6 +656,11 @@ function getMVSceneQualityStats(scenesArg) {
     const hasKoPrompt = Boolean(String(koEl?.value || scene?.promptKo || "").trim());
     const promptQuality = getMVScenePromptQualityIssues(scene, index);
     const hasRepeatedVisualPattern = repeatedVisualPatternIndexes.includes(index);
+    const missingCharacterKeywords = getMVMissingCharacterConsistencyKeywords(
+      scene,
+      index,
+      characterKeywords,
+    );
 
     if (!hasValidTime) stats.invalidTime += 1;
     if (metadataCount === 0) stats.missingMetadata += 1;
@@ -611,6 +672,7 @@ function getMVSceneQualityStats(scenesArg) {
     if (promptQuality.promptLength) stats.promptLength += 1;
     if (promptQuality.blockedTerms) stats.blockedTerms += 1;
     if (promptQuality.duplicatePrompt) stats.duplicatePrompt += 1;
+    if (missingCharacterKeywords.length) stats.characterConsistency += 1;
 
     if (
       hasValidTime &&
@@ -623,7 +685,8 @@ function getMVSceneQualityStats(scenesArg) {
       !promptQuality.promptLength &&
       !promptQuality.blockedTerms &&
       !promptQuality.duplicatePrompt &&
-      !hasRepeatedVisualPattern
+      !hasRepeatedVisualPattern &&
+      missingCharacterKeywords.length === 0
     ) {
       stats.ready += 1;
     }
@@ -636,6 +699,7 @@ function getMVSceneQualityStats(scenesArg) {
 function getMVSceneReviewIndexes(scenesArg) {
   const scenes = Array.isArray(scenesArg) ? scenesArg : [];
   const repeatedVisualPatternIndexes = getMVRepeatedVisualPatternIndexes(scenes);
+  const characterKeywords = getMVCharacterConsistencyKeywords();
   const getElementById =
     typeof document.getElementById === "function"
       ? document.getElementById.bind(document)
@@ -662,6 +726,11 @@ function getMVSceneReviewIndexes(scenesArg) {
       const hasKoPrompt = Boolean(String(koEl?.value || scene?.promptKo || "").trim());
       const promptQuality = getMVScenePromptQualityIssues(scene, index);
       const hasRepeatedVisualPattern = repeatedVisualPatternIndexes.includes(index);
+      const missingCharacterKeywords = getMVMissingCharacterConsistencyKeywords(
+        scene,
+        index,
+        characterKeywords,
+      );
 
       return hasValidTime &&
         hasMetadata &&
@@ -673,7 +742,8 @@ function getMVSceneReviewIndexes(scenesArg) {
         !promptQuality.promptLength &&
         !promptQuality.blockedTerms &&
         !promptQuality.duplicatePrompt &&
-        !hasRepeatedVisualPattern
+        !hasRepeatedVisualPattern &&
+        missingCharacterKeywords.length === 0
         ? null
         : index;
     })
@@ -683,6 +753,7 @@ function getMVSceneReviewIndexes(scenesArg) {
 function getMVSceneIssueIndexes(scenesArg, issueType) {
   const scenes = Array.isArray(scenesArg) ? scenesArg : [];
   const repeatedVisualPatternIndexes = getMVRepeatedVisualPatternIndexes(scenes);
+  const characterKeywords = getMVCharacterConsistencyKeywords();
   const getElementById =
     typeof document.getElementById === "function"
       ? document.getElementById.bind(document)
@@ -709,6 +780,11 @@ function getMVSceneIssueIndexes(scenesArg, issueType) {
       const hasKoPrompt = Boolean(String(koEl?.value || scene?.promptKo || "").trim());
       const promptQuality = getMVScenePromptQualityIssues(scene, index);
       const hasRepeatedVisualPattern = repeatedVisualPatternIndexes.includes(index);
+      const missingCharacterKeywords = getMVMissingCharacterConsistencyKeywords(
+        scene,
+        index,
+        characterKeywords,
+      );
 
       const issueMap = {
         invalidTime: !hasValidTime,
@@ -722,6 +798,7 @@ function getMVSceneIssueIndexes(scenesArg, issueType) {
         blockedTerms: promptQuality.blockedTerms,
         duplicatePrompt: promptQuality.duplicatePrompt,
         repeatedVisualPattern: hasRepeatedVisualPattern,
+        characterConsistency: missingCharacterKeywords.length > 0,
         review:
           !hasValidTime ||
           !hasMetadata ||
@@ -733,7 +810,8 @@ function getMVSceneIssueIndexes(scenesArg, issueType) {
           promptQuality.promptLength ||
           promptQuality.blockedTerms ||
           promptQuality.duplicatePrompt ||
-          hasRepeatedVisualPattern,
+          hasRepeatedVisualPattern ||
+          missingCharacterKeywords.length > 0,
       };
       return issueMap[issueType] ? index : null;
     })
@@ -757,6 +835,7 @@ function getMVSceneQualitySummaryText(scenesArg) {
     `금지어 ${stats.blockedTerms}개`,
     `중복 표현 ${stats.duplicatePrompt}개`,
     `반복 패턴 ${stats.repeatedVisualPattern}개`,
+    `인물 누락 ${stats.characterConsistency}개`,
   ].join(" · ");
 }
 
@@ -766,7 +845,7 @@ function getMVSceneQualityConfirmMessage(scenesArg) {
   return [
     `${stats.needsReview}개 씬에 확인 필요 항목이 남아 있습니다.`,
     `시간 확인 ${stats.invalidTime}개, 장소 없음 ${stats.missingLocation}개, 카메라 없음 ${stats.missingCamera}개, 가사 없음 ${stats.missingLyrics}개, EN 없음 ${stats.missingEnPrompt}개, KO 없음 ${stats.missingKoPrompt}개`,
-    `프롬프트 길이 확인 ${stats.promptLength}개, 금지어 ${stats.blockedTerms}개, 중복 표현 ${stats.duplicatePrompt}개, 반복 패턴 ${stats.repeatedVisualPattern}개`,
+    `프롬프트 길이 확인 ${stats.promptLength}개, 금지어 ${stats.blockedTerms}개, 중복 표현 ${stats.duplicatePrompt}개, 반복 패턴 ${stats.repeatedVisualPattern}개, 인물 누락 ${stats.characterConsistency}개`,
     "취소하면 첫 확인 필요 씬으로 이동합니다.",
     "이 상태로 확정하고 결과 화면으로 이동하려면 확인을 누르세요.",
   ].join("\n");
@@ -785,6 +864,7 @@ function renderMVSceneQualitySummary(scenesArg) {
     ["blockedTerms", "금지어", stats.blockedTerms],
     ["duplicatePrompt", "중복", stats.duplicatePrompt],
     ["repeatedVisualPattern", "반복", stats.repeatedVisualPattern],
+    ["characterConsistency", "인물", stats.characterConsistency],
   ];
   return `
     <div id="mv_scene_quality_summary" class="mv-scene-quality-summary" role="status" aria-live="polite" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 10px 0 18px 0; padding: 12px 14px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.24); border-radius: 8px; color: var(--text-secondary); font-size: 0.84rem; line-height: 1.5;">
@@ -833,6 +913,7 @@ function updateMVSceneQualitySummary() {
     ["blockedTerms", stats.blockedTerms],
     ["duplicatePrompt", stats.duplicatePrompt],
     ["repeatedVisualPattern", stats.repeatedVisualPattern],
+    ["characterConsistency", stats.characterConsistency],
   ].forEach(([key, count]) => {
     const btn = document.getElementById(`mv_scene_quality_filter_${key}`);
     if (btn) {
@@ -849,6 +930,7 @@ function updateMVSceneQualitySummary() {
           blockedTerms: "금지어",
           duplicatePrompt: "중복",
           repeatedVisualPattern: "반복",
+          characterConsistency: "인물",
         }[key] + ` ${count}`;
     }
   });
