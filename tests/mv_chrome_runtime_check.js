@@ -146,6 +146,8 @@ async function cleanup() {
           "saveScenePrompt",
           "markMVScenePromptDirty",
           "saveFocusedMVScenePrompt",
+          "buildMVScenePromptTableText",
+          "copyMVScenePromptTable",
           "buildMVVideoToolPrompts",
           "copyMVVideoToolPrompts",
           "downloadMVVideoToolPrompts",

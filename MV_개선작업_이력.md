@@ -1,5 +1,36 @@
 # MV 개선작업 이력
 
+## 2026-05-06: MV 2차 고도화 - 씬 프롬프트 표 복사
+
+### 작업 목적
+
+씬 번호, 시간, 가사, EN 프롬프트, KO 설명을 외부 스프레드시트나 문서에 바로 붙여넣을 수 있도록 TSV 표 복사 기능을 추가했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `buildMVScenePromptTableText()`로 씬별 TSV 표 생성
+   - `copyMVScenePromptTable()`로 클립보드 복사 지원
+   - 탭/줄바꿈이 표 셀을 깨뜨리지 않도록 `formatMVTableCell()` 추가
+   - MV 결과 프롬프트 화면 상단 내보내기 영역에 `표 복사` 버튼 추가
+
+2. `tests/mv_scene_prompt_table_copy_smoke.js`
+   - 표 헤더, textarea 편집값 우선 반영, 탭/줄바꿈 정리, 클립보드 복사 동작 보호
+
+3. `tests/mv_chrome_runtime_check.js`, `tests/run_mv_smoke_tests.js`
+   - 새 전역 함수와 통합 테스트 러너에 보호 범위 추가
+
+4. 문서
+   - `MV_2차_고도화_로드맵.md`의 2단계 진행 상태 갱신
+   - `MV_테스트_실행_가이드.md`와 `MV_운영_인계_요약.md`의 자동 테스트 기준을 `PASS (91 checks)`로 갱신
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (91 checks)
+```
+
 ## 2026-05-06: MV 2차 고도화 - 영상 생성 도구별 내보내기 템플릿
 
 ### 작업 목적

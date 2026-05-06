@@ -4598,6 +4598,58 @@ window.getMVScenePromptForExport = function (scene, index, field = "prompt") {
   return textareaValue || scene[field] || "";
 };
 
+window.formatMVTableCell = function (value) {
+  return String(value || "")
+    .replace(/\t/g, " ")
+    .replace(/\r?\n/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+};
+
+window.buildMVScenePromptTableText = function () {
+  const scenes = Array.isArray(window.currentScenes) ? window.currentScenes : [];
+  if (scenes.length === 0) return "";
+
+  const headers = ["씬", "시간", "가사", "EN 프롬프트", "KO 설명"];
+  const rows = scenes.map((scene, index) => {
+    const enPrompt = window.getMVScenePromptForExport(scene, index, "prompt");
+    const koPrompt = window.getMVScenePromptForExport(scene, index, "promptKo");
+    return [
+      index + 1,
+      scene.time || "",
+      scene.lyrics || "",
+      enPrompt,
+      koPrompt || scene.scene || "",
+    ].map(window.formatMVTableCell);
+  });
+
+  return [headers, ...rows].map((row) => row.join("\t")).join("\n");
+};
+
+window.copyMVScenePromptTable = function () {
+  const text = window.buildMVScenePromptTableText();
+  if (!text) {
+    alert("복사할 씬 프롬프트 표가 없습니다.");
+    return;
+  }
+
+  navigator.clipboard
+    .writeText(text)
+    .then(() => {
+      if (typeof window.showCopyIndicator === "function") {
+        window.showCopyIndicator(
+          "✅ 씬 프롬프트 표가 클립보드에 복사되었습니다!",
+        );
+      } else {
+        alert("씬 프롬프트 표가 클립보드에 복사되었습니다.");
+      }
+    })
+    .catch((err) => {
+      console.error("씬 프롬프트 표 복사 오류:", err);
+      alert("씬 프롬프트 표 복사 중 오류가 발생했습니다.");
+    });
+};
+
 window.getMVVideoToolConfig = function (tool) {
   const toolKey = String(tool || "runway").toLowerCase();
   const configs = {
@@ -5857,9 +5909,10 @@ window.confirmSceneOverviewAndGenerate = async function (isSilent = false) {
                         <div style="display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: center;">
                             <div>
                                 <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">영상 생성 도구별 내보내기</div>
-                                <div style="font-size: 0.84rem; color: var(--text-secondary);">Runway, Pika, Kling용 씬별 프롬프트를 복사하거나 TXT로 저장합니다.</div>
+                                <div style="font-size: 0.84rem; color: var(--text-secondary);">Runway, Pika, Kling용 씬별 프롬프트와 씬 표를 복사하거나 TXT로 저장합니다.</div>
                             </div>
                             <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
+                                <button class="btn btn-small btn-success" onclick="copyMVScenePromptTable()" style="padding: 6px 10px; font-size: 0.78rem;">표 복사</button>
                                 <button class="btn btn-small btn-primary" onclick="copyMVVideoToolPrompts('runway')" style="padding: 6px 10px; font-size: 0.78rem;">Runway 복사</button>
                                 <button class="btn btn-small btn-secondary" onclick="downloadMVVideoToolPrompts('runway')" style="padding: 6px 10px; font-size: 0.78rem;">TXT</button>
                                 <button class="btn btn-small btn-primary" onclick="copyMVVideoToolPrompts('pika')" style="padding: 6px 10px; font-size: 0.78rem;">Pika 복사</button>
