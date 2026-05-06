@@ -1,5 +1,35 @@
 # MV 개선작업 이력
 
+## 2026-05-06: MV 2차 고도화 - 저장 전후 씬 비교
+
+### 작업 목적
+
+프로젝트 저장 시 `marketing.mv`의 씬 개수, 첫 씬, 마지막 씬, 수정 시각이 저장 전후에 어떻게 달라졌는지 바로 확인할 수 있도록 비교 로그와 수동 진단 표시를 확장했습니다.
+
+### 변경 내용
+
+1. `js/storage.js`
+   - `compareMarketingMVDiagnostics()`로 저장 전/후 진단 스냅샷 비교
+   - `formatMarketingMVDiagnosticsComparison()`으로 사람이 읽는 비교 문구 생성
+   - `saveCurrentProject()`에서 저장 전 스냅샷과 저장 후 스냅샷을 비교해 `MV marketing.mv save comparison` 로그 기록
+   - 마지막 저장 비교 결과를 `showMarketingMVDiagnostics()` 수동 진단에 함께 표시
+
+2. 테스트
+   - `tests/mv_marketing_diagnostics_smoke.js`에서 비교 생성/포맷/수동 표시 보호
+   - `tests/mv_model_storage_smoke.js`에서 저장 전후 비교 로그 보호
+   - `tests/mv_chrome_runtime_check.js`에서 새 비교 헬퍼 노출 보호
+
+3. 문서
+   - `MV_2차_고도화_로드맵.md`의 3단계 진행 상태 갱신
+   - `MV_테스트_실행_가이드.md`와 `MV_운영_인계_요약.md`의 보호 범위 문구 갱신
+
+### 검증 기준
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (95 checks)
+```
+
 ## 2026-05-06: MV 2차 고도화 - marketing.mv 진단 요약
 
 ### 작업 목적

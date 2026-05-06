@@ -87,16 +87,50 @@ assert.ok(formatted.includes("MV marketing.mv 진단 요약"));
 assert.ok(formatted.includes("씬 수: 1 (canonical 1, legacy 2)"));
 assert.ok(formatted.includes("확인 사항: canonical/legacy 씬 수 불일치"));
 
+const afterDiagnostics = {
+  ...diagnostics,
+  context: "after",
+  sceneCount: 2,
+  canonicalSceneCount: 2,
+  legacySceneCount: 2,
+  firstScene: {
+    time: "00:00-00:08",
+    scene: "비 오는 골목 수정",
+    hasPrompt: true,
+  },
+  lastScene: {
+    time: "00:08-00:16",
+    scene: "옥상",
+    hasPrompt: false,
+  },
+  updatedAt: "2026-05-06T00:00:00.000Z",
+};
+const comparison = window.compareMarketingMVDiagnostics(
+  diagnostics,
+  afterDiagnostics,
+);
+assert.strictEqual(comparison.changed, true);
+assert.strictEqual(comparison.sceneCount.changed, true);
+assert.strictEqual(comparison.firstScene.changed, true);
+assert.strictEqual(comparison.lastScene.changed, true);
+assert.strictEqual(comparison.updatedAt.changed, true);
+const comparisonText =
+  window.formatMarketingMVDiagnosticsComparison(comparison);
+assert.ok(comparisonText.includes("MV 저장 전/후 비교"));
+assert.ok(comparisonText.includes("씬 수: 1 -> 2"));
+
 const logged = window.logMarketingMVDiagnostics(
   window.currentProject.data.marketing,
   "manual-log",
 );
 assert.strictEqual(loggedPayload, logged);
 assert.strictEqual(logged.context, "manual-log");
+window.__lastMarketingMVSaveComparison = comparison;
 
 const shown = window.showMarketingMVDiagnostics();
 assert.strictEqual(shown.context, "manual");
 assert.ok(alertText.includes("MV marketing.mv 진단 요약"));
+assert.ok(alertText.includes("MV 저장 전/후 비교"));
 assert.ok(toastMessage.includes("진단"));
 
 originalConsole.log("MV marketing diagnostics smoke test: PASS");

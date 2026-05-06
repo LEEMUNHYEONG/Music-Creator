@@ -359,6 +359,55 @@ window.formatMarketingMVDiagnostics = function (diagnostics) {
   return lines.join("\n");
 };
 
+window.compareMarketingMVDiagnostics = function (before, after) {
+  if (!before || !after) return null;
+  const sceneChanged = before.sceneCount !== after.sceneCount;
+  const firstChanged =
+    (before.firstScene?.time || "") !== (after.firstScene?.time || "") ||
+    (before.firstScene?.scene || "") !== (after.firstScene?.scene || "");
+  const lastChanged =
+    (before.lastScene?.time || "") !== (after.lastScene?.time || "") ||
+    (before.lastScene?.scene || "") !== (after.lastScene?.scene || "");
+  const updatedAtChanged = (before.updatedAt || "") !== (after.updatedAt || "");
+
+  return {
+    before,
+    after,
+    sceneCount: {
+      before: before.sceneCount,
+      after: after.sceneCount,
+      changed: sceneChanged,
+    },
+    firstScene: {
+      before: before.firstScene,
+      after: after.firstScene,
+      changed: firstChanged,
+    },
+    lastScene: {
+      before: before.lastScene,
+      after: after.lastScene,
+      changed: lastChanged,
+    },
+    updatedAt: {
+      before: before.updatedAt || "",
+      after: after.updatedAt || "",
+      changed: updatedAtChanged,
+    },
+    changed: sceneChanged || firstChanged || lastChanged || updatedAtChanged,
+  };
+};
+
+window.formatMarketingMVDiagnosticsComparison = function (comparison) {
+  if (!comparison) return "MV 저장 비교 데이터가 없습니다.";
+  return [
+    "MV 저장 전/후 비교",
+    `씬 수: ${comparison.sceneCount.before} -> ${comparison.sceneCount.after}${comparison.sceneCount.changed ? " (변경)" : ""}`,
+    `첫 씬: ${comparison.firstScene.before?.scene || "없음"} -> ${comparison.firstScene.after?.scene || "없음"}${comparison.firstScene.changed ? " (변경)" : ""}`,
+    `마지막 씬: ${comparison.lastScene.before?.scene || "없음"} -> ${comparison.lastScene.after?.scene || "없음"}${comparison.lastScene.changed ? " (변경)" : ""}`,
+    `수정 시각: ${comparison.updatedAt.before || "없음"} -> ${comparison.updatedAt.after || "없음"}${comparison.updatedAt.changed ? " (변경)" : ""}`,
+  ].join("\n");
+};
+
 window.logMarketingMVDiagnostics = function (
   marketingArg,
   context = "pre-save",
@@ -368,9 +417,19 @@ window.logMarketingMVDiagnostics = function (
   return diagnostics;
 };
 
+window.logMarketingMVSaveComparison = function (before, after) {
+  const comparison = window.compareMarketingMVDiagnostics(before, after);
+  console.info("MV marketing.mv save comparison:", comparison);
+  return comparison;
+};
+
 window.showMarketingMVDiagnostics = function () {
   const diagnostics = window.buildMarketingMVDiagnostics(null, "manual");
-  const text = window.formatMarketingMVDiagnostics(diagnostics);
+  const comparison = window.__lastMarketingMVSaveComparison || null;
+  let text = window.formatMarketingMVDiagnostics(diagnostics);
+  if (comparison) {
+    text += `\n\n${window.formatMarketingMVDiagnosticsComparison(comparison)}`;
+  }
   if (typeof window.showCopyIndicator === "function") {
     window.showCopyIndicator("✅ MV 진단 요약이 준비되었습니다.");
   }
@@ -513,6 +572,7 @@ window.saveCurrentProject = function () {
 
     // 기존 데이터 유지 (DOM에 없는 데이터 보존)
     const existing = (window.currentProject && window.currentProject.data) ? window.currentProject.data : {};
+    const preSaveMarketingSnapshot = cloneData(existing.marketing, {});
     
     // 제목 결정
     const songTitle = document.getElementById("songTitle")?.value?.trim() || "";
@@ -679,11 +739,24 @@ window.saveCurrentProject = function () {
     if (typeof window.syncMarketingMVModel === "function") {
       window.syncMarketingMVModel(m);
     }
+    let preSaveDiagnostics = null;
+    let postSaveDiagnostics = null;
     if (
       typeof window.logMarketingMVDiagnostics === "function" &&
       (m.mv || (Array.isArray(m.mvScenes) && m.mvScenes.length > 0))
     ) {
-      window.logMarketingMVDiagnostics(m, "pre-save");
+      preSaveDiagnostics = window.buildMarketingMVDiagnostics(
+        preSaveMarketingSnapshot,
+        "pre-save-before",
+      );
+      postSaveDiagnostics = window.logMarketingMVDiagnostics(m, "pre-save-after");
+      if (typeof window.logMarketingMVSaveComparison === "function") {
+        window.__lastMarketingMVSaveComparison =
+          window.logMarketingMVSaveComparison(
+            preSaveDiagnostics,
+            postSaveDiagnostics,
+          );
+      }
     }
 
     // 로컬 스토리지 업데이트

@@ -4,11 +4,15 @@ const originalConsole = { ...console };
 const store = new Map();
 const elements = new Map();
 let diagnosticsLog = null;
+let comparisonLog = null;
 
 console.log = function logStub() {};
 console.info = function infoStub(label, payload) {
   if (label === "MV marketing.mv diagnostics:") {
     diagnosticsLog = payload;
+  }
+  if (label === "MV marketing.mv save comparison:") {
+    comparisonLog = payload;
   }
 };
 
@@ -176,11 +180,20 @@ assert.strictEqual(marketing.mvScenes[0].prompt, "rainy alley cinematic still");
 assert.strictEqual(marketing.mv.scenes[0].prompt, "rainy alley cinematic still");
 assert.notStrictEqual(marketing.mv.scenes[0].prompt, "stale canonical prompt");
 assert.ok(diagnosticsLog, "save should log MV diagnostics before persistence");
-assert.strictEqual(diagnosticsLog.context, "pre-save");
+assert.strictEqual(diagnosticsLog.context, "pre-save-after");
 assert.strictEqual(diagnosticsLog.sceneCount, 1);
 assert.strictEqual(diagnosticsLog.canonicalSceneCount, 1);
 assert.strictEqual(diagnosticsLog.legacySceneCount, 1);
 assert.deepStrictEqual(diagnosticsLog.issues, []);
+assert.ok(comparisonLog, "save should log MV before/after comparison");
+assert.strictEqual(comparisonLog.sceneCount.before, 1);
+assert.strictEqual(comparisonLog.sceneCount.after, 1);
+assert.strictEqual(comparisonLog.firstScene.before.scene, "stale canonical scene");
+assert.strictEqual(comparisonLog.firstScene.after.scene, "비 오는 골목");
+assert.strictEqual(comparisonLog.firstScene.changed, true);
+assert.strictEqual(comparisonLog.lastScene.changed, true);
+assert.strictEqual(comparisonLog.updatedAt.changed, true);
+assert.strictEqual(window.__lastMarketingMVSaveComparison, comparisonLog);
 
 originalConsole.log("MV storage smoke test: PASS");
 process.exit(0);
