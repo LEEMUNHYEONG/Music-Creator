@@ -11,6 +11,10 @@ const sceneDescriptions = [
   { value: "수정된 첫 장면: 비 내리는 골목에서 보컬이 걷는다." },
   { value: "수정된 둘째 장면: 새벽 루프탑에서 후렴이 열린다." },
 ];
+const completeScenePrompt1 =
+  "rainy neon alley at blue hour, lonely vocalist walking through reflective pavement, consistent black coat and bob hair, soft side light, slow dolly-in camera movement, cinematic motion, photorealistic detail, 16:9 aspect ratio, sharp focus, emotional music video frame";
+const completeScenePrompt2 =
+  "misty rooftop at sunrise, hopeful vocalist looking toward the opening sky, warm rim light across the face, crane-up reveal from medium shot to wide city skyline, cinematic motion, photorealistic detail, 16:9 aspect ratio, sharp focus, emotional music video frame";
 const calls = {
   indicators: [],
   alerts: [],
@@ -281,7 +285,7 @@ document.getElementById("scene_emotion_0").value = "lonely";
 document.getElementById("scene_mood_0").value = "quiet negative space";
 document.getElementById("scene_lighting_0").value = "blue-hour side light";
 document.getElementById("scene_camera_work_0").value = "slow dolly-in";
-document.getElementById("scene_overview_0_en").value = "edited scene 1 prompt en";
+document.getElementById("scene_overview_0_en").value = completeScenePrompt1;
 document.getElementById("scene_overview_0_ko").value = "수정된 씬 1 프롬프트";
 document.getElementById("scene_time_start_1").value = "0:08";
 document.getElementById("scene_time_end_1").value = "0:18";
@@ -291,7 +295,7 @@ document.getElementById("scene_emotion_1").value = "hopeful";
 document.getElementById("scene_mood_1").value = "wide sunrise release";
 document.getElementById("scene_lighting_1").value = "warm rim light";
 document.getElementById("scene_camera_work_1").value = "crane-up reveal";
-document.getElementById("scene_overview_1_en").value = "edited scene 2 prompt en";
+document.getElementById("scene_overview_1_en").value = completeScenePrompt2;
 document.getElementById("scene_overview_1_ko").value = "수정된 씬 2 프롬프트";
 
 addTagGroup("#mvLocationTags .tag-btn", ["city", "rain", "rooftop"], ["city", "rain"]);
@@ -376,7 +380,7 @@ window.renderSceneOverview = function renderSceneOverviewSpy(scenes) {
   assert.strictEqual(window.currentScenes[0].startSeconds, 0);
   assert.strictEqual(window.currentScenes[0].endSeconds, 8);
   assert.strictEqual(window.currentScenes[0].location, "rainy neon alley");
-  assert.strictEqual(window.currentScenes[0].prompt, "edited scene 1 prompt en");
+  assert.strictEqual(window.currentScenes[0].prompt, completeScenePrompt1);
 
   const savedProjects = JSON.parse(localStorage.getItem("musicCreatorProjects"));
   assert.strictEqual(savedProjects.length, 1);

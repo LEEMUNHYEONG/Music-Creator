@@ -11,6 +11,8 @@ assert.notStrictEqual(start, -1, "timeline editor helpers should exist");
 assert.notStrictEqual(end, -1, "timeline editor helper block should end before prompt UI renderer");
 
 const elements = new Map();
+const completePrompt =
+  "sunrise rooftop music video frame with hopeful vocalist walking toward warm open horizon, golden sunrise backlight, slow crane-up camera movement, photorealistic cinematic detail, emotional performance, 16:9 aspect ratio, sharp focus, detailed lighting, cohesive color palette";
 global.window = global;
 global.document = {
   getElementById(id) {
@@ -30,7 +32,7 @@ elements.set("scene_emotion_0", { value: "hopeful" });
 elements.set("scene_mood_0", { value: "warm open horizon" });
 elements.set("scene_lighting_0", { value: "golden sunrise backlight" });
 elements.set("scene_camera_work_0", { value: "slow crane-up" });
-elements.set("scene_overview_0_en", { value: "A hopeful rooftop scene" });
+elements.set("scene_overview_0_en", { value: completePrompt });
 elements.set("scene_overview_0_ko", { value: "희망적인 옥상 장면" });
 elements.set("scene_editor_notice_0", {
   attributes: {},
@@ -46,10 +48,14 @@ elements.set("mv_scene_quality_summary_text", { textContent: "" });
 elements.set("mv_scene_quality_focus_btn", { disabled: false });
 [
   "invalidTime",
-  "missingMetadata",
+  "missingLocation",
+  "missingCamera",
   "missingLyrics",
   "missingEnPrompt",
   "missingKoPrompt",
+  "promptLength",
+  "blockedTerms",
+  "duplicatePrompt",
 ].forEach((key) => {
   elements.set(`mv_scene_quality_filter_${key}`, {
     disabled: false,
@@ -93,10 +99,14 @@ assert.ok(elements.get("mv_scene_quality_summary_text").textContent.includes("�
 assert.ok(elements.get("mv_scene_quality_summary_text").textContent.includes("확인 필요 0개"));
 assert.strictEqual(elements.get("mv_scene_quality_focus_btn").disabled, true);
 assert.strictEqual(elements.get("mv_scene_quality_filter_invalidTime").disabled, true);
-assert.strictEqual(elements.get("mv_scene_quality_filter_missingMetadata").disabled, true);
+assert.strictEqual(elements.get("mv_scene_quality_filter_missingLocation").disabled, true);
+assert.strictEqual(elements.get("mv_scene_quality_filter_missingCamera").disabled, true);
 assert.strictEqual(elements.get("mv_scene_quality_filter_missingLyrics").disabled, true);
 assert.strictEqual(elements.get("mv_scene_quality_filter_missingEnPrompt").disabled, true);
 assert.strictEqual(elements.get("mv_scene_quality_filter_missingKoPrompt").disabled, true);
+assert.strictEqual(elements.get("mv_scene_quality_filter_promptLength").disabled, true);
+assert.strictEqual(elements.get("mv_scene_quality_filter_blockedTerms").disabled, true);
+assert.strictEqual(elements.get("mv_scene_quality_filter_duplicatePrompt").disabled, true);
 
 elements.set("scene_time_start_1", { value: "0:30" });
 elements.set("scene_time_end_1", { value: "0:20" });
@@ -193,6 +203,8 @@ assert.ok(mixedQualityText.includes("준비 완료 1개"));
 assert.ok(mixedQualityText.includes("확인 필요 1개"));
 assert.ok(mixedQualityText.includes("시간 확인 1개"));
 assert.ok(mixedQualityText.includes("메타데이터 없음 1개"));
+assert.ok(mixedQualityText.includes("장소 없음 1개"));
+assert.ok(mixedQualityText.includes("카메라 없음 1개"));
 assert.ok(mixedQualityText.includes("가사 없음 1개"));
 assert.ok(mixedQualityText.includes("EN 없음 1개"));
 assert.ok(mixedQualityText.includes("KO 없음 1개"));
@@ -208,7 +220,8 @@ const confirmMessage = getMVSceneQualityConfirmMessage([
 ]);
 assert.ok(confirmMessage.includes("1개 씬에 확인 필요"));
 assert.ok(confirmMessage.includes("시간 확인 1개"));
-assert.ok(confirmMessage.includes("메타데이터 없음 1개"));
+assert.ok(confirmMessage.includes("장소 없음 1개"));
+assert.ok(confirmMessage.includes("카메라 없음 1개"));
 assert.ok(confirmMessage.includes("취소하면 첫 확인 필요 씬으로 이동"));
 assert.ok(confirmMessage.includes("결과 화면으로 이동하려면 확인"));
 assert.strictEqual(getMVSceneQualityConfirmMessage([scene]), "");
@@ -237,9 +250,14 @@ const issueScenes = [
 ];
 assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "invalidTime"), [1]);
 assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "missingMetadata"), [1]);
+assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "missingLocation"), [1]);
+assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "missingCamera"), [1]);
 assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "missingLyrics"), [1]);
 assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "missingEnPrompt"), [1]);
 assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "missingKoPrompt"), [1]);
+assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "promptLength"), []);
+assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "blockedTerms"), []);
+assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "duplicatePrompt"), []);
 let focusedReviewIndex = null;
 window.currentScenes = issueScenes;
 elements.set("scene_editor_summary_1", { textContent: "" });
@@ -250,8 +268,8 @@ assert.strictEqual(window.focusMVFirstReviewScene(), true);
 assert.strictEqual(focusedReviewIndex, 1);
 assert.ok(elements.get("scene_editor_summary_1").textContent.includes("선택 필터: 확인 필요 확인"));
 focusedReviewIndex = null;
-assert.strictEqual(window.focusMVSceneIssue("missingMetadata"), true);
+assert.strictEqual(window.focusMVSceneIssue("missingLocation"), true);
 assert.strictEqual(focusedReviewIndex, 1);
-assert.ok(elements.get("scene_editor_summary_1").textContent.includes("선택 필터: 메타데이터 확인"));
+assert.ok(elements.get("scene_editor_summary_1").textContent.includes("선택 필터: 장소 확인"));
 
 console.log("MV scene timing editor smoke test: PASS");

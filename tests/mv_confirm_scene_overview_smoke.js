@@ -252,8 +252,8 @@ addElement("scene_camera_work_1", "slow dolly-in");
     {
       time: "0:30-0:20",
       scene: "확인 필요 장면",
-      prompt: "",
-      promptKo: "",
+      prompt: "watermark cinematic cinematic cinematic",
+      promptKo: "한글 프롬프트",
     },
   ];
   elements.set("scene_time_start_0", { value: "0:30" });
@@ -264,10 +264,17 @@ addElement("scene_camera_work_1", "slow dolly-in");
   elements.set("scene_mood_0", { value: "" });
   elements.set("scene_lighting_0", { value: "" });
   elements.set("scene_camera_work_0", { value: "" });
-  elements.set("scene_overview_0_en", { value: "" });
-  elements.set("scene_overview_0_ko", { value: "" });
+  elements.set("scene_overview_0_en", {
+    value: "watermark cinematic cinematic cinematic",
+  });
+  elements.set("scene_overview_0_ko", { value: "한글 프롬프트" });
   await window.saveAndConfirmMVPrompts();
   assert.ok(confirms.some((message) => message.includes("확인 필요 항목")));
+  assert.ok(confirms.some((message) => message.includes("장소 없음")));
+  assert.ok(confirms.some((message) => message.includes("카메라 없음")));
+  assert.ok(confirms.some((message) => message.includes("프롬프트 길이 확인")));
+  assert.ok(confirms.some((message) => message.includes("금지어")));
+  assert.ok(confirms.some((message) => message.includes("중복 표현")));
   assert.ok(
     confirms.some((message) =>
       message.includes("취소하면 첫 확인 필요 씬으로 이동"),

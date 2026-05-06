@@ -346,6 +346,19 @@ function getMVSceneEditorSummaryText(scene, index) {
   const enPrompt = String(enEl?.value || scene?.prompt || "").trim();
   const koPrompt = String(koEl?.value || scene?.promptKo || "").trim();
   const lyrics = String(scene?.lyrics || "").trim();
+  const promptQuality = getMVScenePromptQualityIssues(scene, index);
+  const qualityNotes = [];
+  if (promptQuality.missingLocation) qualityNotes.push("장소 없음");
+  if (promptQuality.missingCamera) qualityNotes.push("카메라 없음");
+  if (promptQuality.promptLength) {
+    qualityNotes.push(`길이 확인 ${promptQuality.details.promptWordCount}단어`);
+  }
+  if (promptQuality.blockedTerms) {
+    qualityNotes.push(`금지어 ${promptQuality.details.blockedTerms.join(", ")}`);
+  }
+  if (promptQuality.duplicatePrompt) {
+    qualityNotes.push(`중복 ${promptQuality.details.repeatedExpressions.join(", ")}`);
+  }
 
   const summaryParts = [
     `저장/재생성 전 상태: ${timeSummary}`,
@@ -354,6 +367,9 @@ function getMVSceneEditorSummaryText(scene, index) {
     enPrompt ? "EN 있음" : "EN 없음",
     koPrompt ? "KO 있음" : "KO 없음",
   ];
+  if (qualityNotes.length) {
+    summaryParts.push(`품질 확인: ${qualityNotes.join(" / ")}`);
+  }
   if (
     window.currentMVSceneQualityFilter &&
     getMVSceneIssueIndexes([scene], window.currentMVSceneQualityFilter).length
@@ -370,12 +386,96 @@ function getMVSceneIssueLabel(issueType) {
     {
       invalidTime: "시간",
       missingMetadata: "메타데이터",
+      missingLocation: "장소",
+      missingCamera: "카메라",
       missingLyrics: "가사",
       missingEnPrompt: "EN",
       missingKoPrompt: "KO",
+      promptLength: "프롬프트 길이",
+      blockedTerms: "금지어",
+      duplicatePrompt: "중복 표현",
       review: "확인 필요",
     }[issueType] || "확인 필요"
   );
+}
+
+function getMVPromptWordCount(promptText) {
+  return String(promptText || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
+
+function getMVRepeatedPromptExpressions(promptText) {
+  const normalized = String(promptText || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) return [];
+
+  const words = normalized.split(" ").filter((word) => word.length > 2);
+  const counts = {};
+  words.forEach((word) => {
+    counts[word] = (counts[word] || 0) + 1;
+  });
+
+  return Object.entries(counts)
+    .filter(([, count]) => count >= 3)
+    .map(([word]) => word)
+    .slice(0, 4);
+}
+
+function getMVBlockedPromptTerms(promptText) {
+  const blockedTerms = [
+    "watermark",
+    "logo",
+    "subtitle",
+    "caption",
+    "low quality",
+    "blurry",
+    "distorted",
+    "deformed",
+    "extra fingers",
+    "bad anatomy",
+  ];
+  const text = String(promptText || "").toLowerCase();
+  return blockedTerms.filter((term) => {
+    const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const allowedPrefix = new RegExp(`\\b(no|without|avoid)\\s+${escapedTerm}\\b`);
+    const termPattern = new RegExp(`\\b${escapedTerm}\\b`);
+    return termPattern.test(text) && !allowedPrefix.test(text);
+  });
+}
+
+function getMVScenePromptQualityIssues(scene, index) {
+  const getElementById =
+    typeof document.getElementById === "function"
+      ? document.getElementById.bind(document)
+      : () => null;
+  const enEl = getElementById(`scene_overview_${index}_en`);
+  const koEl = getElementById(`scene_overview_${index}_ko`);
+  const enPrompt = String(enEl?.value || scene?.prompt || "").trim();
+  const koPrompt = String(koEl?.value || scene?.promptKo || "").trim();
+  const promptWordCount = getMVPromptWordCount(enPrompt);
+  const promptCharCount = enPrompt.length + koPrompt.length;
+  const repeatedExpressions = getMVRepeatedPromptExpressions(enPrompt);
+  const blockedTerms = getMVBlockedPromptTerms(`${enPrompt} ${koPrompt}`);
+
+  return {
+    missingLocation: !String(scene?.location || "").trim(),
+    missingCamera: !String(scene?.cameraWork || "").trim(),
+    promptLength:
+      Boolean(enPrompt) &&
+      (promptWordCount < 35 || promptWordCount > 180 || promptCharCount > 1800),
+    blockedTerms: blockedTerms.length > 0,
+    duplicatePrompt: repeatedExpressions.length > 0,
+    details: {
+      promptWordCount,
+      repeatedExpressions,
+      blockedTerms,
+    },
+  };
 }
 
 function getMVSceneQualityStats(scenesArg) {
@@ -386,9 +486,14 @@ function getMVSceneQualityStats(scenesArg) {
     needsReview: 0,
     invalidTime: 0,
     missingMetadata: 0,
+    missingLocation: 0,
+    missingCamera: 0,
     missingLyrics: 0,
     missingEnPrompt: 0,
     missingKoPrompt: 0,
+    promptLength: 0,
+    blockedTerms: 0,
+    duplicatePrompt: 0,
   };
 
   scenes.forEach((scene, index) => {
@@ -413,19 +518,30 @@ function getMVSceneQualityStats(scenesArg) {
     const hasLyrics = Boolean(String(scene?.lyrics || "").trim());
     const hasEnPrompt = Boolean(String(enEl?.value || scene?.prompt || "").trim());
     const hasKoPrompt = Boolean(String(koEl?.value || scene?.promptKo || "").trim());
+    const promptQuality = getMVScenePromptQualityIssues(scene, index);
 
     if (!hasValidTime) stats.invalidTime += 1;
     if (metadataCount === 0) stats.missingMetadata += 1;
+    if (promptQuality.missingLocation) stats.missingLocation += 1;
+    if (promptQuality.missingCamera) stats.missingCamera += 1;
     if (!hasLyrics) stats.missingLyrics += 1;
     if (!hasEnPrompt) stats.missingEnPrompt += 1;
     if (!hasKoPrompt) stats.missingKoPrompt += 1;
+    if (promptQuality.promptLength) stats.promptLength += 1;
+    if (promptQuality.blockedTerms) stats.blockedTerms += 1;
+    if (promptQuality.duplicatePrompt) stats.duplicatePrompt += 1;
 
     if (
       hasValidTime &&
       metadataCount > 0 &&
+      !promptQuality.missingLocation &&
+      !promptQuality.missingCamera &&
       hasLyrics &&
       hasEnPrompt &&
-      hasKoPrompt
+      hasKoPrompt &&
+      !promptQuality.promptLength &&
+      !promptQuality.blockedTerms &&
+      !promptQuality.duplicatePrompt
     ) {
       stats.ready += 1;
     }
@@ -461,8 +577,18 @@ function getMVSceneReviewIndexes(scenesArg) {
       const hasLyrics = Boolean(String(scene?.lyrics || "").trim());
       const hasEnPrompt = Boolean(String(enEl?.value || scene?.prompt || "").trim());
       const hasKoPrompt = Boolean(String(koEl?.value || scene?.promptKo || "").trim());
+      const promptQuality = getMVScenePromptQualityIssues(scene, index);
 
-      return hasValidTime && hasMetadata && hasLyrics && hasEnPrompt && hasKoPrompt
+      return hasValidTime &&
+        hasMetadata &&
+        !promptQuality.missingLocation &&
+        !promptQuality.missingCamera &&
+        hasLyrics &&
+        hasEnPrompt &&
+        hasKoPrompt &&
+        !promptQuality.promptLength &&
+        !promptQuality.blockedTerms &&
+        !promptQuality.duplicatePrompt
         ? null
         : index;
     })
@@ -495,19 +621,30 @@ function getMVSceneIssueIndexes(scenesArg, issueType) {
       const hasLyrics = Boolean(String(scene?.lyrics || "").trim());
       const hasEnPrompt = Boolean(String(enEl?.value || scene?.prompt || "").trim());
       const hasKoPrompt = Boolean(String(koEl?.value || scene?.promptKo || "").trim());
+      const promptQuality = getMVScenePromptQualityIssues(scene, index);
 
       const issueMap = {
         invalidTime: !hasValidTime,
         missingMetadata: !hasMetadata,
+        missingLocation: promptQuality.missingLocation,
+        missingCamera: promptQuality.missingCamera,
         missingLyrics: !hasLyrics,
         missingEnPrompt: !hasEnPrompt,
         missingKoPrompt: !hasKoPrompt,
+        promptLength: promptQuality.promptLength,
+        blockedTerms: promptQuality.blockedTerms,
+        duplicatePrompt: promptQuality.duplicatePrompt,
         review:
           !hasValidTime ||
           !hasMetadata ||
+          promptQuality.missingLocation ||
+          promptQuality.missingCamera ||
           !hasLyrics ||
           !hasEnPrompt ||
-          !hasKoPrompt,
+          !hasKoPrompt ||
+          promptQuality.promptLength ||
+          promptQuality.blockedTerms ||
+          promptQuality.duplicatePrompt,
       };
       return issueMap[issueType] ? index : null;
     })
@@ -522,9 +659,14 @@ function getMVSceneQualitySummaryText(scenesArg) {
     `확인 필요 ${stats.needsReview}개`,
     `시간 확인 ${stats.invalidTime}개`,
     `메타데이터 없음 ${stats.missingMetadata}개`,
+    `장소 없음 ${stats.missingLocation}개`,
+    `카메라 없음 ${stats.missingCamera}개`,
     `가사 없음 ${stats.missingLyrics}개`,
     `EN 없음 ${stats.missingEnPrompt}개`,
     `KO 없음 ${stats.missingKoPrompt}개`,
+    `길이 확인 ${stats.promptLength}개`,
+    `금지어 ${stats.blockedTerms}개`,
+    `중복 표현 ${stats.duplicatePrompt}개`,
   ].join(" · ");
 }
 
@@ -533,7 +675,8 @@ function getMVSceneQualityConfirmMessage(scenesArg) {
   if (!stats.needsReview) return "";
   return [
     `${stats.needsReview}개 씬에 확인 필요 항목이 남아 있습니다.`,
-    `시간 확인 ${stats.invalidTime}개, 메타데이터 없음 ${stats.missingMetadata}개, 가사 없음 ${stats.missingLyrics}개, EN 없음 ${stats.missingEnPrompt}개, KO 없음 ${stats.missingKoPrompt}개`,
+    `시간 확인 ${stats.invalidTime}개, 장소 없음 ${stats.missingLocation}개, 카메라 없음 ${stats.missingCamera}개, 가사 없음 ${stats.missingLyrics}개, EN 없음 ${stats.missingEnPrompt}개, KO 없음 ${stats.missingKoPrompt}개`,
+    `프롬프트 길이 확인 ${stats.promptLength}개, 금지어 ${stats.blockedTerms}개, 중복 표현 ${stats.duplicatePrompt}개`,
     "취소하면 첫 확인 필요 씬으로 이동합니다.",
     "이 상태로 확정하고 결과 화면으로 이동하려면 확인을 누르세요.",
   ].join("\n");
@@ -543,10 +686,14 @@ function renderMVSceneQualitySummary(scenesArg) {
   const stats = getMVSceneQualityStats(scenesArg);
   const filters = [
     ["invalidTime", "시간", stats.invalidTime],
-    ["missingMetadata", "메타", stats.missingMetadata],
+    ["missingLocation", "장소", stats.missingLocation],
+    ["missingCamera", "카메라", stats.missingCamera],
     ["missingLyrics", "가사", stats.missingLyrics],
     ["missingEnPrompt", "EN", stats.missingEnPrompt],
     ["missingKoPrompt", "KO", stats.missingKoPrompt],
+    ["promptLength", "길이", stats.promptLength],
+    ["blockedTerms", "금지어", stats.blockedTerms],
+    ["duplicatePrompt", "중복", stats.duplicatePrompt],
   ];
   return `
     <div id="mv_scene_quality_summary" class="mv-scene-quality-summary" role="status" aria-live="polite" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 10px 0 18px 0; padding: 12px 14px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.24); border-radius: 8px; color: var(--text-secondary); font-size: 0.84rem; line-height: 1.5;">
@@ -586,10 +733,14 @@ function updateMVSceneQualitySummary() {
   }
   [
     ["invalidTime", stats.invalidTime],
-    ["missingMetadata", stats.missingMetadata],
+    ["missingLocation", stats.missingLocation],
+    ["missingCamera", stats.missingCamera],
     ["missingLyrics", stats.missingLyrics],
     ["missingEnPrompt", stats.missingEnPrompt],
     ["missingKoPrompt", stats.missingKoPrompt],
+    ["promptLength", stats.promptLength],
+    ["blockedTerms", stats.blockedTerms],
+    ["duplicatePrompt", stats.duplicatePrompt],
   ].forEach(([key, count]) => {
     const btn = document.getElementById(`mv_scene_quality_filter_${key}`);
     if (btn) {
@@ -597,10 +748,14 @@ function updateMVSceneQualitySummary() {
       btn.textContent =
         {
           invalidTime: "시간",
-          missingMetadata: "메타",
+          missingLocation: "장소",
+          missingCamera: "카메라",
           missingLyrics: "가사",
           missingEnPrompt: "EN",
           missingKoPrompt: "KO",
+          promptLength: "길이",
+          blockedTerms: "금지어",
+          duplicatePrompt: "중복",
         }[key] + ` ${count}`;
     }
   });
@@ -741,6 +896,12 @@ window.updateMVSceneTimelineFromEditor = function (scene, index) {
   ].map((value) => String(value || "").trim());
   if (metadataValues.every((value) => !value)) {
     notices.push("장소/감정/무드/조명/카메라 메타데이터가 비어 있습니다. 재생성 품질을 높이려면 최소 한 가지를 입력하세요.");
+  }
+  if (!String(scene.location || "").trim()) {
+    notices.push("장소 값이 비어 있어 배경 일관성 점검에 표시됩니다.");
+  }
+  if (!String(scene.cameraWork || "").trim()) {
+    notices.push("카메라 값이 비어 있어 영상 생성용 프롬프트 점검에 표시됩니다.");
   }
   updateMVSceneEditorNotice(index, notices);
   updateMVSceneEditorSummary(scene, index);
