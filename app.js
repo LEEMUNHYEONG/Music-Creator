@@ -2240,72 +2240,13 @@ window.resetIntermediateAudioUpload = function () {
 };
 
 // 음원 분석 및 최종 가사 반영
-window.analyzeIntermediateAudio = async function () {
-  try {
-    if (!window.intermediateAudioFile) {
-      window.showToast("⚠️ 음원 파일을 먼저 업로드해주세요.", "error");
-      return;
-    }
+// ═══════════════════════════════════════════════════════════════
+// analyzeIntermediateAudio 헬퍼 함수들 (순수 추출 리팩터링, 동작 동일)
+// ═══════════════════════════════════════════════════════════════
 
-    const analyzeBtn = document.getElementById("analyzeIntermediateAudioBtn");
-    const progressDiv = document.getElementById("intermediateVersionProgress");
-
-    if (!analyzeBtn || !progressDiv) {
-      window.showToast("⚠️ 분석 UI 요소를 찾을 수 없습니다.", "error");
-      return;
-    }
-
-    // 버튼 비활성화 및 로딩 표시
-    analyzeBtn.disabled = true;
-    analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 분석 중...';
-    progressDiv.classList.remove("hidden");
-    progressDiv.style.display = "block";
-    progressDiv.innerHTML =
-      '<div style="text-align: center; padding: 20px;"><div class="spinner" style="margin: 0 auto 20px;"></div><p>🎵 음원을 분석하고 가사를 추출하는 중...</p></div>';
-
-    // Gemini API 키 확인
-    const geminiKey = (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || "";
-    if (!geminiKey || !geminiKey.startsWith("AIza")) {
-      window.showToast(
-        '⚠️ Gemini API 키가 설정되지 않았습니다.\n\n"API 키" 버튼을 클릭하여 Gemini API 키를 설정해주세요.', "error");
-      analyzeBtn.disabled = false;
-      analyzeBtn.innerHTML = "🔍 음원 분석 및 최종 가사 반영";
-      progressDiv.classList.add("hidden");
-      progressDiv.style.display = "none";
-      return;
-    }
-
-    // 음원 파일을 Base64로 변환
-    const file = window.intermediateAudioFile;
-    const reader = new FileReader();
-
-    reader.onload = async function (e) {
-      try {
-        const base64Audio = e.target.result.split(",")[1]; // data:audio/...;base64, 부분 제거
-
-        progressDiv.innerHTML =
-          '<div style="text-align: center; padding: 20px;"><div class="spinner" style="margin: 0 auto 20px;"></div><p>🤖 Gemini가 음원을 분석하고 가사를 추출하는 중...</p></div>';
-
-        // 현재 가사와 스타일 가져오기 (Suno 가사란/스타일란 참조)
-        const sunoLyricsForCopy =
-          document.getElementById("intermediateLyricsPreview")?.textContent ||
-          document.getElementById("finalLyrics")?.textContent ||
-          document.getElementById("finalizedLyrics")?.value ||
-          document.getElementById("sunoLyrics")?.value ||
-          "";
-
-        const sunoStyleForCopy =
-          document.getElementById("intermediateStylePreview")?.textContent ||
-          document.getElementById("finalStyle")?.textContent ||
-          document.getElementById("finalizedStyle")?.value ||
-          document.getElementById("stylePrompt")?.value ||
-          "";
-
-        // 지침서 가져오기
-        const guidelines = localStorage.getItem("musicCreatorGuidelines") || "";
-
-        // Gemini API를 사용하여 음원에서 가사 추출 및 분석
-        const prompt = `다음 음원 파일을 분석하여 다음을 수행해주세요:
+// 음원 분석 요청 프롬프트를 만든다.
+function buildAudioAnalysisPrompt(sunoLyricsForCopy, sunoStyleForCopy, guidelines) {
+  return `다음 음원 파일을 분석하여 다음을 수행해주세요:
 
 1. **가사 추출**: 음원에서 들리는 가사를 정확하게 추출해주세요
 2. **지시어 포함 가사 형식**: 추출한 가사를 "Suno 가사란에 복사할 내용" 형식(지시어 포함)으로 변환해주세요
@@ -2391,136 +2332,142 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
 - "extractedLyrics"는 반드시 지시어가 포함된 "Suno 가사란에 복사할 내용" 형식으로 작성해주세요.
 - **중요**: 곡 제목은 별도 필드에서 관리하므로 가사 텍스트 내에 제목을 절대 포함하지 마세요. 가사와 지시어만 출력하세요.
 - 지침서의 가사 구조 규칙을 준수하여 작성해주세요.`;
+}
 
-        let aiResponse = "";
-        try {
-          // Gemini API 호출 (음원 파일 포함)
-          const currentGeminiModel = window.getGeminiModel ? window.getGeminiModel() : (window.AI_DEFAULTS && window.AI_DEFAULTS.GEMINI_MODEL) || "gemini-2.5-flash";
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentGeminiModel}:generateContent?key=${geminiKey}`;
+// Gemini에 음원 파일과 프롬프트를 보내 분석 텍스트를 받아온다.
+// 실패 시 (Gemini 폴백 처리 후) 안내 메시지를 담은 Error를 던진다.
+async function callGeminiAudioAnalysisAPI(prompt, file, base64Audio, geminiKey) {
+  try {
+    // Gemini API 호출 (음원 파일 포함)
+    const currentGeminiModel = window.getGeminiModel ? window.getGeminiModel() : (window.AI_DEFAULTS && window.AI_DEFAULTS.GEMINI_MODEL) || "gemini-2.5-flash";
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentGeminiModel}:generateContent?key=${geminiKey}`;
 
-          const response = await fetch(geminiUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    { text: prompt },
-                    {
-                      inlineData: {
-                        mimeType: file.type || "audio/mpeg",
-                        data: base64Audio,
-                      },
-                    },
-                  ],
+    const response = await fetch(geminiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: file.type || "audio/mpeg",
+                  data: base64Audio,
                 },
-              ],
-              generationConfig: {
-                temperature: 0.7,
-                topK: 40,
-                topP: 0.95,
-                maxOutputTokens: 16000,
-                responseMimeType: "application/json",
               },
-            }),
-          });
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 16000,
+          responseMimeType: "application/json",
+        },
+      }),
+    });
 
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(
-              errorData.error?.message || `API 오류: ${response.status}`,
-            );
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.error?.message || `API 오류: ${response.status}`,
+      );
+    }
+
+    const data = await response.json();
+    if (window.logApiUsage) window.logApiUsage("gemini");
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  } catch (geminiError) {
+    if (typeof window.handleGeminiApiFailure === "function") {
+      window.handleGeminiApiFailure(geminiError);
+    }
+    // ChatGPT 텍스트 폴백은 오디오를 들을 수 없어 가사·점수를 지어내므로
+    // (환각 결과가 실제 평가에 반영되는 데이터 무결성 문제) 수행하지 않는다.
+    throw new Error(
+      "Gemini 오디오 분석에 실패했습니다: " + geminiError.message +
+      "\n\n오디오를 직접 분석할 수 없는 텍스트 모델로는 대체 분석이 불가능합니다." +
+      "\n잠시 후 다시 시도하거나, 파일 용량(15MB 이하)과 API 상태를 확인해 주세요.",
+    );
+  }
+}
+
+// AI 응답을 다단계로 파싱한다: 표준 JSON → 후행 콤마 제거 → 잘린 JSON
+// 필드별 직접 추출 → 그래도 실패하면 { _rawJson } 최종 폴백.
+function parseAudioAnalysisResponse(aiResponse) {
+  let analysisData;
+  const extractJsonField = (key, src) => {
+    // key: "value" 패턴 추출 (잘린 JSON 대응)
+    const re = new RegExp('"' + key + '"\\s*:\\s*"([\\s\\S]*?)(?<!\\\\)"(?=\\s*[,}]|\\s*"[a-z])', 'i');
+    const m = src.match(re);
+    return m ? m[1].replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"') : null;
+  };
+  try {
+    let cleanedResponse = aiResponse.trim()
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+
+    // 1차 표준 파싱
+    try {
+      analysisData = JSON.parse(cleanedResponse);
+      console.log('✅ 음원 분석 JSON 파싱 성공');
+    } catch (e1) {
+      // 2차: 후행 콤마 제거
+      try {
+        analysisData = JSON.parse(cleanedResponse.replace(/,\s*([}\]])/g, '$1'));
+        console.log('✅ 후행 콤마 제거 후 파싱 성공');
+      } catch (e2) {
+        // 3차: 잘린 JSON에서 필드별 직접 추출
+        console.warn('⚠️ JSON 잘림 감지 - 필드 직접 추출:', e2.message);
+        const pd = {};
+        ['extractedLyrics','extractedLyricsPlain','differences','styleDifferences','analysis'].forEach(k => {
+          const v = extractJsonField(k, cleanedResponse);
+          if (v) pd[k] = v;
+        });
+        // suggestions 배열 추출
+        const sm = cleanedResponse.match(/"suggestions"\s*:\s*\[([\s\S]*?)\]/);
+        if (sm) {
+          const items = [];
+          const ir = /"((?:[^"\\]|\\.)*)"/g;
+          let im;
+          while ((im = ir.exec(sm[1])) !== null) {
+            items.push(im[1].replace(/\\n/g, '\n').replace(/\\"/g, '"'));
           }
-
-          const data = await response.json();
-          if (window.logApiUsage) window.logApiUsage("gemini");
-          aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        } catch (geminiError) {
-          if (typeof window.handleGeminiApiFailure === "function") {
-            window.handleGeminiApiFailure(geminiError);
-          }
-          // ChatGPT 텍스트 폴백은 오디오를 들을 수 없어 가사·점수를 지어내므로
-          // (환각 결과가 실제 평가에 반영되는 데이터 무결성 문제) 수행하지 않는다.
-          throw new Error(
-            "Gemini 오디오 분석에 실패했습니다: " + geminiError.message +
-            "\n\n오디오를 직접 분석할 수 없는 텍스트 모델로는 대체 분석이 불가능합니다." +
-            "\n잠시 후 다시 시도하거나, 파일 용량(15MB 이하)과 API 상태를 확인해 주세요.",
-          );
+          if (items.length) pd.suggestions = items;
         }
+        analysisData = Object.keys(pd).length > 0 ? pd : { _rawJson: aiResponse };
+        console.log('✅ 부분 추출 결과 키:', Object.keys(analysisData));
+      }
+    }
+  } catch (parseError) {
+    console.error('음원 분석 JSON 파싱 최종 실패:', parseError);
+    analysisData = { _rawJson: aiResponse };
+  }
+  return analysisData;
+}
 
-        if (!aiResponse.trim()) {
-          throw new Error("Gemini API에서 응답을 받지 못했습니다.");
-        }
+// 분석 결과 데이터를 결과 패널용 HTML 문자열로 렌더링한다.
+// (extractedLyrics가 있으면 window.extractedLyricsForApply에도 저장 - 원본 동작 그대로)
+function renderAudioAnalysisResultHtml(analysisData) {
+  let resultHtml = '<div style="padding: 20px;">';
+  resultHtml +=
+    '<h4 style="margin-bottom: 15px; color: var(--text-primary);">🎵 음원 분석 결과</h4>';
 
-        // JSON 파싱 시도 (강건한 다단계 파싱)
-        let analysisData;
-        const extractJsonField = (key, src) => {
-          // key: "value" 패턴 추출 (잘린 JSON 대응)
-          const re = new RegExp('"' + key + '"\\s*:\\s*"([\\s\\S]*?)(?<!\\\\)"(?=\\s*[,}]|\\s*"[a-z])', 'i');
-          const m = src.match(re);
-          return m ? m[1].replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"') : null;
-        };
-        try {
-          let cleanedResponse = aiResponse.trim()
-            .replace(/^```json\s*/i, '')
-            .replace(/^```\s*/i, '')
-            .replace(/\s*```$/i, '')
-            .trim();
-
-          // 1차 표준 파싱
-          try {
-            analysisData = JSON.parse(cleanedResponse);
-            console.log('✅ 음원 분석 JSON 파싱 성공');
-          } catch (e1) {
-            // 2차: 후행 콤마 제거
-            try {
-              analysisData = JSON.parse(cleanedResponse.replace(/,\s*([}\]])/g, '$1'));
-              console.log('✅ 후행 콤마 제거 후 파싱 성공');
-            } catch (e2) {
-              // 3차: 잘린 JSON에서 필드별 직접 추출
-              console.warn('⚠️ JSON 잘림 감지 - 필드 직접 추출:', e2.message);
-              const pd = {};
-              ['extractedLyrics','extractedLyricsPlain','differences','styleDifferences','analysis'].forEach(k => {
-                const v = extractJsonField(k, cleanedResponse);
-                if (v) pd[k] = v;
-              });
-              // suggestions 배열 추출
-              const sm = cleanedResponse.match(/"suggestions"\s*:\s*\[([\s\S]*?)\]/);
-              if (sm) {
-                const items = [];
-                const ir = /"((?:[^"\\]|\\.)*)"/g;
-                let im;
-                while ((im = ir.exec(sm[1])) !== null) {
-                  items.push(im[1].replace(/\\n/g, '\n').replace(/\\"/g, '"'));
-                }
-                if (items.length) pd.suggestions = items;
-              }
-              analysisData = Object.keys(pd).length > 0 ? pd : { _rawJson: aiResponse };
-              console.log('✅ 부분 추출 결과 키:', Object.keys(analysisData));
-            }
-          }
-        } catch (parseError) {
-          console.error('음원 분석 JSON 파싱 최종 실패:', parseError);
-          analysisData = { _rawJson: aiResponse };
-        }
-
-        // 분석 결과 표시
-        let resultHtml = '<div style="padding: 20px;">';
-        resultHtml +=
-          '<h4 style="margin-bottom: 15px; color: var(--text-primary);">🎵 음원 분석 결과</h4>';
-
-        // _rawJson 폴백: 파싱 완전 실패 시
-        if (analysisData._rawJson && !analysisData.extractedLyrics) {
-          resultHtml += `
+  // _rawJson 폴백: 파싱 완전 실패 시
+  if (analysisData._rawJson && !analysisData.extractedLyrics) {
+    resultHtml += `
             <div style="padding: 15px; background: var(--bg-input); border-radius: 8px; margin-bottom: 15px;">
               <h5 style="color: var(--warning); margin-bottom: 10px;">⚠️ 응답 파싱 실패 - 원본 응답</h5>
               <div style="white-space: pre-wrap; color: var(--text-secondary); font-family: monospace; font-size: 0.85rem; max-height: 300px; overflow-y: auto;">${escapeHtml(analysisData._rawJson.substring(0, 2000))}</div>
             </div>`;
-        }
+  }
 
-        // 추출된 가사 (지시어 포함) 표시
-        if (analysisData.extractedLyrics) {
-          resultHtml += `
+  // 추출된 가사 (지시어 포함) 표시
+  if (analysisData.extractedLyrics) {
+    resultHtml += `
             <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-input); border-radius: 8px;">
               <h5 style="margin-bottom: 10px; color: var(--accent);">📝 추출된 가사 (지시어 포함 - Suno 가사란 형식)</h5>
               <div style="white-space: pre-wrap; color: var(--text-secondary); line-height: 1.8; font-family: monospace; font-size: 0.9rem; background: var(--bg-card); padding: 15px; border-radius: 6px; border: 1px solid var(--border);">${escapeHtml(analysisData.extractedLyrics)}</div>
@@ -2528,20 +2475,20 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
                   💡 이 가사는 "Suno 가사란에 복사할 내용" 형식으로 작성되었습니다. 지시어가 포함되어 있어 Suno에 바로 사용할 수 있습니다.
               </div>
             </div>`;
-        }
+  }
 
-        // 추출된 가사 (순수 가사만) 표시
-        if (analysisData.extractedLyricsPlain) {
-          resultHtml += `
+  // 추출된 가사 (순수 가사만) 표시
+  if (analysisData.extractedLyricsPlain) {
+    resultHtml += `
             <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-input); border-radius: 8px;">
               <h5 style="margin-bottom: 10px; color: var(--accent);">📝 추출된 가사 (순수 가사만)</h5>
               <div style="white-space: pre-wrap; color: var(--text-secondary); line-height: 1.8; font-family: monospace; font-size: 0.9rem;">${escapeHtml(analysisData.extractedLyricsPlain)}</div>
             </div>`;
-        }
+  }
 
-        const audioScoreValue = getAudioAnalysisScoreValue(analysisData, 0);
-        if (audioScoreValue) {
-          resultHtml += `
+  const audioScoreValue = getAudioAnalysisScoreValue(analysisData, 0);
+  if (audioScoreValue) {
+    resultHtml += `
             <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-input); border-radius: 8px;">
               <h5 style="margin-bottom: 10px; color: var(--accent);">📈 음원 반영 평가 점수</h5>
               <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
@@ -2551,10 +2498,10 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
                 <div><strong>${analysisData.styleMatchScore ?? "-"}</strong>점<br><span style="color:var(--text-secondary);font-size:0.85rem;">스타일 일치</span></div>
               </div>
             </div>`;
-        }
+  }
 
-        if (analysisData.matchesOriginal !== undefined) {
-          resultHtml += `
+  if (analysisData.matchesOriginal !== undefined) {
+    resultHtml += `
                         <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-input); border-radius: 8px;">
                             <h5 style="margin-bottom: 10px; color: var(--accent);">✅ 원본 일치 여부</h5>
                             <div style="color: var(--text-primary); font-size: 1.1rem; font-weight: 600;">
@@ -2562,20 +2509,20 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
                             </div>
                         </div>
                     `;
-        }
+  }
 
-        if (analysisData.differences) {
-          resultHtml += `
+  if (analysisData.differences) {
+    resultHtml += `
                         <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-input); border-radius: 8px;">
                             <h5 style="margin-bottom: 10px; color: var(--accent);">📊 가사 차이점</h5>
                             <div style="white-space: pre-wrap; color: var(--text-secondary); line-height: 1.8;">${escapeHtml(analysisData.differences)}</div>
                         </div>
                     `;
-        }
+  }
 
-        // 스타일 프롬프트 차이점 표시
-        if (analysisData.styleMatches !== undefined) {
-          resultHtml += `
+  // 스타일 프롬프트 차이점 표시
+  if (analysisData.styleMatches !== undefined) {
+    resultHtml += `
                         <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-input); border-radius: 8px;">
                             <h5 style="margin-bottom: 10px; color: var(--accent);">🎨 스타일 프롬프트 일치 여부</h5>
                             <div style="color: var(--text-primary); font-size: 1.1rem; font-weight: 600; margin-bottom: 10px;">
@@ -2584,74 +2531,161 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
                             ${analysisData.styleDifferences ? `<div style="white-space: pre-wrap; color: var(--text-secondary); line-height: 1.8; margin-top: 10px;">${escapeHtml(analysisData.styleDifferences)}</div>` : ""}
                         </div>
                     `;
-        }
+  }
 
-        if (analysisData.suggestions && analysisData.suggestions.length > 0) {
-          resultHtml += `
+  if (analysisData.suggestions && analysisData.suggestions.length > 0) {
+    resultHtml += `
                         <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-input); border-radius: 8px;">
                             <h5 style="margin-bottom: 10px; color: var(--accent);">💡 개선 제안</h5>
                             <ul style="margin: 0; padding-left: 20px; line-height: 2;">
                     `;
-          analysisData.suggestions.forEach((suggestion) => {
-            resultHtml += `<li style="color: var(--text-secondary); margin-bottom: 8px;">${escapeHtml(suggestion)}</li>`;
-          });
-          resultHtml += `</ul></div>`;
-        }
+    analysisData.suggestions.forEach((suggestion) => {
+      resultHtml += `<li style="color: var(--text-secondary); margin-bottom: 8px;">${escapeHtml(suggestion)}</li>`;
+    });
+    resultHtml += `</ul></div>`;
+  }
 
-        if (analysisData.analysis) {
-          resultHtml += `
+  if (analysisData.analysis) {
+    resultHtml += `
                         <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-input); border-radius: 8px;">
                             <h5 style="margin-bottom: 10px; color: var(--accent);">🔍 분석 결과</h5>
                             <div style="white-space: pre-wrap; color: var(--text-secondary); line-height: 1.8;">${escapeHtml(analysisData.analysis)}</div>
                         </div>
                     `;
-        }
+  }
 
-        // 추출된 가사를 최종 가사에 반영 버튼
-        if (analysisData.extractedLyrics) {
-          // 전역 변수에 저장
-          window.extractedLyricsForApply = analysisData.extractedLyrics;
+  // 추출된 가사를 최종 가사에 반영 버튼
+  if (analysisData.extractedLyrics) {
+    // 전역 변수에 저장
+    window.extractedLyricsForApply = analysisData.extractedLyrics;
 
-          resultHtml += `
+    resultHtml += `
                         <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
                             <button class="btn btn-success" onclick="if(typeof window.applyExtractedLyrics === 'function') { window.applyExtractedLyrics(this); } else { window.showToast('⚠️ 기능을 사용할 수 없습니다.', "error"); }" style="width: 100%;">
                                 ✅ 추출된 가사를 최종 가사에 반영
                             </button>
                         </div>
                     `;
+  }
+
+  resultHtml += "</div>";
+  return resultHtml;
+}
+
+// 분석 결과를 화면에 반영하고, 프로젝트 데이터 저장 + 후속 알림까지 마무리한다.
+function finishAudioAnalysisSuccess(analyzeBtn, progressDiv, analysisData, resultHtml) {
+  progressDiv.innerHTML = resultHtml;
+
+  // 분석 결과를 전역 변수에 저장
+  window.intermediateAudioAnalysis = analysisData;
+  if (window.currentProject) {
+    if (!window.currentProject.data) window.currentProject.data = {};
+    window.currentProject.data.intermediateAudioAnalysis = analysisData;
+  }
+
+  // 버튼 복원
+  analyzeBtn.disabled = false;
+  analyzeBtn.innerHTML = "🔍 음원 분석 및 최종 가사 반영";
+
+  console.log("✅ 음원 분석 완료:", analysisData);
+
+  if (typeof window.updateIntermediateAudioFeedback === "function") {
+    window.updateIntermediateAudioFeedback(analysisData);
+  }
+
+  if (typeof window.requestFinalEvaluationRefresh === "function") {
+    window.requestFinalEvaluationRefresh("audio-analysis-complete", {
+      audioAnalysisData: analysisData,
+      message:
+        "음원 분석이 완료되었습니다. 최신 음원 분석 결과를 반영해 평가 점수를 다시 계산 중입니다...",
+    });
+  }
+
+  if (typeof window.showCopyIndicator === "function") {
+    window.showCopyIndicator("✅ 음원 분석이 완료되었습니다!");
+  }
+}
+
+window.analyzeIntermediateAudio = async function () {
+  try {
+    if (!window.intermediateAudioFile) {
+      window.showToast("⚠️ 음원 파일을 먼저 업로드해주세요.", "error");
+      return;
+    }
+
+    const analyzeBtn = document.getElementById("analyzeIntermediateAudioBtn");
+    const progressDiv = document.getElementById("intermediateVersionProgress");
+
+    if (!analyzeBtn || !progressDiv) {
+      window.showToast("⚠️ 분석 UI 요소를 찾을 수 없습니다.", "error");
+      return;
+    }
+
+    // 버튼 비활성화 및 로딩 표시
+    analyzeBtn.disabled = true;
+    analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 분석 중...';
+    progressDiv.classList.remove("hidden");
+    progressDiv.style.display = "block";
+    progressDiv.innerHTML =
+      '<div style="text-align: center; padding: 20px;"><div class="spinner" style="margin: 0 auto 20px;"></div><p>🎵 음원을 분석하고 가사를 추출하는 중...</p></div>';
+
+    // Gemini API 키 확인
+    const geminiKey = (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || "";
+    if (!geminiKey || !geminiKey.startsWith("AIza")) {
+      window.showToast(
+        '⚠️ Gemini API 키가 설정되지 않았습니다.\n\n"API 키" 버튼을 클릭하여 Gemini API 키를 설정해주세요.', "error");
+      analyzeBtn.disabled = false;
+      analyzeBtn.innerHTML = "🔍 음원 분석 및 최종 가사 반영";
+      progressDiv.classList.add("hidden");
+      progressDiv.style.display = "none";
+      return;
+    }
+
+    // 음원 파일을 Base64로 변환
+    const file = window.intermediateAudioFile;
+    const reader = new FileReader();
+
+    reader.onload = async function (e) {
+      try {
+        const base64Audio = e.target.result.split(",")[1]; // data:audio/...;base64, 부분 제거
+
+        progressDiv.innerHTML =
+          '<div style="text-align: center; padding: 20px;"><div class="spinner" style="margin: 0 auto 20px;"></div><p>🤖 Gemini가 음원을 분석하고 가사를 추출하는 중...</p></div>';
+
+        // 현재 가사와 스타일 가져오기 (Suno 가사란/스타일란 참조)
+        const sunoLyricsForCopy =
+          document.getElementById("intermediateLyricsPreview")?.textContent ||
+          document.getElementById("finalLyrics")?.textContent ||
+          document.getElementById("finalizedLyrics")?.value ||
+          document.getElementById("sunoLyrics")?.value ||
+          "";
+
+        const sunoStyleForCopy =
+          document.getElementById("intermediateStylePreview")?.textContent ||
+          document.getElementById("finalStyle")?.textContent ||
+          document.getElementById("finalizedStyle")?.value ||
+          document.getElementById("stylePrompt")?.value ||
+          "";
+
+        // 지침서 가져오기
+        const guidelines = localStorage.getItem("musicCreatorGuidelines") || "";
+
+        // Gemini API를 사용하여 음원에서 가사 추출 및 분석
+        const prompt = buildAudioAnalysisPrompt(sunoLyricsForCopy, sunoStyleForCopy, guidelines);
+
+        const aiResponse = await callGeminiAudioAnalysisAPI(prompt, file, base64Audio, geminiKey);
+
+        if (!aiResponse.trim()) {
+          throw new Error("Gemini API에서 응답을 받지 못했습니다.");
         }
 
-        resultHtml += "</div>";
-        progressDiv.innerHTML = resultHtml;
+        // JSON 파싱 시도 (강건한 다단계 파싱)
+        const analysisData = parseAudioAnalysisResponse(aiResponse);
 
-        // 분석 결과를 전역 변수에 저장
-        window.intermediateAudioAnalysis = analysisData;
-        if (window.currentProject) {
-          if (!window.currentProject.data) window.currentProject.data = {};
-          window.currentProject.data.intermediateAudioAnalysis = analysisData;
-        }
+        // 분석 결과 표시
+        const resultHtml = renderAudioAnalysisResultHtml(analysisData);
 
-        // 버튼 복원
-        analyzeBtn.disabled = false;
-        analyzeBtn.innerHTML = "🔍 음원 분석 및 최종 가사 반영";
-
-        console.log("✅ 음원 분석 완료:", analysisData);
-
-        if (typeof window.updateIntermediateAudioFeedback === "function") {
-          window.updateIntermediateAudioFeedback(analysisData);
-        }
-
-        if (typeof window.requestFinalEvaluationRefresh === "function") {
-          window.requestFinalEvaluationRefresh("audio-analysis-complete", {
-            audioAnalysisData: analysisData,
-            message:
-              "음원 분석이 완료되었습니다. 최신 음원 분석 결과를 반영해 평가 점수를 다시 계산 중입니다...",
-          });
-        }
-
-        if (typeof window.showCopyIndicator === "function") {
-          window.showCopyIndicator("✅ 음원 분석이 완료되었습니다!");
-        }
+        finishAudioAnalysisSuccess(analyzeBtn, progressDiv, analysisData, resultHtml);
       } catch (error) {
         console.error("❌ 음원 분석 오류:", error);
 
