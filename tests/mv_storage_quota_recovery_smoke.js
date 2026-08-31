@@ -109,9 +109,10 @@ addElement("finalStyle", "current style");
 require("../js/storage.js");
 
 const storageSource = fs.readFileSync(path.resolve(__dirname, "../js/storage.js"), "utf8");
-const indexSource = fs.readFileSync(path.resolve(__dirname, "../index.html"), "utf8");
+// 클라우드 동기화 UI는 index.html 인라인에서 js/cloud-sync-ui.js로 이관됨
+const cloudSyncSource = fs.readFileSync(path.resolve(__dirname, "../js/cloud-sync-ui.js"), "utf8");
 assert.ok(storageSource.includes(".collection(\"projects\").doc(docId)"));
-assert.ok(indexSource.includes(".collection('projects').doc(String(p.id))"));
+assert.ok(cloudSyncSource.includes(".collection('projects').doc(String(p.id))"));
 
 const saved = window.saveCurrentProject();
 assert.strictEqual(saved, true);
