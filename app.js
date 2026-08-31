@@ -2884,98 +2884,62 @@ window.requestFinalEvaluationRefresh = function (reason, options) {
   }, delay);
 };
 
-window.generateFinalEvaluation = async function (options) {
-  const evaluationRunId = (window.__finalEvaluationRunId || 0) + 1;
-  window.__finalEvaluationRunId = evaluationRunId;
-  const isLatestEvaluationRun = () =>
-    window.__finalEvaluationRunId === evaluationRunId;
+// ═══════════════════════════════════════════════════════════════
+// generateFinalEvaluation 헬퍼 함수들 (순수 추출 리팩터링, 동작 동일)
+// ═══════════════════════════════════════════════════════════════
 
-  try {
-    const beforeScoreEl = document.getElementById("beforeScore");
-    const afterScoreEl = document.getElementById("afterScore");
-    const aiCommentEl = document.getElementById("aiComment");
-    const finalGradeEl = document.getElementById("finalGrade");
+// 최종 평가 생성에 필요한 데이터를 화면/전역 상태에서 모두 모은다.
+function collectFinalEvaluationSourceData() {
+  const analysisData = window.currentProject?.data?.analysis;
+  const beforeScore =
+    analysisData?.scores?.overall || analysisData?.scores?.overallScore || 0;
+  const audioAnalysisData =
+    window.intermediateAudioAnalysis ||
+    window.currentProject?.data?.intermediateAudioAnalysis ||
+    null;
+  if (
+    audioAnalysisData &&
+    typeof window.updateIntermediateAudioFeedback === "function"
+  ) {
+    window.updateIntermediateAudioFeedback(audioAnalysisData);
+  }
 
-    if (!beforeScoreEl || !afterScoreEl || !aiCommentEl) {
-      console.warn("⚠️ 최종 평가 UI 요소를 찾을 수 없습니다.");
-      return;
-    }
+  const finalLyrics =
+    document.getElementById("finalLyrics")?.textContent ||
+    document.getElementById("finalizedLyrics")?.value ||
+    "";
+  const finalStyle =
+    document.getElementById("finalStyle")?.textContent ||
+    document.getElementById("finalizedStyle")?.value ||
+    "";
 
-    // 3단계 분석 결과 가져오기
-    const analysisData = window.currentProject?.data?.analysis;
-    const beforeScore =
-      analysisData?.scores?.overall || analysisData?.scores?.overallScore || 0;
-    const audioAnalysisData =
-      window.intermediateAudioAnalysis ||
-      window.currentProject?.data?.intermediateAudioAnalysis ||
-      null;
-    if (
-      audioAnalysisData &&
-      typeof window.updateIntermediateAudioFeedback === "function"
-    ) {
-      window.updateIntermediateAudioFeedback(audioAnalysisData);
-    }
+  const originalLyrics = document.getElementById("sunoLyrics")?.value || "";
+  const originalStyle = document.getElementById("stylePrompt")?.value || "";
 
-    // 현재 최종 가사와 스타일 가져오기
-    const finalLyrics =
-      document.getElementById("finalLyrics")?.textContent ||
-      document.getElementById("finalizedLyrics")?.value ||
-      "";
-    const finalStyle =
-      document.getElementById("finalStyle")?.textContent ||
-      document.getElementById("finalizedStyle")?.value ||
-      "";
+  return {
+    analysisData,
+    beforeScore,
+    audioAnalysisData,
+    finalLyrics,
+    finalStyle,
+    originalLyrics,
+    originalStyle,
+  };
+}
 
-    // 2단계 원본 가사와 스타일 가져오기 (비교용)
-    const originalLyrics = document.getElementById("sunoLyrics")?.value || "";
-    const originalStyle = document.getElementById("stylePrompt")?.value || "";
+// AI에게 보낼 최종 평가 요청 프롬프트를 만든다.
+function buildFinalEvaluationPrompt(data, guidelines) {
+  const {
+    analysisData,
+    beforeScore,
+    audioAnalysisData,
+    finalLyrics,
+    finalStyle,
+    originalLyrics,
+    originalStyle,
+  } = data;
 
-    if (!finalLyrics.trim()) {
-      console.warn("⚠️ 최종 가사가 없어 평가를 생성할 수 없습니다.");
-      const def = Math.min(100, Math.max(0, parseInt(beforeScore, 10) || 0));
-      if (typeof window.updateFinalEvaluationUI === "function") {
-        window.updateFinalEvaluationUI(
-          def,
-          def,
-          "최종 가사가 없어 평가를 생성할 수 없습니다.\n\n4-5단계에서 최종 가사를 확인한 후 다시 시도해주세요.",
-        );
-      } else {
-        if (beforeScoreEl) beforeScoreEl.textContent = def;
-        if (afterScoreEl) afterScoreEl.textContent = def;
-        if (aiCommentEl)
-          aiCommentEl.textContent =
-            "최종 가사가 없어 평가를 생성할 수 없습니다.\n\n4-5단계에서 최종 가사를 확인한 후 다시 시도해주세요.";
-        if (finalGradeEl) finalGradeEl.textContent = getGradeFromScore(def);
-      }
-      return;
-    }
-
-    // Gemini API 키 확인
-    const geminiKey = (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || "";
-    if (!geminiKey || !geminiKey.startsWith("AIza")) {
-      console.warn("⚠️ Gemini API 키가 없어 평가를 생성할 수 없습니다.");
-      const def = Math.min(100, Math.max(0, parseInt(beforeScore, 10) || 0));
-      if (typeof window.updateFinalEvaluationUI === "function") {
-        window.updateFinalEvaluationUI(
-          def,
-          def,
-          "Gemini API 키를 설정하면 자동으로 최종 평가를 생성할 수 있습니다.",
-        );
-      } else {
-        if (beforeScoreEl) beforeScoreEl.textContent = def;
-        if (afterScoreEl) afterScoreEl.textContent = def;
-        if (aiCommentEl)
-          aiCommentEl.textContent =
-            "Gemini API 키를 설정하면 자동으로 최종 평가를 생성할 수 있습니다.";
-      }
-      return;
-    }
-
-    // 지침서 가져오기
-    const guidelines = localStorage.getItem("musicCreatorGuidelines") || "";
-
-    // 최종 평가 생성 프롬프트
-    const evaluationPrompt = `다음 정보를 바탕으로 최종 평가를 생성해주세요.
+  return `다음 정보를 바탕으로 최종 평가를 생성해주세요.
 
 === 개선 전 가사 (2단계 원본) ===
 ${originalLyrics || "없음"}
@@ -3030,6 +2994,117 @@ ${JSON.stringify(audioAnalysisData).substring(0, 1800)}
 }
 
 **중요**: JSON 형식만 출력하고, 다른 설명이나 텍스트는 포함하지 마세요.`;
+}
+
+// AI 응답을 다단계로 파싱한다 (표준 파싱 → 후행 콤마 제거 → 정규식 직접
+// 추출 → 그래도 실패하면 기본값). 기존 로직 그대로 옮김.
+function parseFinalEvaluationResponse(aiResponse, beforeScore) {
+  let evaluationData;
+  try {
+    let cleanedResponse = aiResponse.trim()
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+
+    try {
+      evaluationData = JSON.parse(cleanedResponse);
+      console.log('✅ 평가 JSON 파싱 성공');
+    } catch (e1) {
+      try {
+        evaluationData = JSON.parse(cleanedResponse.replace(/,\s*([}\]])/g, '$1'));
+        console.log('✅ 코마 제거 후 파싱 성공');
+      } catch (e2) {
+        console.warn('⚠️ 평가 JSON 부분 추출 시도:', e2.message);
+        const bsM = cleanedResponse.match(/"beforeScore"\s*:\s*(\d+)/);
+        const asM = cleanedResponse.match(/"afterScore"\s*:\s*(\d+)/);
+        const cmM = cleanedResponse.match(/"aiComment"\s*:\s*"([\s\S]*?)(?<!\\)"/);
+        evaluationData = {
+          beforeScore: bsM ? parseInt(bsM[1], 10) : (beforeScore || 70),
+          afterScore: asM ? parseInt(asM[1], 10) : null,
+          aiComment: cmM ? cmM[1].replace(/\\n/g, '\n') : '파싱 실패하여 기본값을 사용합니다.',
+        };
+        if (evaluationData.afterScore === null) {
+          evaluationData.afterScore = Math.min(100, (evaluationData.beforeScore || 70) + 5);
+        }
+      }
+    }
+  } catch (parseError) {
+    console.error('JSON 파싱 최종 실패:', parseError);
+    evaluationData = {
+      beforeScore: beforeScore || 70,
+      afterScore: Math.min(100, (beforeScore || 70) + 5),
+      aiComment: '평가 생성 중 오류가 발생했습니다. 재시도해주세요.',
+    };
+  }
+  return evaluationData;
+}
+
+window.generateFinalEvaluation = async function (options) {
+  const evaluationRunId = (window.__finalEvaluationRunId || 0) + 1;
+  window.__finalEvaluationRunId = evaluationRunId;
+  const isLatestEvaluationRun = () =>
+    window.__finalEvaluationRunId === evaluationRunId;
+
+  try {
+    const beforeScoreEl = document.getElementById("beforeScore");
+    const afterScoreEl = document.getElementById("afterScore");
+    const aiCommentEl = document.getElementById("aiComment");
+    const finalGradeEl = document.getElementById("finalGrade");
+
+    if (!beforeScoreEl || !afterScoreEl || !aiCommentEl) {
+      console.warn("⚠️ 최종 평가 UI 요소를 찾을 수 없습니다.");
+      return;
+    }
+
+    const srcData = collectFinalEvaluationSourceData();
+    const { beforeScore, audioAnalysisData, finalLyrics } = srcData;
+
+    if (!finalLyrics.trim()) {
+      console.warn("⚠️ 최종 가사가 없어 평가를 생성할 수 없습니다.");
+      const def = Math.min(100, Math.max(0, parseInt(beforeScore, 10) || 0));
+      if (typeof window.updateFinalEvaluationUI === "function") {
+        window.updateFinalEvaluationUI(
+          def,
+          def,
+          "최종 가사가 없어 평가를 생성할 수 없습니다.\n\n4-5단계에서 최종 가사를 확인한 후 다시 시도해주세요.",
+        );
+      } else {
+        if (beforeScoreEl) beforeScoreEl.textContent = def;
+        if (afterScoreEl) afterScoreEl.textContent = def;
+        if (aiCommentEl)
+          aiCommentEl.textContent =
+            "최종 가사가 없어 평가를 생성할 수 없습니다.\n\n4-5단계에서 최종 가사를 확인한 후 다시 시도해주세요.";
+        if (finalGradeEl) finalGradeEl.textContent = getGradeFromScore(def);
+      }
+      return;
+    }
+
+    // Gemini API 키 확인
+    const geminiKey = (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || "";
+    if (!geminiKey || !geminiKey.startsWith("AIza")) {
+      console.warn("⚠️ Gemini API 키가 없어 평가를 생성할 수 없습니다.");
+      const def = Math.min(100, Math.max(0, parseInt(beforeScore, 10) || 0));
+      if (typeof window.updateFinalEvaluationUI === "function") {
+        window.updateFinalEvaluationUI(
+          def,
+          def,
+          "Gemini API 키를 설정하면 자동으로 최종 평가를 생성할 수 있습니다.",
+        );
+      } else {
+        if (beforeScoreEl) beforeScoreEl.textContent = def;
+        if (afterScoreEl) afterScoreEl.textContent = def;
+        if (aiCommentEl)
+          aiCommentEl.textContent =
+            "Gemini API 키를 설정하면 자동으로 최종 평가를 생성할 수 있습니다.";
+      }
+      return;
+    }
+
+    // 지침서 가져오기
+    const guidelines = localStorage.getItem("musicCreatorGuidelines") || "";
+
+    const evaluationPrompt = buildFinalEvaluationPrompt(srcData, guidelines);
 
     const aiResponse = await window.callAIWithTextFallback({
       prompt: evaluationPrompt,
@@ -3044,49 +3119,7 @@ ${JSON.stringify(audioAnalysisData).substring(0, 1800)}
       throw new Error("Gemini API에서 응답을 받지 못했습니다.");
     }
 
-    // JSON 파싱 시도 (강건한 다단계)
-    let evaluationData;
-    try {
-      let cleanedResponse = aiResponse.trim()
-        .replace(/^```json\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/\s*```$/i, '')
-        .trim();
-
-      // 1차: 표준 파싱
-      try {
-        evaluationData = JSON.parse(cleanedResponse);
-        console.log('✅ 평가 JSON 파싱 성공');
-      } catch (e1) {
-        // 2차: 후행 코마 제거 후 재시도
-        try {
-          evaluationData = JSON.parse(cleanedResponse.replace(/,\s*([}\]])/g, '$1'));
-          console.log('✅ 코마 제거 후 파싱 성공');
-        } catch (e2) {
-          // 3차: 정규식 직접 추출
-          console.warn('⚠️ 평가 JSON 부분 추출 시도:', e2.message);
-          const bsM = cleanedResponse.match(/"beforeScore"\s*:\s*(\d+)/);
-          const asM = cleanedResponse.match(/"afterScore"\s*:\s*(\d+)/);
-          const cmM = cleanedResponse.match(/"aiComment"\s*:\s*"([\s\S]*?)(?<!\\)"/);
-          evaluationData = {
-            beforeScore: bsM ? parseInt(bsM[1], 10) : (beforeScore || 70),
-            afterScore: asM ? parseInt(asM[1], 10) : null,
-            aiComment: cmM ? cmM[1].replace(/\\n/g, '\n') : '\ud30c싱 실패하여 기본값을 사용합니다.',
-          };
-          // afterScore 미추출 시: beforeScore보다 업그레이드된 것으로 추론
-          if (evaluationData.afterScore === null) {
-            evaluationData.afterScore = Math.min(100, (evaluationData.beforeScore || 70) + 5);
-          }
-        }
-      }
-    } catch (parseError) {
-      console.error('JSON 파싱 최종 실패:', parseError);
-      evaluationData = {
-        beforeScore: beforeScore || 70,
-        afterScore: Math.min(100, (beforeScore || 70) + 5),
-        aiComment: '평가 생성 중 오류가 발생했습니다. 재시도해주세요.',
-      };
-    }
+    const evaluationData = parseFinalEvaluationResponse(aiResponse, beforeScore);
 
     // 점수 정수화 (0-100) 후 UI 갱신 (수치·등급·프로그레스 바)
     const beforeScoreValue = Math.min(
