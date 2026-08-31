@@ -26,13 +26,16 @@ service cloud.firestore {
     }
 
     // users/{userId}/projects 하위 컬렉션 권한 (자동 백업용)
+    // 승인(approved)된 본인 또는 관리자만 접근 가능
     match /users/{userId}/projects/{projectId} {
-      allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow read, write: if request.auth != null
+        && ((request.auth.uid == userId && isApproved()) || isAdmin());
     }
 
     // users/{userId}/projects/{projectId}/history 시간대별 백업 히스토리 권한
     match /users/{userId}/projects/{projectId}/history/{historyId} {
-      allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow read, write: if request.auth != null
+        && ((request.auth.uid == userId && isApproved()) || isAdmin());
     }
 
     // config 컬렉션: 관리자만 읽기/쓰기 가능
@@ -41,10 +44,13 @@ service cloud.firestore {
       allow write: if request.auth != null && isAdmin();
     }
 
-    // api_usage 컬렉션: 로그인한 사용자는 쓰기(로그 기록)만 가능, 관리자는 전체 읽기 가능
+    // api_usage 컬렉션: 승인된 사용자만 정해진 스키마로 로그 기록, 관리자는 전체 읽기 가능
     match /api_usage/{docId} {
       allow create: if request.auth != null
-                    && request.resource.data.uid == request.auth.uid;
+                    && isApproved()
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.keys().hasOnly(['uid', 'provider', 'timestamp'])
+                    && request.resource.data.provider in ['openai', 'gemini'];
       allow read: if request.auth != null && isAdmin();
     }
 
@@ -56,9 +62,10 @@ service cloud.firestore {
         || request.auth.uid == resource.data.userId
       );
       allow create: if request.auth != null
+                    && isApproved()
                     && request.resource.data.userId == request.auth.uid;
       allow update: if request.auth != null
-                    && (isAdmin() || request.auth.uid == resource.data.userId)
+                    && (isAdmin() || (request.auth.uid == resource.data.userId && isApproved()))
                     && request.resource.data.userId == resource.data.userId;
       allow delete: if request.auth != null
                     && (isAdmin() || request.auth.uid == resource.data.userId);
@@ -67,6 +74,12 @@ service cloud.firestore {
     function isAdmin() {
       return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // 관리자 승인(approved == true)을 받은 사용자만 통과
+    function isApproved() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.approved == true;
     }
   }
 }
