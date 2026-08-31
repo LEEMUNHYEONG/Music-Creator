@@ -51,7 +51,8 @@
       "package-lock.json",
       "jsconfig.json",
       ".markdownlintignore",
-      ".firebase/**"
+      ".firebase/**",
+      "_archive_backup/**"
     ],
     "rewrites": [
       {
