@@ -355,7 +355,7 @@ window.cleanEnglishMidjourneyPrompt = cleanEnglishMidjourneyPrompt;
  */
 async function callGeminiWithAutoRoute(prompt, generationConfig, geminiKey) {
   const key = geminiKey || (window.getGeminiApiKey ? window.getGeminiApiKey() : "");
-  const model = window.getGeminiModel ? window.getGeminiModel() : "gemini-2.5-flash";
+  const model = window.getGeminiModel ? window.getGeminiModel() : (window.AI_DEFAULTS && window.AI_DEFAULTS.GEMINI_MODEL) || "gemini-2.5-flash";
 
   // 실제 개인 키 여부 확인 (플레이스홀더 제외)
   const isRealKey = key && key.startsWith("AIza") && !key.includes("Proxy");

@@ -1972,7 +1972,7 @@ window.callAIWithTextFallback = async function ({
     }
     const currentGeminiModel = window.getGeminiModel
       ? window.getGeminiModel()
-      : "gemini-2.5-flash";
+      : (window.AI_DEFAULTS && window.AI_DEFAULTS.GEMINI_MODEL) || "gemini-2.5-flash";
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentGeminiModel}:generateContent?key=${geminiKey}`;
 
     const controller = new AbortController();
@@ -2351,7 +2351,7 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
         let aiResponse = "";
         try {
           // Gemini API 호출 (음원 파일 포함)
-          const currentGeminiModel = window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash";
+          const currentGeminiModel = window.getGeminiModel ? window.getGeminiModel() : (window.AI_DEFAULTS && window.AI_DEFAULTS.GEMINI_MODEL) || "gemini-2.5-flash";
           const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentGeminiModel}:generateContent?key=${geminiKey}`;
 
           const response = await fetch(geminiUrl, {

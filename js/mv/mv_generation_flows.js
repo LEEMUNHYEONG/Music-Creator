@@ -734,7 +734,7 @@ window.generateSceneOverview = async function () {
         // ═══════════════════════════════════════════════════════════════
         const BATCH_SIZE = 7;
         const totalBatches = Math.ceil(imageCount / BATCH_SIZE);
-        const currentGeminiModel = window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash";
+        const currentGeminiModel = window.getGeminiModel ? window.getGeminiModel() : (window.AI_DEFAULTS && window.AI_DEFAULTS.GEMINI_MODEL) || "gemini-2.5-flash";
         const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentGeminiModel}:generateContent?key=${geminiKey}`;
 
         // ChatGPT API 키 확인 (배치 홀짝 교대에 사용)

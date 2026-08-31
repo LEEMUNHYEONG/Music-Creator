@@ -92,7 +92,7 @@
       ...init,
       headers,
       body: JSON.stringify({
-        model: modelMatch?.[1] || body.model || (window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash"),
+        model: modelMatch?.[1] || body.model || (window.getGeminiModel ? window.getGeminiModel() : (window.AI_DEFAULTS && window.AI_DEFAULTS.GEMINI_MODEL) || "gemini-2.5-flash"),
         contents: body.contents,
         prompt: body.prompt,
         generationConfig: body.generationConfig,
@@ -112,7 +112,7 @@ window.testServerAIProxy = async function (provider, customKey = "") {
   if (hasRealKey) {
     const fetchFunc = window.__nativeFetch || window.fetch;
     if (isGemini) {
-      const currentGeminiModel = window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash";
+      const currentGeminiModel = window.getGeminiModel ? window.getGeminiModel() : (window.AI_DEFAULTS && window.AI_DEFAULTS.GEMINI_MODEL) || "gemini-2.5-flash";
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentGeminiModel}:generateContent?key=${customKey}`;
       const response = await fetchFunc(geminiUrl, {
         method: "POST",
@@ -176,7 +176,7 @@ window.testServerAIProxy = async function (provider, customKey = "") {
     body: JSON.stringify(
       isGemini
         ? {
-            model: (window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash"),
+            model: (window.getGeminiModel ? window.getGeminiModel() : (window.AI_DEFAULTS && window.AI_DEFAULTS.GEMINI_MODEL) || "gemini-2.5-flash"),
             prompt: "Reply with OK only.",
             maxOutputTokens: 8,
             temperature: 0,
@@ -368,7 +368,7 @@ ${englishText}
           headers,
           body: JSON.stringify({
             prompt: prompt,
-            model: (window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash"),
+            model: (window.getGeminiModel ? window.getGeminiModel() : (window.AI_DEFAULTS && window.AI_DEFAULTS.GEMINI_MODEL) || "gemini-2.5-flash"),
             temperature: 0.3,
             maxOutputTokens: 1000,
           }),
@@ -484,7 +484,7 @@ ${koreanText}
           headers,
           body: JSON.stringify({
             prompt: prompt,
-            model: (window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash"),
+            model: (window.getGeminiModel ? window.getGeminiModel() : (window.AI_DEFAULTS && window.AI_DEFAULTS.GEMINI_MODEL) || "gemini-2.5-flash"),
             temperature: 0.3,
             maxOutputTokens: 1000,
           }),
@@ -645,7 +645,7 @@ window.callGeminiForScenes = async function (prompt, geminiKey) {
     headers,
     body: JSON.stringify({
       prompt: prompt,
-      model: (window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash"),
+      model: (window.getGeminiModel ? window.getGeminiModel() : (window.AI_DEFAULTS && window.AI_DEFAULTS.GEMINI_MODEL) || "gemini-2.5-flash"),
       temperature: 0.92,
       maxOutputTokens: 8192,
     }),
