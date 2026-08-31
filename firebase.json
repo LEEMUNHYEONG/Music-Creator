@@ -35,7 +35,23 @@
       "scan_perf.py",
       "find_lines.py",
       "check_bal.py",
-      "clean_app.py"
+      "clean_app.py",
+      ".DS_Store",
+      "**/.DS_Store",
+      "*.log",
+      "*.rules",
+      "firestore.indexes.json",
+      "firebase_cors.json",
+      "index-fresh-*.html",
+      "test-results/**",
+      "fix_*.js",
+      "extract.js",
+      "test_sticky.js",
+      "package.json",
+      "package-lock.json",
+      "jsconfig.json",
+      ".markdownlintignore",
+      ".firebase/**"
     ],
     "rewrites": [
       {

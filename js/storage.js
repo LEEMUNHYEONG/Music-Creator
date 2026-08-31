@@ -1041,7 +1041,11 @@ window.upsertSingleProjectToLocalStores = function (project) {
     } else {
       list.push(project);
     }
-    localStorage.setItem(key, JSON.stringify(list));
+    // 용량 초과 시 압축 재시도까지 처리하는 공용 저장 경로 사용
+    const saveResult = window.saveProjectListToLocalStorage(key, list, project);
+    if (!saveResult.ok) {
+      console.error(`${key} 프로젝트 저장 실패:`, saveResult.error);
+    }
   });
   return project;
 };
@@ -1093,13 +1097,14 @@ window.importSingleProjectJSON = function () {
 function isNewerOrBetter(newProj, oldProj) {
   const nData = newProj.data || newProj;
   const oData = oldProj.data || oldProj;
-  
+
   // 데이터 완성도 체크 (가사나 마케팅 자료가 있는지)
   const hasMore = !!(nData.finalLyrics || nData.marketing);
   const existingHas = !!(oData.finalLyrics || oData.marketing);
-  
-  const nDate = new Date(nData.savedAt || nData.updatedAt || 0);
-  const oDate = new Date(oData.savedAt || oData.updatedAt || 0);
+
+  // savedAt/updatedAt은 프로젝트 루트에 기록되므로 루트를 우선 조회한다.
+  const nDate = new Date(newProj.savedAt || newProj.updatedAt || nData.savedAt || nData.updatedAt || 0);
+  const oDate = new Date(oldProj.savedAt || oldProj.updatedAt || oData.savedAt || oData.updatedAt || 0);
 
   if (hasMore && !existingHas) return true;
   if (!hasMore && existingHas) return false;
@@ -1175,8 +1180,11 @@ window.loadProject = function (projectId) {
     window.currentProjectId = projectId;
     
     // 데이터 구조 보정 (old format 지원)
+    // 자기 자신을 참조시키면 순환 구조가 되어 JSON.stringify가 실패하므로
+    // 얕은 복사본을 data로 넣는다.
     if (!window.currentProject.data) {
-      window.currentProject.data = foundProject;
+      window.currentProject.data = { ...foundProject };
+      delete window.currentProject.data.data;
     }
     if (
       window.currentProject.data.marketing &&
@@ -1493,17 +1501,36 @@ window.saveCurrentProject = function () {
               window.updateSaveStatusUI("success");
             }
 
-            // ⏱️ 시간대별 히스토리 스냅샷 저장 (수량 제한 없이 전체 보관)
-            const historyRef = window.firebaseDb
-              .collection("users").doc(uid)
-              .collection("projects").doc(projectId)
-              .collection("history");
-            const historyId = "snap_" + Date.now();
-            historyRef.doc(historyId).set({
-              ...projectToSave,
-              _historyDocId: historyId,
-              _savedAt: projectToSave.savedAt
-            }).catch(() => {});
+            // ⏱️ 시간대별 히스토리 스냅샷 저장
+            // 자동저장(60초)마다 쌓이면 하루 최대 1,440개가 되므로
+            // 최소 10분 간격으로만 기록하고 최근 30개만 보관한다.
+            const HISTORY_MIN_INTERVAL_MS = 10 * 60 * 1000;
+            const HISTORY_KEEP_COUNT = 30;
+            window.__historySnapshotAt = window.__historySnapshotAt || {};
+            const lastSnapAt = window.__historySnapshotAt[projectId] || 0;
+            if (Date.now() - lastSnapAt >= HISTORY_MIN_INTERVAL_MS) {
+              window.__historySnapshotAt[projectId] = Date.now();
+              const historyRef = window.firebaseDb
+                .collection("users").doc(uid)
+                .collection("projects").doc(projectId)
+                .collection("history");
+              const historyId = "snap_" + Date.now();
+              historyRef.doc(historyId).set({
+                ...projectToSave,
+                _historyDocId: historyId,
+                _savedAt: projectToSave.savedAt
+              }).then(() => {
+                // 보관 상한 초과분 정리 (한 번에 최대 200개까지)
+                return historyRef.get().then((snap) => {
+                  const ids = snap.docs.map((d) => d.id).sort().reverse();
+                  const excess = ids.slice(HISTORY_KEEP_COUNT, HISTORY_KEEP_COUNT + 200);
+                  if (!excess.length) return;
+                  const batch = window.firebaseDb.batch();
+                  excess.forEach((id) => batch.delete(historyRef.doc(id)));
+                  return batch.commit();
+                });
+              }).catch(() => {});
+            }
           })
           .catch((err) => {
             console.error("☁️ 클라우드 백업 실패:", err);
@@ -1724,7 +1751,17 @@ window.smartMergeToLocal = function(selectedProjects) {
     }
   });
 
-  localStorage.setItem(localKey, JSON.stringify(localProjects));
+  {
+    // 용량 초과 시 압축 재시도까지 처리하는 공용 저장 경로 사용
+    const saveResult = window.saveProjectListToLocalStorage(
+      localKey,
+      localProjects,
+      window.currentProject,
+    );
+    if (!saveResult.ok) {
+      console.error("스마트 병합 로컬 저장 실패:", saveResult.error);
+    }
+  }
 
   // projectOrder도 업데이트: 신규 프로젝트 ID를 savedAt 기준으로 올바른 위치에 삽입
   try {
@@ -1887,7 +1924,27 @@ window.downloadSelectedCloudProjects = async function(projectIds) {
     }
   }
   if (downloaded > 0) {
-    localStorage.setItem(localKey, JSON.stringify(localProjects));
+    // 용량 초과 시에도 안전하게 저장되도록 공용 저장 경로를 사용한다.
+    const saveResult = window.saveProjectListToLocalStorage(
+      localKey,
+      localProjects,
+      window.currentProject,
+    );
+    if (!saveResult.ok) {
+      console.error("☁️ 다운로드 프로젝트 로컬 저장 실패:", saveResult.error);
+    }
+
+    // 현재 열려 있는 프로젝트가 방금 덮어써졌다면 메모리 상태도 갱신해
+    // 다음 자동저장이 구버전으로 되돌리지 않게 한다.
+    if (
+      window.currentProject &&
+      projectIds.includes(window.currentProject.id) &&
+      typeof window.loadProject === "function"
+    ) {
+      window.__lastLoadProjectId = null; // 중복 로드 가드 해제
+      window.loadProject(window.currentProject.id);
+    }
+
     if (typeof window.loadProjectList === "function") window.loadProjectList();
     if (typeof window.updateSaveStatusUI === "function") window.updateSaveStatusUI("success");
   }
@@ -2010,10 +2067,19 @@ window.restoreFromCloudHistory = async function(projectId, historyDocId) {
     } else {
       localProjects.push(snapshot);
     }
-    localStorage.setItem(localKey, JSON.stringify(localProjects));
+    // 용량 초과 시 압축 재시도까지 처리하는 공용 저장 경로 사용
+    const saveResult = window.saveProjectListToLocalStorage(
+      localKey,
+      localProjects,
+      window.currentProject,
+    );
+    if (!saveResult.ok) {
+      console.error("히스토리 복원 로컬 저장 실패:", saveResult.error);
+    }
     if (typeof window.loadProjectList === "function") window.loadProjectList();
     // 현재 프로젝트와 동일하면 즉시 UI 갱신
     if (window.currentProjectId === projectId && typeof window.loadProject === "function") {
+      window.__lastLoadProjectId = null; // 중복 로드 가드 해제
       window.loadProject(projectId);
     }
     return true;

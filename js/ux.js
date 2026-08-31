@@ -128,41 +128,11 @@
     });
   };
 
-  // 3. Auto-save (Drafting)
-  window.initAutoSave = function () {
-    setInterval(() => {
-      if (
-        window.currentProjectId &&
-        typeof window.saveCurrentProject === "function" &&
-        window.editMode !== false
-      ) {
-        // save in background quietly
-        const activeEl = document.activeElement;
-        if (
-          activeEl &&
-          (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA")
-        ) {
-          // Only autosave if user is actively typing? Actually just save periodically.
-          window.saveCurrentProject(true); // maybe pass a flag to not alert
-          // Update a subtle UI indicator
-          const header = document.querySelector(".header-title");
-          if (header && !header.innerHTML.includes("autosave-indicator")) {
-            const ind = document.createElement("span");
-            ind.id = "autosave-indicator";
-            ind.style.cssText =
-              "font-size: 0.75rem; color: var(--text-secondary); margin-left: 10px; opacity: 0;";
-            ind.innerText = "저장됨";
-            header.appendChild(ind);
-          }
-          const ind = document.getElementById("autosave-indicator");
-          if (ind) {
-            ind.style.opacity = "1";
-            setTimeout(() => (ind.style.opacity = "0"), 2000);
-          }
-        }
-      }
-    }, 60000); // every 60 seconds
-  };
+  // 3. Auto-save
+  // 주기적 자동저장 타이머는 js/storage.js(60초)가 단일 담당한다.
+  // 과거 이 파일에도 동일 주기 타이머가 있어 저장·히스토리 기록이 이중으로
+  // 발생했으므로 여기서는 등록하지 않는다.
+  window.initAutoSave = function () {};
 
   // 4. Suno One-click Copy (to be injected to UI later, function defined here)
   window.copyForSuno = function (lyricsId, styleId) {
