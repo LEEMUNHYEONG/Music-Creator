@@ -61,8 +61,11 @@
   // ─── 입력란 데이터 보존을 위한 리팩토링 ───
   function setBoardImage(file) {
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      window.showToast("이미지 파일만 첨부할 수 있습니다.", "info");
+    // SVG는 이미지 파일이지만 내부에 <script>를 담을 수 있어 게시판 이미지를
+    // 새 탭에서 직접 여는 기능(onclick="window.open(this.src)")과 결합하면
+    // 저장형 XSS로 이어질 수 있으므로 제외한다. (storage.rules에서도 동일하게 차단)
+    if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
+      window.showToast("이미지 파일만 첨부할 수 있습니다. (SVG 형식은 지원하지 않습니다)", "info");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {

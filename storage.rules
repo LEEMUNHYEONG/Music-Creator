@@ -9,7 +9,11 @@ service firebase.storage {
                               /databases/(default)/documents/users/$(request.auth.uid)
                             ).data.approved == true
                             && request.resource.size < 5 * 1024 * 1024
-                            && request.resource.contentType.matches('image/.*');
+                            // SVG(image/svg+xml)는 제외한다: 내부에 <script>를 담을 수 있고,
+                            // 게시판이 이미지를 새 탭에서 직접 여는 기능(window.open)을 제공하므로
+                            // 허용 시 저장형 XSS로 이어질 수 있다.
+                            && request.resource.contentType.matches('image/.*')
+                            && request.resource.contentType != 'image/svg+xml';
       allow delete: if request.auth != null && (
         request.auth.uid == userId
         || firestore.get(
