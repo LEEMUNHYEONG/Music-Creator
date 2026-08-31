@@ -6946,22 +6946,12 @@ window.resetGuidelines = async function () {
 // 전역 변수로 드래그 중인 step 추적
 let draggedStepElement = null;
 
-window.initStepDragAndDrop = function () {
-  const progressSteps =
-    document.querySelector(".progress-steps") ||
-    document.getElementById("progressSteps");
-  if (!progressSteps) {
-    console.warn("progress-steps 요소를 찾을 수 없습니다.");
-    return;
-  }
+// ═══════════════════════════════════════════════════════════════
+// initStepDragAndDrop 헬퍼 함수들 (순수 추출 리팩터링, 동작 동일)
+// ═══════════════════════════════════════════════════════════════
 
-  const steps = Array.from(progressSteps.querySelectorAll(".step"));
-  if (steps.length === 0) {
-    console.warn("step 요소를 찾을 수 없습니다.");
-    return;
-  }
-
-  // 저장된 순서 로드
+// localStorage에 저장된 단계 순서가 있으면 progressSteps DOM을 그 순서로 재배치한다.
+function restoreSavedStepOrder(progressSteps, steps) {
   const savedOrder = localStorage.getItem("stepOrder");
   if (savedOrder) {
     try {
@@ -7006,135 +6996,160 @@ window.initStepDragAndDrop = function () {
       console.warn("단계 순서 로드 실패:", e);
     }
   }
+}
+
+// 하나의 step 요소에 드래그 앤 드롭 이벤트 리스너 전체(dragstart/dragend/
+// dragover/dragleave/drop)를 붙인다.
+function attachStepDragHandlers(step, currentSteps, progressSteps) {
+  const dragHandle = step.querySelector(".step-drag-handle");
+  if (!dragHandle) return;
+
+  // 드래그 핸들에서 드래그 시작
+  dragHandle.addEventListener("dragstart", function (e) {
+    e.stopPropagation();
+    draggedStepElement = step;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", step.getAttribute("data-step"));
+    e.dataTransfer.setData(
+      "application/json",
+      JSON.stringify({ step: step.getAttribute("data-step") }),
+    );
+    step.classList.add("dragging");
+
+    // 드래그 이미지 생성
+    const dragImage = step.cloneNode(true);
+    dragImage.style.opacity = "0.8";
+    dragImage.style.transform = "rotate(2deg)";
+    dragImage.style.width = step.offsetWidth + "px";
+    dragImage.style.backgroundColor = "var(--bg-card)";
+    dragImage.style.border = "2px solid var(--accent)";
+    document.body.appendChild(dragImage);
+    dragImage.style.position = "absolute";
+    dragImage.style.top = "-1000px";
+    e.dataTransfer.setDragImage(dragImage, e.offsetX, e.offsetY);
+    setTimeout(() => {
+      if (dragImage.parentNode) {
+        document.body.removeChild(dragImage);
+      }
+    }, 0);
+  });
+
+  // 드래그 종료
+  dragHandle.addEventListener("dragend", function (e) {
+    if (draggedStepElement) {
+      draggedStepElement.classList.remove("dragging");
+    }
+
+    // 모든 드롭존 하이라이트 제거
+    currentSteps.forEach((s) => {
+      s.classList.remove("drag-over");
+    });
+
+    draggedStepElement = null;
+  });
+
+  // 다른 step 위에 드래그할 때
+  step.addEventListener("dragover", function (e) {
+    if (!draggedStepElement || draggedStepElement === step) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+
+    // 삽입 위치 결정 (마우스 위치 기준)
+    const rect = step.getBoundingClientRect();
+    const mouseY = e.clientY;
+    const stepCenter = rect.top + rect.height / 2;
+
+    // 드롭존 하이라이트
+    step.classList.add("drag-over");
+  });
+
+  // 드래그 떠날 때
+  step.addEventListener("dragleave", function (e) {
+    // relatedTarget이 step 내부에 있지 않으면 하이라이트 제거
+    const relatedTarget = e.relatedTarget;
+    if (!relatedTarget || !step.contains(relatedTarget)) {
+      step.classList.remove("drag-over");
+    }
+  });
+
+  // 드롭
+  step.addEventListener("drop", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!draggedStepElement || draggedStepElement === step) {
+      step.classList.remove("drag-over");
+      return;
+    }
+
+    // 삽입 위치 결정
+    const rect = step.getBoundingClientRect();
+    const mouseY = e.clientY;
+    const stepCenter = rect.top + rect.height / 2;
+    const insertBefore = mouseY < stepCenter;
+
+    // 요소 이동
+    if (insertBefore) {
+      progressSteps.insertBefore(draggedStepElement, step);
+    } else {
+      if (step.nextSibling) {
+        progressSteps.insertBefore(draggedStepElement, step.nextSibling);
+      } else {
+        progressSteps.appendChild(draggedStepElement);
+      }
+    }
+
+    step.classList.remove("drag-over");
+    draggedStepElement.classList.remove("dragging");
+
+    // 순서 저장
+    const newOrder = Array.from(progressSteps.querySelectorAll(".step")).map(
+      (s) => parseInt(s.getAttribute("data-step")),
+    );
+    localStorage.setItem("stepOrder", JSON.stringify(newOrder));
+
+    console.log("✅ 단계 순서 변경 및 저장 완료:", newOrder);
+
+    // 사용자 피드백
+    if (typeof window.showCopyIndicator === "function") {
+      window.showCopyIndicator("✅ 단계 순서가 저장되었습니다!");
+    }
+
+    // 드래그 앤 드롭 다시 초기화 (이벤트 리스너 재설정)
+    setTimeout(() => {
+      window.initStepDragAndDrop();
+    }, 100);
+
+    draggedStepElement = null;
+  });
+}
+
+window.initStepDragAndDrop = function () {
+  const progressSteps =
+    document.querySelector(".progress-steps") ||
+    document.getElementById("progressSteps");
+  if (!progressSteps) {
+    console.warn("progress-steps 요소를 찾을 수 없습니다.");
+    return;
+  }
+
+  const steps = Array.from(progressSteps.querySelectorAll(".step"));
+  if (steps.length === 0) {
+    console.warn("step 요소를 찾을 수 없습니다.");
+    return;
+  }
+
+  // 저장된 순서 로드
+  restoreSavedStepOrder(progressSteps, steps);
 
   // 현재 steps 가져오기 (순서 복원 후)
   const currentSteps = Array.from(progressSteps.querySelectorAll(".step"));
 
   // 드래그 이벤트 설정
   currentSteps.forEach((step) => {
-    const dragHandle = step.querySelector(".step-drag-handle");
-    if (!dragHandle) return;
-
-    // 드래그 핸들에서 드래그 시작
-    dragHandle.addEventListener("dragstart", function (e) {
-      e.stopPropagation();
-      draggedStepElement = step;
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", step.getAttribute("data-step"));
-      e.dataTransfer.setData(
-        "application/json",
-        JSON.stringify({ step: step.getAttribute("data-step") }),
-      );
-      step.classList.add("dragging");
-
-      // 드래그 이미지 생성
-      const dragImage = step.cloneNode(true);
-      dragImage.style.opacity = "0.8";
-      dragImage.style.transform = "rotate(2deg)";
-      dragImage.style.width = step.offsetWidth + "px";
-      dragImage.style.backgroundColor = "var(--bg-card)";
-      dragImage.style.border = "2px solid var(--accent)";
-      document.body.appendChild(dragImage);
-      dragImage.style.position = "absolute";
-      dragImage.style.top = "-1000px";
-      e.dataTransfer.setDragImage(dragImage, e.offsetX, e.offsetY);
-      setTimeout(() => {
-        if (dragImage.parentNode) {
-          document.body.removeChild(dragImage);
-        }
-      }, 0);
-    });
-
-    // 드래그 종료
-    dragHandle.addEventListener("dragend", function (e) {
-      if (draggedStepElement) {
-        draggedStepElement.classList.remove("dragging");
-      }
-
-      // 모든 드롭존 하이라이트 제거
-      currentSteps.forEach((s) => {
-        s.classList.remove("drag-over");
-      });
-
-      draggedStepElement = null;
-    });
-
-    // 다른 step 위에 드래그할 때
-    step.addEventListener("dragover", function (e) {
-      if (!draggedStepElement || draggedStepElement === step) return;
-
-      e.preventDefault();
-      e.stopPropagation();
-      e.dataTransfer.dropEffect = "move";
-
-      // 삽입 위치 결정 (마우스 위치 기준)
-      const rect = step.getBoundingClientRect();
-      const mouseY = e.clientY;
-      const stepCenter = rect.top + rect.height / 2;
-
-      // 드롭존 하이라이트
-      step.classList.add("drag-over");
-    });
-
-    // 드래그 떠날 때
-    step.addEventListener("dragleave", function (e) {
-      // relatedTarget이 step 내부에 있지 않으면 하이라이트 제거
-      const relatedTarget = e.relatedTarget;
-      if (!relatedTarget || !step.contains(relatedTarget)) {
-        step.classList.remove("drag-over");
-      }
-    });
-
-    // 드롭
-    step.addEventListener("drop", function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-
-      if (!draggedStepElement || draggedStepElement === step) {
-        step.classList.remove("drag-over");
-        return;
-      }
-
-      // 삽입 위치 결정
-      const rect = step.getBoundingClientRect();
-      const mouseY = e.clientY;
-      const stepCenter = rect.top + rect.height / 2;
-      const insertBefore = mouseY < stepCenter;
-
-      // 요소 이동
-      if (insertBefore) {
-        progressSteps.insertBefore(draggedStepElement, step);
-      } else {
-        if (step.nextSibling) {
-          progressSteps.insertBefore(draggedStepElement, step.nextSibling);
-        } else {
-          progressSteps.appendChild(draggedStepElement);
-        }
-      }
-
-      step.classList.remove("drag-over");
-      draggedStepElement.classList.remove("dragging");
-
-      // 순서 저장
-      const newOrder = Array.from(progressSteps.querySelectorAll(".step")).map(
-        (s) => parseInt(s.getAttribute("data-step")),
-      );
-      localStorage.setItem("stepOrder", JSON.stringify(newOrder));
-
-      console.log("✅ 단계 순서 변경 및 저장 완료:", newOrder);
-
-      // 사용자 피드백
-      if (typeof window.showCopyIndicator === "function") {
-        window.showCopyIndicator("✅ 단계 순서가 저장되었습니다!");
-      }
-
-      // 드래그 앤 드롭 다시 초기화 (이벤트 리스너 재설정)
-      setTimeout(() => {
-        window.initStepDragAndDrop();
-      }, 100);
-
-      draggedStepElement = null;
-    });
+    attachStepDragHandlers(step, currentSteps, progressSteps);
   });
 
   // progress-steps 전체 드롭 영역 허용
