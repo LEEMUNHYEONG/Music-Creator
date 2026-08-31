@@ -262,10 +262,10 @@ async function loadRestoreCloudList() {
                     <span>${relativeTime(p.savedAt)}</span>
                 </div>
             </div>
-            <button class="sync-card-action-btn restore-btn" onclick="openHistoryModal('${escapeHtmlStr(p.id)}', '${escapeHtmlStr(p.title || "제목 없음")}')">
+            <button class="sync-card-action-btn restore-btn" data-project-id="${escapeHtmlStr(p.id)}" data-project-title="${escapeHtmlStr(p.title || "제목 없음")}" onclick="openHistoryModal(this.dataset.projectId, this.dataset.projectTitle)">
                 <i class="fas fa-history"></i> 히스토리
             </button>
-            <button class="sync-card-action-btn" onclick="doRestoreFromCloud('${escapeHtmlStr(p.id)}')">
+            <button class="sync-card-action-btn" data-project-id="${escapeHtmlStr(p.id)}" onclick="doRestoreFromCloud(this.dataset.projectId)">
                 <i class="fas fa-download"></i> 최신본 복원
             </button>
         </div>
@@ -504,7 +504,7 @@ async function openHistoryModal(projectId, projectTitle) {
                 </div>
                 <div class="history-card-rel">${relativeTime(h.savedAt)} · ${h.lastStep || 1}단계</div>
             </div>
-            <button class="sync-card-action-btn restore-btn" onclick="doRestoreHistory('${escapeHtmlStr(h._historyDocId)}', '${escapeHtmlStr(formatDateTimeKo(h.savedAt))}')">
+            <button class="sync-card-action-btn restore-btn" data-history-doc-id="${escapeHtmlStr(h._historyDocId)}" data-time-label="${escapeHtmlStr(formatDateTimeKo(h.savedAt))}" onclick="doRestoreHistory(this.dataset.historyDocId, this.dataset.timeLabel)">
                 <i class="fas fa-undo"></i> 이 시점으로 복원
             </button>
         </div>
