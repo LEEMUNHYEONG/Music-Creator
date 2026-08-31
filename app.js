@@ -255,10 +255,10 @@ window.goToStep = function (step, saveBefore = false, skipValidation = false) {
                     ? thumb
                     : thumb.text || thumb.content || String(thumb);
                 thumbnailsHtml += `
-                                    <div class="thumbnail-item" style="padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s;" 
-                                         onclick="if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, '${escapeHtml(thumbnailText).replace(/'/g, "\\'")}', event); }">
-                                        <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">${escapeHtml(thumbnailText)}</div>
-                                        <button class="btn btn-small btn-success" onclick="event.stopPropagation(); if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, '${escapeHtml(thumbnailText).replace(/'/g, "\\'")}', event); }">
+                                    <div class="thumbnail-item" style="padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s;"
+                                         onclick="if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, this.querySelector('.thumbnail-text').textContent, event); }">
+                                        <div class="thumbnail-text" style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">${escapeHtml(thumbnailText)}</div>
+                                        <button class="btn btn-small btn-success" onclick="event.stopPropagation(); if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, this.closest('.thumbnail-item').querySelector('.thumbnail-text').textContent, event); }">
                                             <i class="fas fa-copy"></i> 복사
                                         </button>
                                     </div>
@@ -854,11 +854,12 @@ window.restoreStepData = function (step) {
         }
         if (lyrics5) {
           const el = document.getElementById("finalLyrics");
-          if (el) el.innerHTML = lyrics5;
+          // 저장된 프로젝트/가져온 백업의 내용이므로 HTML로 해석하지 않는다
+          if (el) el.textContent = lyrics5;
         }
         if (style5) {
           const el = document.getElementById("finalStyle");
-          if (el) el.innerHTML = style5;
+          if (el) el.textContent = style5;
         }
 
         const bScore = evalData.beforeScore || projectData.beforeScore || "0";
@@ -1857,7 +1858,7 @@ ${stylePrompt}
             resultHtml += `
                             <div style="padding: 15px; background: var(--bg-card); border-radius: 8px; margin-bottom: 15px; border-left: 4px solid var(--accent);">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                    <h5 style="margin: 0; color: var(--text-primary);">${feedback.category || "분류 없음"}</h5>
+                                    <h5 style="margin: 0; color: var(--text-primary);">${escapeHtml(feedback.category || "분류 없음")}</h5>
                                     <span style="font-size: 1.2rem; font-weight: bold; color: var(--accent);">${feedback.score || 0}점</span>
                                 </div>
                                 ${feedback.strength ? `<div style="margin-bottom: 10px;"><strong style="color: var(--success);">✅ 강점:</strong> <span style="color: var(--text-secondary);">${escapeHtml(feedback.strength)}</span></div>` : ""}
@@ -2008,13 +2009,16 @@ ${stylePrompt}
   }
 };
 
-// HTML 이스케이프 헬퍼 함수
+// HTML 이스케이프 헬퍼 함수 (전역 단일 구현)
+// 주의: 속성 컨텍스트 삽입까지 안전하도록 따옴표(" ')도 반드시 이스케이프한다.
+// (기존 DOM 기반 구현은 따옴표를 통과시켜 onclick 속성 주입 XSS의 원인이었음)
 function escapeHtml(text) {
-  if (!text) return "";
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
+  if (text === null || text === undefined || text === "") return "";
+  return String(text).replace(/[&<>"']/g, function (m) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m];
+  });
 }
+window.escapeHtml = escapeHtml;
 
 // Step 4 관련 중복 함수 제거됨 (js/step4.js에서 관리)
 // updateSelectedCount, selectAllImprovements, deselectAllImprovements, applySelectedImprovements 등
@@ -2065,13 +2069,15 @@ window.handleIntermediateAudioUpload = function (event) {
       return;
     }
 
-    // 파일 크기 검증 (100MB 제한)
-    const maxSize = 100 * 1024 * 1024; // 100MB
+    // 파일 크기 검증
+    // Gemini 인라인 요청 한도(~20MB, base64 팽창 포함)를 넘으면 어차피 실패하므로
+    // 업로드 단계에서 15MB로 제한해 대용량 메모리 낭비와 확정 실패를 막는다.
+    const maxSize = 15 * 1024 * 1024; // 15MB
     if (file.size > maxSize) {
       alert(
-        "⚠️ 파일 크기가 너무 큽니다.\n\n최대 크기: 100MB\n현재 크기: " +
+        "⚠️ 파일 크기가 너무 큽니다.\n\n최대 크기: 15MB (AI 오디오 분석 한도)\n현재 크기: " +
           (file.size / 1024 / 1024).toFixed(2) +
-          "MB",
+          "MB\n\n💡 MP3(128kbps 내외)로 변환하면 대부분의 곡이 15MB 이하가 됩니다.",
       );
       fileInput.value = "";
       return;
@@ -2358,37 +2364,13 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
           if (typeof window.handleGeminiApiFailure === "function") {
             window.handleGeminiApiFailure(geminiError);
           }
-          console.warn("⚠️ Gemini 음원 분석 실패, ChatGPT로 전환하여 재시도합니다:", geminiError.message);
-          const openaiKey = window.getOpenAIApiKey ? window.getOpenAIApiKey() : "";
-          if (!openaiKey) {
-            throw new Error(`Gemini 분석 실패 (${geminiError.message}) 후 ChatGPT 폴백을 시도했으나 OpenAI API 키가 없습니다.`);
-          }
-
-          const chatGPTResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${openaiKey}`,
-            },
-            body: JSON.stringify({
-              model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
-              messages: [
-                { role: "system", content: "You are an AI music analyzer. (Note: Audio file input not supported over text chat fallback, please rely on the provided text prompt details to formulate the evaluation)." },
-                { role: "user", content: prompt + "\n\n(Note: Audio data omitted in fallback)" },
-              ],
-              temperature: 0.7,
-              response_format: { type: "json_object" },
-            }),
-          });
-
-          if (!chatGPTResponse.ok) {
-            const errorData = await chatGPTResponse.json().catch(() => ({}));
-            throw new Error(errorData.error?.message || `ChatGPT API 오류: ${chatGPTResponse.status}`);
-          }
-
-          const chatGPTData = await chatGPTResponse.json();
-          if (window.logApiUsage) window.logApiUsage("openai");
-          aiResponse = chatGPTData.choices?.[0]?.message?.content || "";
+          // ChatGPT 텍스트 폴백은 오디오를 들을 수 없어 가사·점수를 지어내므로
+          // (환각 결과가 실제 평가에 반영되는 데이터 무결성 문제) 수행하지 않는다.
+          throw new Error(
+            "Gemini 오디오 분석에 실패했습니다: " + geminiError.message +
+            "\n\n오디오를 직접 분석할 수 없는 텍스트 모델로는 대체 분석이 불가능합니다." +
+            "\n잠시 후 다시 시도하거나, 파일 용량(15MB 이하)과 API 상태를 확인해 주세요.",
+          );
         }
 
         if (!aiResponse.trim()) {
@@ -4146,7 +4128,7 @@ window.generateStylePromptTranslation = async function () {
     const translation = data.choices?.[0]?.message?.content || "";
 
     if (translation) {
-      translationEl.innerHTML = `<div style="line-height: 1.8;">${translation.replace(/\n/g, "<br>")}</div>`;
+      translationEl.innerHTML = `<div style="line-height: 1.8; white-space: pre-line;">${escapeHtml(translation)}</div>`;
       console.log("✅ 스타일 프롬프트 한글 해석 완료");
     } else {
       throw new Error("번역 결과 없음");
@@ -4313,7 +4295,7 @@ function translateStylePromptBasic(stylePrompt) {
         <div style="margin-bottom: 10px; color: var(--text-secondary); font-size: 0.85rem;">
             <i class="fas fa-info-circle"></i> 기본 번역 (API 키 설정 시 더 정확한 해석 제공)
         </div>
-        <div>${translations.join(", ")}</div>
+        <div>${escapeHtml(translations.join(", "))}</div>
     </div>`;
 }
 
@@ -4602,10 +4584,10 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
             ? thumb
             : thumb.text || thumb.content || String(thumb);
         thumbnailsHtml += `
-                    <div class="thumbnail-item" style="padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s;" 
-                         onclick="if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, '${escapeHtml(thumbnailText).replace(/'/g, "\\'")}', event); }">
-                        <div style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">${escapeHtml(thumbnailText)}</div>
-                        <button class="btn btn-small btn-success" onclick="event.stopPropagation(); if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, '${escapeHtml(thumbnailText).replace(/'/g, "\\'")}', event); }">
+                    <div class="thumbnail-item" style="padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s;"
+                         onclick="if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, this.querySelector('.thumbnail-text').textContent, event); }">
+                        <div class="thumbnail-text" style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">${escapeHtml(thumbnailText)}</div>
+                        <button class="btn btn-small btn-success" onclick="event.stopPropagation(); if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, this.closest('.thumbnail-item').querySelector('.thumbnail-text').textContent, event); }">
                             <i class="fas fa-copy"></i> 복사
                         </button>
                     </div>
@@ -4951,13 +4933,11 @@ window.loadProjectList = function (force = false) {
       var recentHtml =
         '<div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px;">📌 최근 프로젝트</div>';
       recent.forEach(function (proj) {
-        var t = (proj.title || "제목 없음")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;");
+        var t = escapeHtml(proj.title || "제목 없음");
+        var safeRecentId = String(proj.id).replace(/[^\w.-]/g, "");
         recentHtml +=
           '<button type="button" class="btn btn-small" style="width: 100%; margin-bottom: 6px; justify-content: flex-start; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem;" onclick="event.stopPropagation(); if(typeof window.loadProject === \'function\') { window.loadProject(\'' +
-          proj.id +
+          safeRecentId +
           "'); }\">" +
           t +
           "</button>";
@@ -4975,13 +4955,6 @@ window.loadProjectList = function (force = false) {
     // 기본값(savedAt-desc)이 아닌 경우에는 사용자가 정렬을 선택한 것으로 간주
     if (!hasSortSelected && typeof restoreProjectOrder === "function") {
       filteredProjects = restoreProjectOrder(filteredProjects);
-    }
-
-    function escapeHtml(text) {
-      if (!text) return "";
-      const div = document.createElement("div");
-      div.textContent = text;
-      return div.innerHTML;
     }
 
     function formatDate(date) {
@@ -5089,9 +5062,13 @@ window.loadProjectList = function (force = false) {
         showStep = !!stepStr;
       }
 
+      // 가져오기(import)로 유입될 수 있는 임의 ID가 onclick/속성 컨텍스트를
+      // 깨뜨리지 않도록 안전한 문자만 남긴다.
+      const safeId = String(project.id).replace(/[^\w.-]/g, "");
+
       html += `
-                <div class="project-item" 
-                     data-project-id="${project.id}"
+                <div class="project-item"
+                     data-project-id="${safeId}"
                      draggable="true"
                      style="padding: 12px 15px; margin-bottom: 10px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); cursor: move; transition: all 0.2s; position: relative; min-height: 50px; display: flex; align-items: center;" 
                      onmouseover="if(!this.classList.contains('dragging')) this.style.background='var(--bg-input)'" 
@@ -5100,7 +5077,7 @@ window.loadProjectList = function (force = false) {
                         <i class="fas fa-grip-vertical"></i>
                     </span>
                     <button class="project-duplicate" 
-                            onclick="event.stopPropagation(); duplicateProject('${project.id}');" 
+                            onclick="event.stopPropagation(); duplicateProject('${safeId}');"
                             style="position: absolute; right: 58px; top: 50%; transform: translateY(-50%); background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 6px; padding: 5px 8px; cursor: pointer; opacity: 0.6; transition: all 0.2s; color: var(--accent); font-size: 0.75rem; z-index: 10; flex-shrink: 0; white-space: nowrap;" 
                             onmouseover="this.style.opacity='1'; this.style.background='rgba(139, 92, 246, 0.2)'" 
                             onmouseout="this.style.opacity='0.6'; this.style.background='rgba(139, 92, 246, 0.1)'"
@@ -5108,14 +5085,14 @@ window.loadProjectList = function (force = false) {
                         <i class="fas fa-copy"></i> 복제
                     </button>
                     <button class="project-delete" 
-                            onclick="event.stopPropagation(); deleteProject('${project.id}');" 
+                            onclick="event.stopPropagation(); deleteProject('${safeId}');"
                             style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 5px 8px; cursor: pointer; opacity: 0.6; transition: all 0.2s; color: var(--error); font-size: 0.75rem; z-index: 10; flex-shrink: 0; white-space: nowrap;" 
                             onmouseover="this.style.opacity='1'; this.style.background='rgba(239, 68, 68, 0.2)'" 
                             onmouseout="this.style.opacity='0.6'; this.style.background='rgba(239, 68, 68, 0.1)'"
                             title="프로젝트 삭제">
                         <i class="fas fa-trash-alt"></i> 삭제
                     </button>
-                    <div style="padding-left: 22px; padding-right: 125px; cursor: pointer; word-wrap: break-word; overflow-wrap: break-word; min-width: 0; flex: 1; width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; text-align: left; display: flex; flex-direction: column; justify-content: center;" onclick="event.stopPropagation(); loadProject('${project.id}');">
+                    <div style="padding-left: 22px; padding-right: 125px; cursor: pointer; word-wrap: break-word; overflow-wrap: break-word; min-width: 0; flex: 1; width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; text-align: left; display: flex; flex-direction: column; justify-content: center;" onclick="event.stopPropagation(); loadProject('${safeId}');">
                         <div style="font-weight: 600; color: var(--text-primary); margin-bottom: ${isSortMode && !showCreatedDate && !showSavedDate && !showGenres && !showStep ? "0" : "4px"}; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; text-align: left;">${escapeHtml(koreanTitle)}</div>
                         ${showCreatedDate && createdDateStr ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 2px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;"><span style="opacity: 0.7;">📅 작성일시:</span> <span>${createdDateStr}</span></div>` : ""}
                         ${showSavedDate && savedDateStr && savedAt ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 2px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;"><span style="opacity: 0.7;">✏️ 수정일시:</span> <span>${savedDateStr}</span></div>` : ""}
