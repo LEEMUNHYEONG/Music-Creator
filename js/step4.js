@@ -3,19 +3,10 @@
 // ==========================================
 
 // --- Utility Functions ---
-function escapeHtml(text) {
-  if (!text) return "";
-  const map = {
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;",
-  };
-  return text.toString().replace(/[&<>"']/g, function (m) {
-    return map[m];
-  });
-}
+// escapeHtml은 app.js가 전역 단일 구현을 소유한다 (따옴표까지 이스케이프하는
+// 버전). 이 파일에 중복 정의가 있었으나 app.js가 나중에 로드되며 항상
+// 덮어써 죽은 코드였고, `if (!text) return ""` falsy 체크 때문에
+// escapeHtml(0)을 빈 문자열로 만드는 버그까지 있어 제거한다.
 
 // 4단계 완료 배너 표시 함수
 function showStep4CompleteBanner(message, type) {

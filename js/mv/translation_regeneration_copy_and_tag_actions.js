@@ -2238,27 +2238,8 @@ ${sceneContext.promptLines || "- 없음"}
 };
 
 // 선택된 태그들 가져오기 헬퍼 함수
-function getSelectedTags(containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) return [];
-
-  const activeTags = container.querySelectorAll(".tag-btn.active");
-  const tags = [];
-
-  activeTags.forEach((tag) => {
-    const text = tag.dataset.value || tag.textContent.trim();
-    if (
-      text &&
-      text !== "+" &&
-      text !== "+ 직접 입력" &&
-      !text.includes("기타(추가)")
-    ) {
-      tags.push(text);
-    }
-  });
-
-  return tags;
-}
+// → js/step1.js가 완전히 동일한 구현을 전역으로 소유한다 (step1.js가 이
+//   파일보다 먼저 로드됨). 내용이 100% 동일한 중복 정의였으므로 제거.
 
 // 태그 버튼 클릭 이벤트 초기화 함수
 window.initializeTagButtons = function () {
