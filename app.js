@@ -23,6 +23,261 @@ window.editMode = false; // 수정 모드 상태 (false = 읽기 전용, true = 
 // ═══════════════════════════════════════════════════════════════
 // 단계 이동 함수
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// goToStep 헬퍼 함수들 (순수 추출 리팩터링, 동작 동일)
+// 각 단계별 특별 처리 블록을 그대로 이름 붙은 함수로 옮겼다.
+// ═══════════════════════════════════════════════════════════════
+
+// 4단계 특별 처리: 개선안 표시
+function handleGoToStepFour() {
+  const improvementCard = document.getElementById("improvementCard");
+  const improvementLoading = document.getElementById("improvementLoading");
+
+  if (improvementCard && improvementLoading) {
+    improvementLoading.style.display = "none";
+    improvementCard.classList.remove("hidden");
+    improvementCard.style.display = "block";
+  }
+
+  // 3단계 분석 결과에서 개선안 표시
+  if (window.currentProject && window.currentProject.data) {
+    const analysisData = window.currentProject.data.analysis;
+    if (analysisData) {
+      displayImprovements(analysisData);
+    }
+  }
+}
+
+// 5단계 특별 처리: 최종 평가 요약 생성 및 데이터 복원
+function handleGoToStepFive() {
+  // 저장된 프로젝트 데이터가 있으면 5단계 데이터 복원 (항상 복원 시도)
+  if (window.currentProject && window.currentProject.data) {
+    const projectData = window.currentProject.data;
+
+    // 5단계 최종 가사 복원 (우선순위: finalLyrics > finalizedLyrics)
+    const lyrics5 =
+      projectData.finalLyrics || projectData.finalizedLyrics || "";
+    if (lyrics5) {
+      const finalLyricsEl = document.getElementById("finalLyrics");
+      if (finalLyricsEl) {
+        finalLyricsEl.textContent = lyrics5;
+        console.log("✅ 5단계 가사 복원 (goToStep):", lyrics5.length, "자");
+      }
+      // 중간 버전 프리뷰도 복원
+      const intermediateLyricsPreview = document.getElementById(
+        "intermediateLyricsPreview",
+      );
+      if (intermediateLyricsPreview) {
+        intermediateLyricsPreview.textContent = lyrics5;
+      }
+    }
+
+    // 5단계 최종 스타일 복원 (우선순위: finalStyle > finalizedStyle)
+    const style5 =
+      projectData.finalStyle || projectData.finalizedStyle || "";
+    if (style5) {
+      const finalStyleEl = document.getElementById("finalStyle");
+      if (finalStyleEl) {
+        finalStyleEl.textContent = style5;
+        console.log(
+          "✅ 5단계 스타일 복원 (goToStep):",
+          style5.length,
+          "자",
+        );
+      }
+      // 중간 버전 프리뷰도 복원
+      const intermediateStylePreview = document.getElementById(
+        "intermediateStylePreview",
+      );
+      if (intermediateStylePreview) {
+        intermediateStylePreview.textContent = style5;
+      }
+    }
+
+    // 제목 복원
+    const title = window.currentProject.title || projectData.title || "";
+    if (title) {
+      const finalTitleTextEl = document.getElementById("finalTitleText");
+      if (finalTitleTextEl) {
+        finalTitleTextEl.textContent = title;
+      }
+    }
+
+    // 최종 평가 점수·등급·프로그레스 바 복원
+    if (
+      projectData.beforeScore !== undefined ||
+      projectData.afterScore !== undefined
+    ) {
+      const before =
+        projectData.beforeScore !== undefined ? projectData.beforeScore : 0;
+      const after =
+        projectData.afterScore !== undefined
+          ? projectData.afterScore
+          : before;
+      if (typeof window.updateFinalEvaluationUI === "function") {
+        window.updateFinalEvaluationUI(
+          before,
+          after,
+          projectData.aiComment != null ? projectData.aiComment : undefined,
+        );
+      } else {
+        const beforeScoreEl = document.getElementById("beforeScore");
+        const afterScoreEl = document.getElementById("afterScore");
+        const aiCommentEl = document.getElementById("aiComment");
+        if (beforeScoreEl && !beforeScoreEl.textContent)
+          beforeScoreEl.textContent = before;
+        if (afterScoreEl && !afterScoreEl.textContent)
+          afterScoreEl.textContent = after;
+        if (
+          projectData.aiComment &&
+          aiCommentEl &&
+          !aiCommentEl.textContent
+        )
+          aiCommentEl.textContent = projectData.aiComment;
+      }
+    } else if (projectData.aiComment) {
+      const aiCommentEl = document.getElementById("aiComment");
+      if (aiCommentEl && !aiCommentEl.textContent)
+        aiCommentEl.textContent = projectData.aiComment;
+    }
+  }
+
+  // 최종 평가 요약 자동 생성 (데이터가 있는 경우)
+  if (typeof window.generateFinalEvaluation === "function") {
+    setTimeout(() => {
+      window.generateFinalEvaluation();
+    }, 500);
+  }
+}
+
+// 6단계 특별 처리: 마케팅 자료 표시 또는 생성
+function handleGoToStepSix() {
+  const marketingResult = document.getElementById("marketingResult");
+  const marketingLoading = document.getElementById("marketingLoading");
+
+  if (marketingResult && marketingLoading) {
+    // 저장된 마케팅 자료가 있으면 표시
+    if (
+      window.currentProject &&
+      window.currentProject.data &&
+      window.currentProject.data.marketing
+    ) {
+      const marketing = window.currentProject.data.marketing;
+
+      // 마케팅 자료 표시
+      if (marketing.youtubeDesc) {
+        const youtubeDescEl = document.getElementById("youtubeDesc");
+        if (youtubeDescEl)
+          youtubeDescEl.textContent = marketing.youtubeDesc;
+      }
+
+      if (marketing.tiktokDesc) {
+        const tiktokDescEl = document.getElementById("tiktokDesc");
+        if (tiktokDescEl) tiktokDescEl.textContent = marketing.tiktokDesc;
+      }
+
+      if (marketing.hashtags) {
+        const hashtagsEl = document.getElementById("hashtagsContent");
+        if (hashtagsEl) hashtagsEl.textContent = marketing.hashtags;
+      }
+
+      // 썸네일 문구 표시
+      if (
+        marketing.thumbnails &&
+        Array.isArray(marketing.thumbnails) &&
+        marketing.thumbnails.length > 0
+      ) {
+        const thumbnailsGridEl = document.getElementById("thumbnailsGrid");
+        if (thumbnailsGridEl) {
+          let thumbnailsHtml = "";
+          marketing.thumbnails.forEach((thumb, index) => {
+            const thumbnailText =
+              typeof thumb === "string"
+                ? thumb
+                : thumb.text || thumb.content || String(thumb);
+            thumbnailsHtml += `
+                                    <div class="thumbnail-item" style="padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s;"
+                                         onclick="if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, this.querySelector('.thumbnail-text').textContent, event); }">
+                                        <div class="thumbnail-text" style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">${escapeHtml(thumbnailText)}</div>
+                                        <button class="btn btn-small btn-success" onclick="event.stopPropagation(); if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, this.closest('.thumbnail-item').querySelector('.thumbnail-text').textContent, event); }">
+                                            <i class="fas fa-copy"></i> 복사
+                                        </button>
+                                    </div>
+                                `;
+          });
+          thumbnailsGridEl.innerHTML = thumbnailsHtml;
+        }
+      }
+
+      marketingLoading.style.display = "none";
+      marketingResult.style.display = "block";
+      marketingResult.classList.remove("hidden");
+      console.log("✅ 저장된 마케팅 자료 표시 완료");
+    } else {
+      // 저장된 자료가 없으면 자동 생성
+      if (typeof window.generateMarketingMaterials === "function") {
+        setTimeout(() => {
+          window.generateMarketingMaterials();
+        }, 500);
+      } else {
+        // 생성 함수가 없으면 로딩 화면 유지
+        console.warn("⚠️ 마케팅 자료 생성 함수를 찾을 수 없습니다.");
+      }
+    }
+  }
+}
+
+// 3단계 특별 처리: UI 제어 및 2단계 데이터 동기화
+function handleGoToStepThree() {
+  const analysisResult = document.getElementById("analysisResult");
+  const analysisLoading = document.getElementById("analysisLoading");
+  const analysisError = document.getElementById("analysisError");
+  const analysisTargetLyrics = document.getElementById("analysisTargetLyrics");
+  const analysisTargetStyle = document.getElementById("analysisTargetStyle");
+
+  // 2단계 최신 데이터를 3단계 분석 대상에 강제 동기화 (탭 전환 시 빈 화면 방지)
+  const currentSunoLyrics = document.getElementById("sunoLyrics")?.value || "";
+  const currentStylePrompt = document.getElementById("stylePrompt")?.value || "";
+
+  if (analysisTargetLyrics && currentSunoLyrics.trim()) {
+    analysisTargetLyrics.textContent = currentSunoLyrics;
+  }
+  if (analysisTargetStyle && currentStylePrompt.trim()) {
+    analysisTargetStyle.textContent = currentStylePrompt;
+  }
+
+  const hasTargetData =
+    analysisTargetLyrics &&
+    analysisTargetLyrics.textContent.trim() &&
+    analysisTargetStyle &&
+    analysisTargetStyle.textContent.trim();
+
+  // 저장된 분석 데이터 확인
+  const projectData =
+    window.currentProject && window.currentProject.data
+      ? window.currentProject.data
+      : null;
+  const analysisData =
+    projectData && projectData.analysis ? projectData.analysis : {};
+  const hasSavedAnalysis = !!(
+    analysisData.scores ||
+    analysisData.feedbacks ||
+    analysisData.improvements ||
+    analysisData.raw ||
+    (projectData && (projectData.analysisScores || projectData.feedbacks))
+  );
+
+  // 로딩/에러 화면 숨기고 결과 영역은 항상 표시
+  if (analysisLoading) analysisLoading.style.display = "none";
+  if (analysisError) analysisError.style.display = "none";
+
+  if (analysisResult) {
+    analysisResult.style.display = "block";
+    analysisResult.classList.remove("hidden");
+    console.log(hasSavedAnalysis || hasTargetData ? "✅ 3단계 분석 결과 영역 표시 완료" : "✅ 3단계 데이터 대기 중");
+  }
+}
+
 window.goToStep = function (step, saveBefore = false, skipValidation = false) {
   try {
     // 저장이 필요한 경우
@@ -89,252 +344,22 @@ window.goToStep = function (step, saveBefore = false, skipValidation = false) {
 
     // 4단계 특별 처리: 개선안 표시
     if (step === 4) {
-      const improvementCard = document.getElementById("improvementCard");
-      const improvementLoading = document.getElementById("improvementLoading");
-
-      if (improvementCard && improvementLoading) {
-        improvementLoading.style.display = "none";
-        improvementCard.classList.remove("hidden");
-        improvementCard.style.display = "block";
-      }
-
-      // 3단계 분석 결과에서 개선안 표시
-      if (window.currentProject && window.currentProject.data) {
-        const analysisData = window.currentProject.data.analysis;
-        if (analysisData) {
-          displayImprovements(analysisData);
-        }
-      }
+      handleGoToStepFour();
     }
 
     // 5단계 특별 처리: 최종 평가 요약 생성 및 데이터 복원
     if (step === 5) {
-      // 저장된 프로젝트 데이터가 있으면 5단계 데이터 복원 (항상 복원 시도)
-      if (window.currentProject && window.currentProject.data) {
-        const projectData = window.currentProject.data;
-
-        // 5단계 최종 가사 복원 (우선순위: finalLyrics > finalizedLyrics)
-        const lyrics5 =
-          projectData.finalLyrics || projectData.finalizedLyrics || "";
-        if (lyrics5) {
-          const finalLyricsEl = document.getElementById("finalLyrics");
-          if (finalLyricsEl) {
-            finalLyricsEl.textContent = lyrics5;
-            console.log("✅ 5단계 가사 복원 (goToStep):", lyrics5.length, "자");
-          }
-          // 중간 버전 프리뷰도 복원
-          const intermediateLyricsPreview = document.getElementById(
-            "intermediateLyricsPreview",
-          );
-          if (intermediateLyricsPreview) {
-            intermediateLyricsPreview.textContent = lyrics5;
-          }
-        }
-
-        // 5단계 최종 스타일 복원 (우선순위: finalStyle > finalizedStyle)
-        const style5 =
-          projectData.finalStyle || projectData.finalizedStyle || "";
-        if (style5) {
-          const finalStyleEl = document.getElementById("finalStyle");
-          if (finalStyleEl) {
-            finalStyleEl.textContent = style5;
-            console.log(
-              "✅ 5단계 스타일 복원 (goToStep):",
-              style5.length,
-              "자",
-            );
-          }
-          // 중간 버전 프리뷰도 복원
-          const intermediateStylePreview = document.getElementById(
-            "intermediateStylePreview",
-          );
-          if (intermediateStylePreview) {
-            intermediateStylePreview.textContent = style5;
-          }
-        }
-
-        // 제목 복원
-        const title = window.currentProject.title || projectData.title || "";
-        if (title) {
-          const finalTitleTextEl = document.getElementById("finalTitleText");
-          if (finalTitleTextEl) {
-            finalTitleTextEl.textContent = title;
-          }
-        }
-
-        // 최종 평가 점수·등급·프로그레스 바 복원
-        if (
-          projectData.beforeScore !== undefined ||
-          projectData.afterScore !== undefined
-        ) {
-          const before =
-            projectData.beforeScore !== undefined ? projectData.beforeScore : 0;
-          const after =
-            projectData.afterScore !== undefined
-              ? projectData.afterScore
-              : before;
-          if (typeof window.updateFinalEvaluationUI === "function") {
-            window.updateFinalEvaluationUI(
-              before,
-              after,
-              projectData.aiComment != null ? projectData.aiComment : undefined,
-            );
-          } else {
-            const beforeScoreEl = document.getElementById("beforeScore");
-            const afterScoreEl = document.getElementById("afterScore");
-            const aiCommentEl = document.getElementById("aiComment");
-            if (beforeScoreEl && !beforeScoreEl.textContent)
-              beforeScoreEl.textContent = before;
-            if (afterScoreEl && !afterScoreEl.textContent)
-              afterScoreEl.textContent = after;
-            if (
-              projectData.aiComment &&
-              aiCommentEl &&
-              !aiCommentEl.textContent
-            )
-              aiCommentEl.textContent = projectData.aiComment;
-          }
-        } else if (projectData.aiComment) {
-          const aiCommentEl = document.getElementById("aiComment");
-          if (aiCommentEl && !aiCommentEl.textContent)
-            aiCommentEl.textContent = projectData.aiComment;
-        }
-      }
-
-      // 최종 평가 요약 자동 생성 (데이터가 있는 경우)
-      if (typeof window.generateFinalEvaluation === "function") {
-        setTimeout(() => {
-          window.generateFinalEvaluation();
-        }, 500);
-      }
+      handleGoToStepFive();
     }
 
     // 6단계 특별 처리: 마케팅 자료 표시 또는 생성
     if (step === 6) {
-      const marketingResult = document.getElementById("marketingResult");
-      const marketingLoading = document.getElementById("marketingLoading");
-
-      if (marketingResult && marketingLoading) {
-        // 저장된 마케팅 자료가 있으면 표시
-        if (
-          window.currentProject &&
-          window.currentProject.data &&
-          window.currentProject.data.marketing
-        ) {
-          const marketing = window.currentProject.data.marketing;
-
-          // 마케팅 자료 표시
-          if (marketing.youtubeDesc) {
-            const youtubeDescEl = document.getElementById("youtubeDesc");
-            if (youtubeDescEl)
-              youtubeDescEl.textContent = marketing.youtubeDesc;
-          }
-
-          if (marketing.tiktokDesc) {
-            const tiktokDescEl = document.getElementById("tiktokDesc");
-            if (tiktokDescEl) tiktokDescEl.textContent = marketing.tiktokDesc;
-          }
-
-          if (marketing.hashtags) {
-            const hashtagsEl = document.getElementById("hashtagsContent");
-            if (hashtagsEl) hashtagsEl.textContent = marketing.hashtags;
-          }
-
-          // 썸네일 문구 표시
-          if (
-            marketing.thumbnails &&
-            Array.isArray(marketing.thumbnails) &&
-            marketing.thumbnails.length > 0
-          ) {
-            const thumbnailsGridEl = document.getElementById("thumbnailsGrid");
-            if (thumbnailsGridEl) {
-              let thumbnailsHtml = "";
-              marketing.thumbnails.forEach((thumb, index) => {
-                const thumbnailText =
-                  typeof thumb === "string"
-                    ? thumb
-                    : thumb.text || thumb.content || String(thumb);
-                thumbnailsHtml += `
-                                    <div class="thumbnail-item" style="padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s;"
-                                         onclick="if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, this.querySelector('.thumbnail-text').textContent, event); }">
-                                        <div class="thumbnail-text" style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">${escapeHtml(thumbnailText)}</div>
-                                        <button class="btn btn-small btn-success" onclick="event.stopPropagation(); if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, this.closest('.thumbnail-item').querySelector('.thumbnail-text').textContent, event); }">
-                                            <i class="fas fa-copy"></i> 복사
-                                        </button>
-                                    </div>
-                                `;
-              });
-              thumbnailsGridEl.innerHTML = thumbnailsHtml;
-            }
-          }
-
-          marketingLoading.style.display = "none";
-          marketingResult.style.display = "block";
-          marketingResult.classList.remove("hidden");
-          console.log("✅ 저장된 마케팅 자료 표시 완료");
-        } else {
-          // 저장된 자료가 없으면 자동 생성
-          if (typeof window.generateMarketingMaterials === "function") {
-            setTimeout(() => {
-              window.generateMarketingMaterials();
-            }, 500);
-          } else {
-            // 생성 함수가 없으면 로딩 화면 유지
-            console.warn("⚠️ 마케팅 자료 생성 함수를 찾을 수 없습니다.");
-          }
-        }
-      }
+      handleGoToStepSix();
     }
 
     // 3단계 특별 처리: UI 제어 및 2단계 데이터 동기화
     if (step === 3) {
-      const analysisResult = document.getElementById("analysisResult");
-      const analysisLoading = document.getElementById("analysisLoading");
-      const analysisError = document.getElementById("analysisError");
-      const analysisTargetLyrics = document.getElementById("analysisTargetLyrics");
-      const analysisTargetStyle = document.getElementById("analysisTargetStyle");
-
-      // 2단계 최신 데이터를 3단계 분석 대상에 강제 동기화 (탭 전환 시 빈 화면 방지)
-      const currentSunoLyrics = document.getElementById("sunoLyrics")?.value || "";
-      const currentStylePrompt = document.getElementById("stylePrompt")?.value || "";
-      
-      if (analysisTargetLyrics && currentSunoLyrics.trim()) {
-        analysisTargetLyrics.textContent = currentSunoLyrics;
-      }
-      if (analysisTargetStyle && currentStylePrompt.trim()) {
-        analysisTargetStyle.textContent = currentStylePrompt;
-      }
-
-      const hasTargetData =
-        analysisTargetLyrics &&
-        analysisTargetLyrics.textContent.trim() &&
-        analysisTargetStyle &&
-        analysisTargetStyle.textContent.trim();
-
-      // 저장된 분석 데이터 확인
-      const projectData =
-        window.currentProject && window.currentProject.data
-          ? window.currentProject.data
-          : null;
-      const analysisData =
-        projectData && projectData.analysis ? projectData.analysis : {};
-      const hasSavedAnalysis = !!(
-        analysisData.scores ||
-        analysisData.feedbacks ||
-        analysisData.improvements ||
-        analysisData.raw ||
-        (projectData && (projectData.analysisScores || projectData.feedbacks))
-      );
-
-      // 로딩/에러 화면 숨기고 결과 영역은 항상 표시
-      if (analysisLoading) analysisLoading.style.display = "none";
-      if (analysisError) analysisError.style.display = "none";
-      
-      if (analysisResult) {
-        analysisResult.style.display = "block";
-        analysisResult.classList.remove("hidden");
-        console.log(hasSavedAnalysis || hasTargetData ? "✅ 3단계 분석 결과 영역 표시 완료" : "✅ 3단계 데이터 대기 중");
-      }
+      handleGoToStepThree();
     }
 
     if (typeof window.updateStepProgress === "function") {
