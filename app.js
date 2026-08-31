@@ -3443,81 +3443,73 @@ document.addEventListener("DOMContentLoaded", function () {
 // ═══════════════════════════════════════════════════════════════
 // AI로 스타일 프롬프트 생성 함수
 // ═══════════════════════════════════════════════════════════════
-window.generateStylePromptAI = async function () {
-  try {
-    // 로딩 표시
-    const stylePromptEl = document.getElementById("stylePrompt");
-    if (!stylePromptEl) {
-      window.showToast("스타일 프롬프트 입력란을 찾을 수 없습니다.", "error");
-      return;
-    }
+// ═══════════════════════════════════════════════════════════════
+// generateStylePromptAI 헬퍼 함수들 (순수 추출 리팩터링, 동작 동일)
+// ═══════════════════════════════════════════════════════════════
 
-    // 기존 값 백업
-    const previousValue = stylePromptEl.value;
-    stylePromptEl.value = "🔄 AI가 스타일 프롬프트를 생성 중입니다...";
-    stylePromptEl.disabled = true;
+// 1~2단계 화면에서 스타일 프롬프트 생성에 필요한 데이터를 모두 모은다.
+function collectStylePromptGenerationData() {
+  const songTitle =
+    document.getElementById("sunoTitle")?.value ||
+    document.getElementById("songTitle")?.value ||
+    "";
+  const sunoLyrics = document.getElementById("sunoLyrics")?.value || "";
+  const manualStylePrompt = document.getElementById("manualStylePrompt")?.value || "";
 
-    // API 키 확인
-    const apiKey = (typeof window.getOpenAIApiKey === "function" ? window.getOpenAIApiKey() : localStorage.getItem("openai_api_key"));
-    if (!apiKey) {
-      stylePromptEl.value = previousValue;
-      stylePromptEl.disabled = false;
-      window.showToast(
-        "OpenAI API 키가 설정되지 않았습니다.\n\n설정 → API 키 설정에서 키를 입력해주세요.", "info");
-      return;
-    }
+  const step1Tags = {
+    genre: getSelectedTags("genreTags"),
+    mood: getSelectedTags("moodTags"),
+    era: getSelectedTags("eraTags"),
+    theme: getSelectedTags("themeTags"),
+    perspective: getSelectedTags("perspectiveTags"),
+    time: getSelectedTags("timeTags"),
+    special: getSelectedTags("specialTags"),
+    region: getSelectedTags("regionTags"),
+  };
 
-    // ═══════════════════════════════════════════════════════════════
-    // 1단계 데이터 수집
-    // ═══════════════════════════════════════════════════════════════
-    const songTitle =
-      document.getElementById("sunoTitle")?.value ||
-      document.getElementById("songTitle")?.value ||
-      "";
-    const sunoLyrics = document.getElementById("sunoLyrics")?.value || "";
-    const manualStylePrompt =
-      document.getElementById("manualStylePrompt")?.value || "";
+  const step2Tags = {
+    audioFormat: getSelectedTags("audioFormatTags"),
+    venue: getSelectedTags("sunoVenueTags"),
+    vocalStyle: getSelectedTags("vocalStyle"),
+    instruments: getSelectedTags("instrumentTags"),
+  };
 
-    // 1단계 선택 태그들
-    const step1Tags = {
-      genre: getSelectedTags("genreTags"),
-      mood: getSelectedTags("moodTags"),
-      era: getSelectedTags("eraTags"),
-      theme: getSelectedTags("themeTags"),
-      perspective: getSelectedTags("perspectiveTags"),
-      time: getSelectedTags("timeTags"),
-      special: getSelectedTags("specialTags"),
-      region: getSelectedTags("regionTags"),
-    };
+  const tempo = document.getElementById("tempoSlider")?.value || "80";
 
-    // ═══════════════════════════════════════════════════════════════
-    // 2단계 데이터 수집
-    // ═══════════════════════════════════════════════════════════════
-    const step2Tags = {
-      audioFormat: getSelectedTags("audioFormatTags"),
-      venue: getSelectedTags("sunoVenueTags"),
-      vocalStyle: getSelectedTags("vocalStyle"),
-      instruments: getSelectedTags("instrumentTags"),
-    };
+  const vocalPartAssignments = window.vocalPartAssignments || {};
+  const vocalPartAssignmentsList = Object.keys(vocalPartAssignments)
+    .map((part) => `${part}: ${vocalPartAssignments[part]}`)
+    .join(", ");
 
-    // 템포
-    const tempo = document.getElementById("tempoSlider")?.value || "80";
+  const guidelines = localStorage.getItem("musicCreatorGuidelines") || "";
 
-    // 파트별 보컬 지정 (전역 변수에서 가져오기)
-    const vocalPartAssignments = window.vocalPartAssignments || {};
-    const vocalPartAssignmentsList = Object.keys(vocalPartAssignments)
-      .map((part) => {
-        return `${part}: ${vocalPartAssignments[part]}`;
-      })
-      .join(", ");
+  return {
+    songTitle,
+    sunoLyrics,
+    manualStylePrompt,
+    step1Tags,
+    step2Tags,
+    tempo,
+    vocalPartAssignments,
+    vocalPartAssignmentsList,
+    guidelines,
+  };
+}
 
-    // 지침서
-    const guidelines = localStorage.getItem("musicCreatorGuidelines") || "";
+// 수집한 데이터로 AI에게 보낼 스타일 프롬프트 생성 요청 텍스트를 만든다.
+function buildStylePromptGenerationRequest(data) {
+  const {
+    songTitle,
+    sunoLyrics,
+    manualStylePrompt,
+    step1Tags,
+    step2Tags,
+    tempo,
+    vocalPartAssignments,
+    vocalPartAssignmentsList,
+  } = data;
 
-    // ═══════════════════════════════════════════════════════════════
-    // AI 프롬프트 구성
-    // ═══════════════════════════════════════════════════════════════
-    const prompt = `당신은 Suno AI 음악 생성을 위한 스타일 프롬프트 전문가입니다.
+  return `당신은 Suno AI 음악 생성을 위한 스타일 프롬프트 전문가입니다.
 아래 정보를 바탕으로 Suno AI의 스타일란에 입력할 최적의 영문 스타일 프롬프트를 생성해주세요.
 
 ## 곡 정보
@@ -3567,48 +3559,78 @@ ${
 
 예시:
 K-Pop Ballad, emotional, melancholic, 75 BPM, soft female vocals, breathy tone, piano, gentle strings, ambient pads, wide stereo, studio reverb, intimate atmosphere, cinematic, heartfelt, nostalgic undertones`;
+}
 
-    // ChatGPT API 호출
+// ChatGPT를 호출해 생성된 스타일 프롬프트 문자열을 반환한다.
+async function callOpenAIForStylePromptGeneration(prompt, apiKey, guidelines) {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: guidelines
+            ? `당신은 Suno AI 스타일 프롬프트 전문가입니다. 다음 제작 지침서를 참고하세요:\n\n${guidelines.substring(0, 1000)}`
+            : "당신은 Suno AI 스타일 프롬프트 전문가입니다.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.7,
+      max_tokens: 500,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error?.message || `API 오류: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const generatedPrompt = data.choices?.[0]?.message?.content?.trim() || "";
+  if (!generatedPrompt) {
+    throw new Error("생성된 프롬프트가 없습니다.");
+  }
+  return generatedPrompt;
+}
+
+window.generateStylePromptAI = async function () {
+  try {
+    // 로딩 표시
+    const stylePromptEl = document.getElementById("stylePrompt");
+    if (!stylePromptEl) {
+      window.showToast("스타일 프롬프트 입력란을 찾을 수 없습니다.", "error");
+      return;
+    }
+
+    // 기존 값 백업
+    const previousValue = stylePromptEl.value;
+    stylePromptEl.value = "🔄 AI가 스타일 프롬프트를 생성 중입니다...";
+    stylePromptEl.disabled = true;
+
+    // API 키 확인
+    const apiKey = (typeof window.getOpenAIApiKey === "function" ? window.getOpenAIApiKey() : localStorage.getItem("openai_api_key"));
+    if (!apiKey) {
+      stylePromptEl.value = previousValue;
+      stylePromptEl.disabled = false;
+      window.showToast(
+        "OpenAI API 키가 설정되지 않았습니다.\n\n설정 → API 키 설정에서 키를 입력해주세요.", "info");
+      return;
+    }
+
+    const genData = collectStylePromptGenerationData();
+    const prompt = buildStylePromptGenerationRequest(genData);
+
     console.log("🤖 AI 스타일 프롬프트 생성 시작...");
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
-        messages: [
-          {
-            role: "system",
-            content: guidelines
-              ? `당신은 Suno AI 스타일 프롬프트 전문가입니다. 다음 제작 지침서를 참고하세요:\n\n${guidelines.substring(0, 1000)}`
-              : "당신은 Suno AI 스타일 프롬프트 전문가입니다.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
-        max_tokens: 500,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        errorData.error?.message || `API 오류: ${response.status}`,
-      );
-    }
-
-    const data = await response.json();
-    const generatedPrompt = data.choices?.[0]?.message?.content?.trim() || "";
-
-    if (!generatedPrompt) {
-      throw new Error("생성된 프롬프트가 없습니다.");
-    }
+    const generatedPrompt = await callOpenAIForStylePromptGeneration(
+      prompt,
+      apiKey,
+      genData.guidelines,
+    );
 
     // 스타일 프롬프트 설정
     stylePromptEl.value = generatedPrompt;
