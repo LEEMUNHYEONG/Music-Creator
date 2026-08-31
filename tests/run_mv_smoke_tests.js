@@ -10,12 +10,14 @@ if (buildResult.status !== 0) {
 }
 
 const checks = [
+  ["Syntax: check_dom_ids.js", ["--check", "tests/check_dom_ids.js"]],
   ["Syntax: app.js", ["--check", "app.js"]],
   ["Syntax: MV compatibility bundle", ["--check", "test-results/mv_modules.compat.js"]],
   ["Syntax: MV smoke tests", ["--check", __filename]],
 ];
 
 const tests = [
+  "tests/check_dom_ids.js",
   "tests/mv_duplicate_ownership_check.js",
   "tests/mv_chrome_runtime_check.js",
   "tests/mv_responsive_layout_smoke.js",
