@@ -4513,6 +4513,290 @@ if (typeof document !== "undefined") {
 // ═══════════════════════════════════════════════════════════════
 // 프로젝트 목록 로드 함수 (debounce 적용)
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// loadProjectList 헬퍼 함수들 (원래 함수 내부에 중첩되어 있던 것을
+// 모듈 스코프로 끌어올리고, 단계별로 이름 붙여 분리함 — 동작은
+// 원본과 완전히 동일하게 유지한다. 순수 추출 리팩터링.)
+// ═══════════════════════════════════════════════════════════════
+
+// 한글 제목 분리 헬퍼 (정렬 시 제목 비교용)
+function getKoreanTitle(fullTitle) {
+  if (!fullTitle) return "";
+  const match = fullTitle.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+  return match ? match[1].trim() : fullTitle.trim();
+}
+
+// 한글 제목과 영어 제목 분리 ("한글제목 (English Title)" 형식 파싱)
+function splitTitle(fullTitle) {
+  if (!fullTitle) return { korean: "제목 없음", english: "" };
+  const match = fullTitle.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+  if (match) {
+    return { korean: match[1].trim(), english: match[2].trim() };
+  }
+  return { korean: fullTitle.trim(), english: "" };
+}
+
+function formatDate(date) {
+  if (!date) return "";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+// localStorage 전체를 훑어 프로젝트로 보이는 데이터를 모두 모으고,
+// 같은 id는 "유효한 제목 우선 → 더 최신 우선" 규칙으로 중복 제거한다.
+function collectAllStoredProjects() {
+  let allProjects = [];
+  const foundKeys = [];
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key) continue;
+
+    try {
+      const data = localStorage.getItem(key);
+      if (!data) continue;
+
+      if (data.trim().startsWith("[")) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const firstItem = parsed[0];
+          if (firstItem && typeof firstItem === "object" && firstItem.id) {
+            allProjects = allProjects.concat(parsed);
+            foundKeys.push(key);
+            console.log(`✅ ${key} 키에서 ${parsed.length}개 프로젝트 발견`);
+          }
+        }
+      } else if (data.trim().startsWith("{")) {
+        const parsed = JSON.parse(data);
+        if (parsed && typeof parsed === "object" && parsed.id) {
+          allProjects.push(parsed);
+          foundKeys.push(key);
+          console.log(`✅ ${key} 키에서 단일 프로젝트 발견`);
+        }
+      }
+    } catch (e) {
+      // JSON 파싱 실패는 무시
+    }
+  }
+
+  const projectMap = new Map();
+  const isValidTitle = (t) => t && t !== "제목 없음" && t !== "undefined";
+
+  allProjects.forEach((project) => {
+    if (!project.id) return;
+
+    const existing = projectMap.get(project.id);
+    if (!existing) {
+      projectMap.set(project.id, project);
+    } else {
+      const existingHasValidTitle = isValidTitle(existing.title);
+      const nextHasValidTitle = isValidTitle(project.title);
+
+      if (!existingHasValidTitle && nextHasValidTitle) {
+        projectMap.set(project.id, project);
+      } else if (existingHasValidTitle && !nextHasValidTitle) {
+        return;
+      } else {
+        const existingDate = new Date(existing.savedAt || existing.createdAt || 0);
+        const newDate = new Date(project.savedAt || project.createdAt || 0);
+        if (newDate > existingDate) {
+          projectMap.set(project.id, project);
+        }
+      }
+    }
+  });
+
+  const projects = Array.from(projectMap.values());
+  console.log(`✅ 총 ${projects.length}개 프로젝트 발견 (${foundKeys.length}개 키에서)`);
+  return projects;
+}
+
+// #projectSearch 입력값으로 프로젝트 목록을 필터링한다.
+function filterProjectsBySearchInput(projects) {
+  const searchInput = document.getElementById("projectSearch");
+  if (!searchInput || !searchInput.value.trim()) return projects;
+
+  const searchTerm = searchInput.value.trim().toLowerCase();
+  return projects.filter((project) => {
+    const title = (project.title || "").toLowerCase();
+    const genres = (project.genres || []).join(" ").toLowerCase();
+    return title.includes(searchTerm) || genres.includes(searchTerm);
+  });
+}
+
+// #projectSort 드롭다운 값을 읽어 정렬을 적용한다.
+// { sorted, sortField, sortOrder, sortValue } 를 반환한다.
+function sortProjectsForList(projects) {
+  const sortSelect = document.getElementById("projectSort");
+  const sortValue = sortSelect && sortSelect.value ? sortSelect.value : "savedAt-desc";
+  const [sortField, sortOrder] = sortValue.split("-");
+
+  const sorted = projects.slice().sort((a, b) => {
+    let valueA, valueB;
+
+    if (sortField === "savedAt" || sortField === "createdAt") {
+      valueA = new Date(a[sortField] || a.createdAt || a.savedAt || 0);
+      valueB = new Date(b[sortField] || b.createdAt || b.savedAt || 0);
+    } else if (sortField === "title") {
+      valueA = getKoreanTitle(a.title || "").toLowerCase();
+      valueB = getKoreanTitle(b.title || "").toLowerCase();
+    } else if (sortField === "genre") {
+      valueA = (a.genres || []).join(", ").toLowerCase();
+      valueB = (b.genres || []).join(", ").toLowerCase();
+    } else if (sortField === "step") {
+      const stepA = a.lastStep || "";
+      const stepB = b.lastStep || "";
+      valueA = parseInt(stepA.toString().replace(/[^0-9]/g, "")) || 0;
+      valueB = parseInt(stepB.toString().replace(/[^0-9]/g, "")) || 0;
+    } else {
+      valueA = new Date(a.savedAt || a.createdAt || a.updatedAt || 0);
+      valueB = new Date(b.savedAt || b.createdAt || b.updatedAt || 0);
+    }
+
+    if (sortOrder === "asc") {
+      return valueA > valueB ? 1 : valueA < valueB ? -1 : 0;
+    }
+    return valueA < valueB ? 1 : valueA > valueB ? -1 : 0;
+  });
+
+  console.log(`✅ 정렬 적용 완료: ${sortValue} (${sortField}-${sortOrder})`);
+  return { sorted, sortField, sortOrder, sortValue };
+}
+
+// 사이드바 "최근 프로젝트" 5개 영역을 갱신한다.
+function renderRecentProjectsList(filteredProjects) {
+  const recentEl = document.getElementById("recentProjectsList");
+  if (!recentEl) return;
+
+  const recent = filteredProjects.slice(0, 5);
+  let recentHtml =
+    '<div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px;">📌 최근 프로젝트</div>';
+  recent.forEach(function (proj) {
+    const t = escapeHtml(proj.title || "제목 없음");
+    const safeRecentId = String(proj.id).replace(/[^\w.-]/g, "");
+    recentHtml +=
+      '<button type="button" class="btn btn-small" style="width: 100%; margin-bottom: 6px; justify-content: flex-start; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem;" onclick="event.stopPropagation(); if(typeof window.loadProject === \'function\') { window.loadProject(\'' +
+      safeRecentId +
+      "'); }\">" +
+      t +
+      "</button>";
+  });
+  recentEl.innerHTML = recentHtml;
+  recentEl.style.display = "block";
+}
+
+// 정렬 기준(sortField)에 따라 이 항목에 어떤 부가 정보를 보여줄지 결정한다.
+// isSortMode는 loadProjectList에서 항상 true로 고정되어 있으므로 그대로 전달받는다.
+function getProjectListItemDisplayFlags(project, sortField, isSortMode, createdDateStr, savedDateStr, savedAt, genresStr, stepStr) {
+  let showCreatedDate = false;
+  let showSavedDate = false;
+  let showGenres = false;
+  let showStep = false;
+
+  if (isSortMode) {
+    switch (sortField) {
+      case "createdAt":
+        showCreatedDate = true;
+        break;
+      case "savedAt":
+        showSavedDate = true;
+        break;
+      case "genre":
+        showGenres = true;
+        break;
+      case "step":
+        showStep = true;
+        break;
+      case "title":
+        break;
+    }
+  } else {
+    showCreatedDate = !!createdDateStr;
+    showSavedDate = !!(savedDateStr && savedAt);
+    showGenres = !!genresStr;
+    showStep = !!stepStr;
+  }
+
+  return { showCreatedDate, showSavedDate, showGenres, showStep };
+}
+
+// 프로젝트 하나에 대한 목록 항목 HTML을 만든다.
+function buildProjectListItemHtml(project, sortField, isSortMode) {
+  const titleParts = splitTitle(project.title);
+  const koreanTitle = titleParts.korean;
+
+  const createdAt = project.createdAt || null;
+  const savedAt = project.savedAt || project.updatedAt || null;
+  const savedDate = savedAt || createdAt || Date.now();
+
+  const createdDateStr = formatDate(createdAt);
+  const savedDateStr = formatDate(savedAt || savedDate);
+
+  const genresStr =
+    project.genres && project.genres.length > 0 ? project.genres.join(", ") : "";
+  const stepStr = project.lastStep ? project.lastStep : "";
+
+  const { showCreatedDate, showSavedDate, showGenres, showStep } =
+    getProjectListItemDisplayFlags(
+      project,
+      sortField,
+      isSortMode,
+      createdDateStr,
+      savedDateStr,
+      savedAt,
+      genresStr,
+      stepStr,
+    );
+
+  // 가져오기(import)로 유입될 수 있는 임의 ID가 onclick/속성 컨텍스트를
+  // 깨뜨리지 않도록 안전한 문자만 남긴다.
+  const safeId = String(project.id).replace(/[^\w.-]/g, "");
+
+  return `
+                <div class="project-item"
+                     data-project-id="${safeId}"
+                     draggable="true"
+                     style="padding: 12px 15px; margin-bottom: 10px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); cursor: move; transition: all 0.2s; position: relative; min-height: 50px; display: flex; align-items: center;"
+                     onmouseover="if(!this.classList.contains('dragging')) this.style.background='var(--bg-input)'"
+                     onmouseout="if(!this.classList.contains('dragging')) this.style.background='var(--bg-card)'">
+                    <span class="project-drag-handle" style="position: absolute; left: 3px; top: 50%; transform: translateY(-50%); opacity: 0.3; cursor: grab; font-size: 0.85rem; color: var(--text-secondary); z-index: 10; flex-shrink: 0; width: 18px;" title="드래그하여 순서 변경" onmousedown="event.stopPropagation();">
+                        <i class="fas fa-grip-vertical"></i>
+                    </span>
+                    <button class="project-duplicate"
+                            onclick="event.stopPropagation(); duplicateProject('${safeId}');"
+                            style="position: absolute; right: 58px; top: 50%; transform: translateY(-50%); background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 6px; padding: 5px 8px; cursor: pointer; opacity: 0.6; transition: all 0.2s; color: var(--accent); font-size: 0.75rem; z-index: 10; flex-shrink: 0; white-space: nowrap;"
+                            onmouseover="this.style.opacity='1'; this.style.background='rgba(139, 92, 246, 0.2)'"
+                            onmouseout="this.style.opacity='0.6'; this.style.background='rgba(139, 92, 246, 0.1)'"
+                            title="프로젝트 복제">
+                        <i class="fas fa-copy"></i> 복제
+                    </button>
+                    <button class="project-delete"
+                            onclick="event.stopPropagation(); deleteProject('${safeId}');"
+                            style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 5px 8px; cursor: pointer; opacity: 0.6; transition: all 0.2s; color: var(--error); font-size: 0.75rem; z-index: 10; flex-shrink: 0; white-space: nowrap;"
+                            onmouseover="this.style.opacity='1'; this.style.background='rgba(239, 68, 68, 0.2)'"
+                            onmouseout="this.style.opacity='0.6'; this.style.background='rgba(239, 68, 68, 0.1)'"
+                            title="프로젝트 삭제">
+                        <i class="fas fa-trash-alt"></i> 삭제
+                    </button>
+                    <div style="padding-left: 22px; padding-right: 125px; cursor: pointer; word-wrap: break-word; overflow-wrap: break-word; min-width: 0; flex: 1; width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; text-align: left; display: flex; flex-direction: column; justify-content: center;" onclick="event.stopPropagation(); loadProject('${safeId}');">
+                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: ${isSortMode && !showCreatedDate && !showSavedDate && !showGenres && !showStep ? "0" : "4px"}; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; text-align: left;">${escapeHtml(koreanTitle)}</div>
+                        ${showCreatedDate && createdDateStr ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 2px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;"><span style="opacity: 0.7;">📅 작성일시:</span> <span>${createdDateStr}</span></div>` : ""}
+                        ${showSavedDate && savedDateStr && savedAt ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 2px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;"><span style="opacity: 0.7;">✏️ 수정일시:</span> <span>${savedDateStr}</span></div>` : ""}
+                        ${showGenres && genresStr ? `<div style="font-size: 0.75rem; color: var(--accent); margin-top: 2px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;"><span style="opacity: 0.8;">🎵 장르:</span> ${escapeHtml(genresStr)}</div>` : ""}
+                        ${showStep && stepStr ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;"><span style="opacity: 0.7;">📍 진행 단계:</span> ${escapeHtml(stepStr)}</div>` : ""}
+                    </div>
+                </div>
+            `;
+}
+
 window.loadProjectList = function (force = false) {
   try {
     // 디바운스: 연속 호출 시 마지막 호출만 실행 (150ms)
@@ -4538,94 +4822,12 @@ window.loadProjectList = function (force = false) {
       return;
     }
 
-    // localStorage에서 모든 프로젝트 데이터 수집
-    let allProjects = [];
-    const foundKeys = [];
-
-    // 모든 localStorage 키를 확인하여 프로젝트 데이터 찾기
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (!key) continue;
-
-      try {
-        const data = localStorage.getItem(key);
-        if (!data) continue;
-
-        // JSON 배열인지 확인
-        if (data.trim().startsWith("[")) {
-          const parsed = JSON.parse(data);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            // 프로젝트 객체인지 확인 (id가 있는지)
-            const firstItem = parsed[0];
-            if (
-              firstItem &&
-              typeof firstItem === "object" &&
-              firstItem.id
-            ) {
-              allProjects = allProjects.concat(parsed);
-              foundKeys.push(key);
-              console.log(`✅ ${key} 키에서 ${parsed.length}개 프로젝트 발견`);
-            }
-          }
-        }
-        // 단일 프로젝트 객체인지 확인
-        else if (data.trim().startsWith("{")) {
-          const parsed = JSON.parse(data);
-          if (
-            parsed &&
-            typeof parsed === "object" &&
-            parsed.id
-          ) {
-            allProjects.push(parsed);
-            foundKeys.push(key);
-            console.log(`✅ ${key} 키에서 단일 프로젝트 발견`);
-          }
-        }
-      } catch (e) {
-        // JSON 파싱 실패는 무시
-      }
-    }
-
-    // 중복 제거 (같은 id를 가진 프로젝트는 가장 최신 것 및 유효한 제목 우선 유지)
-    const projectMap = new Map();
-    const isValidTitle = (t) => t && t !== "제목 없음" && t !== "undefined";
-
-    allProjects.forEach((project) => {
-      if (!project.id) return;
-
-      const existing = projectMap.get(project.id);
-      if (!existing) {
-        projectMap.set(project.id, project);
-      } else {
-        // 우선순위 1: 유효한 제목이 있는 프로젝트 우선
-        const existingHasValidTitle = isValidTitle(existing.title);
-        const nextHasValidTitle = isValidTitle(project.title);
-
-        if (!existingHasValidTitle && nextHasValidTitle) {
-          // 기존 것이 제목이 없는데 새 것이 있으면 교체
-          projectMap.set(project.id, project);
-        } else if (existingHasValidTitle && !nextHasValidTitle) {
-          // 기존 것이 제목이 있는데 새 것이 없으면 유지
-          return;
-        } else {
-          // 둘 다 제목이 있거나 둘 다 없으면 더 최신 프로젝트로 교체
-          const existingDate = new Date(
-            existing.savedAt || existing.createdAt || 0,
-          );
-          const newDate = new Date(project.savedAt || project.createdAt || 0);
-          if (newDate > existingDate) {
-            projectMap.set(project.id, project);
-          }
-        }
-      }
-    });
-
-    const projects = Array.from(projectMap.values());
+    const projects = collectAllStoredProjects();
 
     if (projects.length === 0) {
       projectListEl.innerHTML =
         '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">저장된 프로젝트가 없습니다.<br><br><small style="color: var(--text-secondary);">프로젝트를 저장하면 여기에 표시됩니다.</small></div>';
-      var recentEl = document.getElementById("recentProjectsList");
+      const recentEl = document.getElementById("recentProjectsList");
       if (recentEl) {
         recentEl.innerHTML = "";
         recentEl.style.display = "none";
@@ -4635,77 +4837,14 @@ window.loadProjectList = function (force = false) {
       return;
     }
 
-    console.log(
-      `✅ 총 ${projects.length}개 프로젝트 발견 (${foundKeys.length}개 키에서)`,
-    );
-
-    // 검색어 필터링
-    const searchInput = document.getElementById("projectSearch");
-    let filteredProjects = projects;
-    if (searchInput && searchInput.value.trim()) {
-      const searchTerm = searchInput.value.trim().toLowerCase();
-      filteredProjects = projects.filter((project) => {
-        const title = (project.title || "").toLowerCase();
-        const genres = (project.genres || []).join(" ").toLowerCase();
-        return title.includes(searchTerm) || genres.includes(searchTerm);
-      });
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // 정렬 옵션 적용 (항상 정렬 드롭다운의 값을 우선 적용)
-    // ═══════════════════════════════════════════════════════════════
-    const sortSelect = document.getElementById("projectSort");
-    // 정렬 드롭다운이 없거나 값이 없으면 기본값 사용
-    const sortValue =
-      sortSelect && sortSelect.value ? sortSelect.value : "savedAt-desc";
-    const [sortField, sortOrder] = sortValue.split("-");
-
-    // 한글 제목 분리 헬퍼 함수
-    function getKoreanTitle(fullTitle) {
-      if (!fullTitle) return "";
-      const match = fullTitle.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
-      return match ? match[1].trim() : fullTitle.trim();
-    }
-
-    // 정렬 적용 (항상 적용)
-    filteredProjects.sort((a, b) => {
-      let valueA, valueB;
-
-      if (sortField === "savedAt" || sortField === "createdAt") {
-        valueA = new Date(a[sortField] || a.createdAt || a.savedAt || 0);
-        valueB = new Date(b[sortField] || b.createdAt || b.savedAt || 0);
-      } else if (sortField === "title") {
-        // 한글 제목만 사용하여 정렬
-        valueA = getKoreanTitle(a.title || "").toLowerCase();
-        valueB = getKoreanTitle(b.title || "").toLowerCase();
-      } else if (sortField === "genre") {
-        valueA = (a.genres || []).join(", ").toLowerCase();
-        valueB = (b.genres || []).join(", ").toLowerCase();
-      } else if (sortField === "step") {
-        // 진행 단계를 숫자로 변환 (예: "6단계" -> 6)
-        const stepA = a.lastStep || "";
-        const stepB = b.lastStep || "";
-        valueA = parseInt(stepA.toString().replace(/[^0-9]/g, "")) || 0;
-        valueB = parseInt(stepB.toString().replace(/[^0-9]/g, "")) || 0;
-      } else {
-        // 기본값: 수정일시 최신순
-        valueA = new Date(a.savedAt || a.createdAt || a.updatedAt || 0);
-        valueB = new Date(b.savedAt || b.createdAt || b.updatedAt || 0);
-      }
-
-      if (sortOrder === "asc") {
-        return valueA > valueB ? 1 : valueA < valueB ? -1 : 0;
-      } else {
-        return valueA < valueB ? 1 : valueA > valueB ? -1 : 0;
-      }
-    });
-
-    console.log(`✅ 정렬 적용 완료: ${sortValue} (${sortField}-${sortOrder})`);
+    const searchFiltered = filterProjectsBySearchInput(projects);
+    const { sorted, sortField, sortValue } = sortProjectsForList(searchFiltered);
+    let filteredProjects = sorted;
 
     if (filteredProjects.length === 0) {
       projectListEl.innerHTML =
         '<div style="padding: 20px; text-align: center; color: var(--text-secondary);">검색 결과가 없습니다.</div>';
-      var recentEl = document.getElementById("recentProjectsList");
+      const recentEl = document.getElementById("recentProjectsList");
       if (recentEl) {
         recentEl.innerHTML = "";
         recentEl.style.display = "none";
@@ -4714,181 +4853,22 @@ window.loadProjectList = function (force = false) {
       return;
     }
 
-    // 최근 프로젝트 5개 표시
-    var recentEl = document.getElementById("recentProjectsList");
-    if (recentEl) {
-      var recent = filteredProjects.slice(0, 5);
-      var recentHtml =
-        '<div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 8px;">📌 최근 프로젝트</div>';
-      recent.forEach(function (proj) {
-        var t = escapeHtml(proj.title || "제목 없음");
-        var safeRecentId = String(proj.id).replace(/[^\w.-]/g, "");
-        recentHtml +=
-          '<button type="button" class="btn btn-small" style="width: 100%; margin-bottom: 6px; justify-content: flex-start; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8rem;" onclick="event.stopPropagation(); if(typeof window.loadProject === \'function\') { window.loadProject(\'' +
-          safeRecentId +
-          "'); }\">" +
-          t +
-          "</button>";
-      });
-      recentEl.innerHTML = recentHtml;
-      recentEl.style.display = "block";
-    }
+    renderRecentProjectsList(filteredProjects);
 
     // ═══════════════════════════════════════════════════════════════
     // 프로젝트 순서 복원 (정렬이 선택된 경우에는 건너뛰기)
     // ═══════════════════════════════════════════════════════════════
     const hasSortSelected = sortValue && sortValue !== "savedAt-desc";
-
-    // 정렬이 명시적으로 선택된 경우에만 순서 복원을 건너뛰기
-    // 기본값(savedAt-desc)이 아닌 경우에는 사용자가 정렬을 선택한 것으로 간주
     if (!hasSortSelected && typeof restoreProjectOrder === "function") {
       filteredProjects = restoreProjectOrder(filteredProjects);
     }
 
-    function formatDate(date) {
-      if (!date) return "";
-      const d = new Date(date);
-      if (isNaN(d.getTime())) return "";
-      return d.toLocaleDateString("ko-KR", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      });
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // 정렬 기준에 따라 표시할 정보 결정
-    // ═══════════════════════════════════════════════════════════════
-    // sortSelect는 이미 위에서 선언되었으므로 재사용
-    // const sortSelect = document.getElementById('projectSort'); // 중복 선언 제거
-    // sortValue와 sortField, sortOrder도 이미 위에서 선언되었으므로 재사용
-
     // 정렬 드롭다운이 있으면 항상 정렬 모드 활성화 (기본값 포함)
-    // 정렬 모드에서는 한글 제목 + 선택한 정렬 기준 정보만 표시
-    const isSortMode = true; // 항상 정렬 모드로 동작
-
-    // 한글 제목과 영어 제목 분리 함수
-    function splitTitle(fullTitle) {
-      if (!fullTitle) return { korean: "제목 없음", english: "" };
-
-      // "한글제목 (English Title)" 형식 파싱
-      const match = fullTitle.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
-      if (match) {
-        return {
-          korean: match[1].trim(),
-          english: match[2].trim(),
-        };
-      }
-
-      // 괄호가 없으면 전체를 한글 제목으로 간주
-      return {
-        korean: fullTitle.trim(),
-        english: "",
-      };
-    }
+    const isSortMode = true;
 
     let html = "";
     filteredProjects.forEach((project) => {
-      // 제목 분리
-      const titleParts = splitTitle(project.title);
-      const koreanTitle = titleParts.korean;
-      const englishTitle = titleParts.english;
-
-      // 작성일시와 수정일시 구분
-      const createdAt = project.createdAt || null;
-      const savedAt = project.savedAt || project.updatedAt || null;
-      const savedDate = savedAt || createdAt || Date.now();
-
-      const createdDateStr = formatDate(createdAt);
-      const savedDateStr = formatDate(savedAt || savedDate);
-
-      // 장르 정보
-      const genresStr =
-        project.genres && project.genres.length > 0
-          ? project.genres.join(", ")
-          : "";
-
-      // 진행 단계
-      const stepStr = project.lastStep ? project.lastStep : "";
-
-      // ═══════════════════════════════════════════════════════════════
-      // 정렬 모드에 따라 표시할 정보 결정
-      // ═══════════════════════════════════════════════════════════════
-      let showCreatedDate = false;
-      let showSavedDate = false;
-      let showGenres = false;
-      let showStep = false;
-      let showEnglishTitle = false;
-
-      if (isSortMode) {
-        // 정렬 모드: 한글 제목 + 선택한 정렬 기준 정보만 표시
-        switch (sortField) {
-          case "createdAt":
-            showCreatedDate = true;
-            break;
-          case "savedAt":
-            showSavedDate = true;
-            break;
-          case "genre":
-            showGenres = true;
-            break;
-          case "step":
-            showStep = true;
-            break;
-          case "title":
-            // 제목 정렬 시에는 제목만 표시
-            break;
-        }
-      } else {
-        // 기본 모드: 모든 정보 표시 (영어 제목 제외)
-        showCreatedDate = !!createdDateStr;
-        showSavedDate = !!(savedDateStr && savedAt);
-        showGenres = !!genresStr;
-        showStep = !!stepStr;
-      }
-
-      // 가져오기(import)로 유입될 수 있는 임의 ID가 onclick/속성 컨텍스트를
-      // 깨뜨리지 않도록 안전한 문자만 남긴다.
-      const safeId = String(project.id).replace(/[^\w.-]/g, "");
-
-      html += `
-                <div class="project-item"
-                     data-project-id="${safeId}"
-                     draggable="true"
-                     style="padding: 12px 15px; margin-bottom: 10px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); cursor: move; transition: all 0.2s; position: relative; min-height: 50px; display: flex; align-items: center;" 
-                     onmouseover="if(!this.classList.contains('dragging')) this.style.background='var(--bg-input)'" 
-                     onmouseout="if(!this.classList.contains('dragging')) this.style.background='var(--bg-card)'">
-                    <span class="project-drag-handle" style="position: absolute; left: 3px; top: 50%; transform: translateY(-50%); opacity: 0.3; cursor: grab; font-size: 0.85rem; color: var(--text-secondary); z-index: 10; flex-shrink: 0; width: 18px;" title="드래그하여 순서 변경" onmousedown="event.stopPropagation();">
-                        <i class="fas fa-grip-vertical"></i>
-                    </span>
-                    <button class="project-duplicate" 
-                            onclick="event.stopPropagation(); duplicateProject('${safeId}');"
-                            style="position: absolute; right: 58px; top: 50%; transform: translateY(-50%); background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 6px; padding: 5px 8px; cursor: pointer; opacity: 0.6; transition: all 0.2s; color: var(--accent); font-size: 0.75rem; z-index: 10; flex-shrink: 0; white-space: nowrap;" 
-                            onmouseover="this.style.opacity='1'; this.style.background='rgba(139, 92, 246, 0.2)'" 
-                            onmouseout="this.style.opacity='0.6'; this.style.background='rgba(139, 92, 246, 0.1)'"
-                            title="프로젝트 복제">
-                        <i class="fas fa-copy"></i> 복제
-                    </button>
-                    <button class="project-delete" 
-                            onclick="event.stopPropagation(); deleteProject('${safeId}');"
-                            style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 6px; padding: 5px 8px; cursor: pointer; opacity: 0.6; transition: all 0.2s; color: var(--error); font-size: 0.75rem; z-index: 10; flex-shrink: 0; white-space: nowrap;" 
-                            onmouseover="this.style.opacity='1'; this.style.background='rgba(239, 68, 68, 0.2)'" 
-                            onmouseout="this.style.opacity='0.6'; this.style.background='rgba(239, 68, 68, 0.1)'"
-                            title="프로젝트 삭제">
-                        <i class="fas fa-trash-alt"></i> 삭제
-                    </button>
-                    <div style="padding-left: 22px; padding-right: 125px; cursor: pointer; word-wrap: break-word; overflow-wrap: break-word; min-width: 0; flex: 1; width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; text-align: left; display: flex; flex-direction: column; justify-content: center;" onclick="event.stopPropagation(); loadProject('${safeId}');">
-                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: ${isSortMode && !showCreatedDate && !showSavedDate && !showGenres && !showStep ? "0" : "4px"}; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; text-align: left;">${escapeHtml(koreanTitle)}</div>
-                        ${showCreatedDate && createdDateStr ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 2px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;"><span style="opacity: 0.7;">📅 작성일시:</span> <span>${createdDateStr}</span></div>` : ""}
-                        ${showSavedDate && savedDateStr && savedAt ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 2px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;"><span style="opacity: 0.7;">✏️ 수정일시:</span> <span>${savedDateStr}</span></div>` : ""}
-                        ${showGenres && genresStr ? `<div style="font-size: 0.75rem; color: var(--accent); margin-top: 2px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;"><span style="opacity: 0.8;">🎵 장르:</span> ${escapeHtml(genresStr)}</div>` : ""}
-                        ${showStep && stepStr ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;"><span style="opacity: 0.7;">📍 진행 단계:</span> ${escapeHtml(stepStr)}</div>` : ""}
-                    </div>
-                </div>
-            `;
+      html += buildProjectListItemHtml(project, sortField, isSortMode);
     });
 
     projectListEl.innerHTML = html;
