@@ -776,7 +776,7 @@ window.confirmSceneOverviewAndGenerate = async function (isSilent = false) {
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                             <h4 style="margin: 0; color: var(--text-primary); font-size: 1.1rem;">씬 ${index + 1}</h4>
                             <div style="display: flex; gap: 8px; align-items: center;">
-                                <span style="color: var(--accent); font-weight: 600; font-size: 0.9rem;">${scene.time}</span>
+                                <span style="color: var(--accent); font-weight: 600; font-size: 0.9rem;">${escapeMVTextarea(scene.time || "")}</span>
                                 <button id="regenerateScenePromptBtn_${index}" class="btn btn-small btn-primary" onclick="regenerateScenePrompt(${index})" title="이 씬의 영어/한글 프롬프트를 다시 생성합니다. 생성 후 씬 데이터에 반영됩니다." style="padding: 4px 8px; font-size: 0.75rem;">재생성</button>
                                 <span id="scene_${index}_dirty" class="mv-scene-unsaved-badge" data-scene-index="${index}" data-dirty="false" style="display: none; padding: 3px 8px; border-radius: 999px; background: rgba(245, 158, 11, 0.14); border: 1px solid rgba(245, 158, 11, 0.45); color: #f59e0b; font-size: 0.72rem; font-weight: 700;">수정 미저장</span>
                                 <button id="saveScenePromptBtn_${index}" class="btn btn-small btn-success" onclick="saveScenePrompt(${index})" title="이 씬 카드의 영어/한글 프롬프트만 저장합니다. 전체 씬 확정은 상단의 현재 편집 내용 저장을 사용하세요." style="padding: 4px 8px; font-size: 0.75rem;">씬 저장</button>
@@ -784,7 +784,7 @@ window.confirmSceneOverviewAndGenerate = async function (isSilent = false) {
                             </div>
                         <div style="margin-bottom: 15px; padding: 12px; background: var(--bg-input); border-radius: 6px;">
                             <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">장면:</div>
-                            <div style="color: var(--text-primary);">${scene.scene || "장면 설명"}</div>
+                            <div style="color: var(--text-primary);">${escapeMVTextarea(scene.scene || "장면 설명")}</div>
                                     </div>
                             <div style="margin-bottom: 10px;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -799,7 +799,7 @@ window.confirmSceneOverviewAndGenerate = async function (isSilent = false) {
                                     data-scene-index="${index}"
                                     style="width: 100%; min-height: 100px; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; font-family: monospace; font-size: 0.9rem; color: var(--text-primary); resize: vertical;"
                                     onchange="syncScenePromptTranslation(${index}, 'en')"
-                                    placeholder="영어 프롬프트를 입력하세요...">${scene.prompt || ""}</textarea>
+                                    placeholder="영어 프롬프트를 입력하세요...">${escapeMVTextarea(scene.prompt || "")}</textarea>
                             </div>
                         <div>
                             <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">한글 번역본</label>
@@ -809,7 +809,7 @@ window.confirmSceneOverviewAndGenerate = async function (isSilent = false) {
                                 data-scene-index="${index}"
                                 style="width: 100%; min-height: 100px; padding: 12px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; font-family: inherit; font-size: 0.9rem; color: var(--text-primary); resize: vertical;"
                                 onchange="syncScenePromptTranslation(${index}, 'ko')"
-                                placeholder="한글 프롬프트를 입력하세요...">${scene.promptKo || ""}</textarea>
+                                placeholder="한글 프롬프트를 입력하세요...">${escapeMVTextarea(scene.promptKo || "")}</textarea>
                                     </div>
                             <div id="scene_${index}_action_status" class="mv-scene-action-status" data-state="saved" style="margin-top: 10px; padding: 8px 10px; border-radius: 6px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); color: var(--text-secondary); font-size: 0.78rem;">
                                 저장 완료 상태입니다. 복사는 저장하지 않고 클립보드에만 보냅니다.

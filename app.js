@@ -488,6 +488,26 @@ function setMVRestoreValue(id, val) {
   if (el && val !== undefined && val !== null) el.value = val;
 }
 
+// HTML 이스케이프 헬퍼 함수 (전역 단일 구현)
+// 주의: 속성 컨텍스트 삽입까지 안전하도록 따옴표(" ')도 반드시 이스케이프한다.
+// (기존 DOM 기반 구현은 따옴표를 통과시켜 onclick 속성 주입 XSS의 원인이었음)
+// 이 위치(setMVRestoreValue 바로 뒤)에 둔 이유: 일부 테스트 하네스가
+// app.js를 "function setMVRestoreValue(id, val) {" 문자열부터 문자열
+// 슬라이스로 잘라 vm에서 재실행한다(tests/mv_restore_step6_smoke.js,
+// tests/mv_user_flow_integration_smoke.js). escapeHtml이 그 마커보다
+// 앞에 있으면 슬라이스 범위 밖으로 잘려나가, 슬라이스 안의
+// restoreMarketingThumbnails 등이 escapeHtml을 호출할 때 ReferenceError가
+// 난다. 함수 선언은 어차피 호이스팅되어 실제 프로덕션 동작(전체 app.js
+// 로드)에는 위치가 영향을 주지 않으므로, 슬라이스 호환성을 위해 이
+// 마커 바로 뒤에 둔다.
+function escapeHtml(text) {
+  if (text === null || text === undefined || text === "") return "";
+  return String(text).replace(/[&<>"']/g, function (m) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m];
+  });
+}
+window.escapeHtml = escapeHtml;
+
 function restoreMarketingSummaryData(marketing) {
   const mResult = document.getElementById("marketingResult");
   if (mResult) {
@@ -521,10 +541,10 @@ function restoreMarketingThumbnails(marketing) {
     const img = typeof t === 'object' ? t.img : "";
     const text = typeof t === 'object' ? t.text : t;
     html += `<div class="thumbnail-card" style="background:var(--bg-card);border-radius:12px;border:1px solid var(--border);overflow:hidden;">
-      ${img ? `<img src="${img}" style="width:100%;height:160px;object-fit:cover;">` : `<div style="width:100%;height:160px;background:var(--bg-input);display:flex;align-items:center;justify-content:center;"><i class="fas fa-image" style="font-size:2rem;color:var(--text-secondary);"></i></div>`}
+      ${img ? `<img src="${escapeHtml(img)}" style="width:100%;height:160px;object-fit:cover;">` : `<div style="width:100%;height:160px;background:var(--bg-input);display:flex;align-items:center;justify-content:center;"><i class="fas fa-image" style="font-size:2rem;color:var(--text-secondary);"></i></div>`}
       <div style="padding:12px;">
-        <div style="font-weight:600;margin-bottom:8px;font-size:0.9rem;color:var(--text-primary);cursor:pointer;" onclick="copyToClipboard(null, '${text.replace(/'/g, "\\'")}', event)">${text}</div>
-        <button class="btn btn-small btn-success" style="width:100%;" onclick="copyToClipboard(null, '${text.replace(/'/g, "\\'")}', event)">복사</button>
+        <div class="thumbnail-text" style="font-weight:600;margin-bottom:8px;font-size:0.9rem;color:var(--text-primary);cursor:pointer;" onclick="if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, this.textContent, event); }">${escapeHtml(text)}</div>
+        <button class="btn btn-small btn-success" style="width:100%;" onclick="if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, this.closest('.thumbnail-card').querySelector('.thumbnail-text').textContent, event); }">복사</button>
       </div>
     </div>`;
   });
@@ -823,8 +843,8 @@ function restoreStep3Data(projectData) {
           feedbacks.forEach(f => {
             html += `<div style="margin-bottom:15px;padding:15px;background:var(--bg-input);border-radius:8px;border-left:4px solid var(--accent);">
                     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                      <span>${f.icon || "💡"}</span>
-                      <h4 style="margin:0;color:var(--text-primary);font-size:1rem;">${f.title || f.category || "피드백"}</h4>
+                      <span>${escapeHtml(f.icon || "💡")}</span>
+                      <h4 style="margin:0;color:var(--text-primary);font-size:1rem;">${escapeHtml(f.title || f.category || "피드백")}</h4>
                     </div>
                     <p style="margin:0;color:var(--text-secondary);line-height:1.6;font-size:0.9rem;">${escapeHtml(f.suggestion || f.desc || f.text || "")}</p>
                   </div>`;
@@ -2007,17 +2027,6 @@ window.startGeminiAnalysis = async function () {
         "3. 잠시 후 다시 시도해주세요", "error");
   }
 };
-
-// HTML 이스케이프 헬퍼 함수 (전역 단일 구현)
-// 주의: 속성 컨텍스트 삽입까지 안전하도록 따옴표(" ')도 반드시 이스케이프한다.
-// (기존 DOM 기반 구현은 따옴표를 통과시켜 onclick 속성 주입 XSS의 원인이었음)
-function escapeHtml(text) {
-  if (text === null || text === undefined || text === "") return "";
-  return String(text).replace(/[&<>"']/g, function (m) {
-    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m];
-  });
-}
-window.escapeHtml = escapeHtml;
 
 // ═══════════════════════════════════════════════════════════════
 // 공용 AI 호출 헬퍼: Gemini 시도 → 실패 시 ChatGPT 폴백
@@ -3926,15 +3935,15 @@ function renderVocalPartAssignments() {
       .trim();
 
     html += `
-            <div class="vocal-assignment-item" 
-                 data-part="${part}" 
+            <div class="vocal-assignment-item"
+                 data-part="${escapeHtml(part)}"
                  style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; margin-bottom: 5px; background: var(--bg-input); border-radius: 6px; border: 1px solid var(--border);">
                 <div style="flex: 1;">
-                    <div style="font-weight: 600; color: var(--text-primary); font-size: 0.9rem; margin-bottom: 3px;">${part}</div>
-                    <div style="font-size: 0.85rem; color: var(--text-secondary);">${displayStyle}</div>
+                    <div style="font-weight: 600; color: var(--text-primary); font-size: 0.9rem; margin-bottom: 3px;">${escapeHtml(part)}</div>
+                    <div style="font-size: 0.85rem; color: var(--text-secondary);">${escapeHtml(displayStyle)}</div>
                 </div>
-                <button class="btn btn-small btn-danger" 
-                        onclick="removeVocalPartAssignment('${part}')" 
+                <button class="btn btn-small btn-danger"
+                        onclick="removeVocalPartAssignment(this.closest('.vocal-assignment-item').dataset.part)"
                         style="padding: 4px 8px; font-size: 0.75rem; margin-left: 10px;"
                         title="삭제">
                     <i class="fas fa-times"></i>

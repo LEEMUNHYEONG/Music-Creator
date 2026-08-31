@@ -26,15 +26,15 @@ window.renderMVSceneTimelinePreview = function (scenesArg) {
           data-scene-index="${index}"
           onclick="window.focusMVSceneCard(${index})"
           style="min-width: 170px; max-width: 220px; text-align: left; padding: 10px 12px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text-primary); border-radius: 8px; cursor: pointer;"
-          title="${label.sceneText.replace(/"/g, "&quot;")}"
-          aria-label="${`${label.title} ${label.time} ${label.sceneText}`.replace(/"/g, "&quot;")}"
+          title="${escapeMVAttribute(label.sceneText)}"
+          aria-label="${escapeMVAttribute(`${label.title} ${label.time} ${label.sceneText}`)}"
         >
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
-            <strong style="font-size: 0.85rem; color: var(--text-primary);">${label.title}</strong>
-            <span style="font-size: 0.75rem; color: var(--accent); white-space: nowrap;">${label.time}</span>
+            <strong style="font-size: 0.85rem; color: var(--text-primary);">${escapeMVTextarea(label.title)}</strong>
+            <span style="font-size: 0.75rem; color: var(--accent); white-space: nowrap;">${escapeMVTextarea(label.time)}</span>
           </div>
-          <div style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${label.sceneText}</div>
-          ${label.meta ? `<div style="margin-top: 6px; font-size: 0.72rem; color: var(--text-secondary); opacity: 0.9; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">${label.meta}</div>` : ""}
+          <div style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">${escapeMVTextarea(label.sceneText)}</div>
+          ${label.meta ? `<div style="margin-top: 6px; font-size: 0.72rem; color: var(--text-secondary); opacity: 0.9; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">${escapeMVTextarea(label.meta)}</div>` : ""}
         </button>
       `;
     })
@@ -1150,7 +1150,7 @@ function renderMVSceneEditorSummary(scene, index) {
   return `
     <div id="scene_editor_summary_${index}" class="mv-scene-editor-summary" role="status" aria-live="polite" style="margin: -2px 0 15px 0; padding: 9px 12px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.22); border-radius: 6px; color: var(--text-secondary); font-size: 0.8rem; line-height: 1.45;">
       ${renderMVSceneQualityBadges(scene, index)}
-      ${getMVSceneEditorSummaryText(scene, index)}
+      ${escapeMVTextarea(getMVSceneEditorSummaryText(scene, index))}
     </div>
   `;
 }
@@ -1161,7 +1161,7 @@ function updateMVSceneEditorSummary(scene, index) {
   if ("innerHTML" in summaryEl) {
     summaryEl.innerHTML = `
       ${renderMVSceneQualityBadges(scene, index)}
-      ${getMVSceneEditorSummaryText(scene, index)}
+      ${escapeMVTextarea(getMVSceneEditorSummaryText(scene, index))}
     `;
   } else {
     summaryEl.textContent = getMVSceneEditorSummaryText(scene, index);
@@ -1330,11 +1330,11 @@ window.renderMvThumbnailPromptsUI = function (prompts) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
                         <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">통합 프롬프트(EN)</label>
-                        <textarea id="review_thumbnail_en" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${thumbEn}</textarea>
+                        <textarea id="review_thumbnail_en" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${escapeMVTextarea(thumbEn)}</textarea>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">한글 번역</label>
-                        <textarea id="review_thumbnail_ko" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${thumbKo}</textarea>
+                        <textarea id="review_thumbnail_ko" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${escapeMVTextarea(thumbKo)}</textarea>
                     </div>
                 </div>
             </div>
@@ -1356,11 +1356,11 @@ window.renderMvThumbnailPromptsUI = function (prompts) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
                         <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">통합 프롬프트(EN)</label>
-                        <textarea id="review_background_en" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${backEn}</textarea>
+                        <textarea id="review_background_en" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${escapeMVTextarea(backEn)}</textarea>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">한글 번역</label>
-                        <textarea id="review_background_ko" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${backKo}</textarea>
+                        <textarea id="review_background_ko" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${escapeMVTextarea(backKo)}</textarea>
                     </div>
                 </div>
             </div>
@@ -1382,11 +1382,11 @@ window.renderMvThumbnailPromptsUI = function (prompts) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
                         <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">통합 프롬프트(EN)</label>
-                        <textarea id="review_character_en" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${charEn}</textarea>
+                        <textarea id="review_character_en" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${escapeMVTextarea(charEn)}</textarea>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">한글 번역</label>
-                        <textarea id="review_character_ko" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${charKo}</textarea>
+                        <textarea id="review_character_ko" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${escapeMVTextarea(charKo)}</textarea>
                     </div>
                 </div>
             </div>
@@ -1476,14 +1476,14 @@ window.renderSceneOverview = function (scenesArg) {
                     <div class="mv-scene-card-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <h4 id="scene_overview_title_${index}" style="margin: 0; color: var(--text-primary);">씬 ${index + 1}</h4>
-                            <span style="color: var(--accent); font-weight: 600;">${scene.time}</span>
+                            <span style="color: var(--accent); font-weight: 600;">${escapeMVTextarea(scene.time || "")}</span>
                             ${scene._isFilled ? `<span style="background: #e67e22; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 12px; font-weight: 700;">⚠ 자동보충 (재생성 권장)</span>` : ""}
                         </div>
                         <div class="mv-scene-card-actions" style="display: flex; gap: 8px;">
                             <button class="btn btn-small btn-primary" onclick="regenerateSceneOverviewPrompt(${index})" title="이 씬의 프롬프트 재생성" style="padding: 6px 12px; font-size: 0.8rem;">
                                 <i class="fas fa-sync-alt"></i> 재생성
                             </button>
-                            <button id="editSceneOverviewBtn_${index}" class="btn btn-small btn-secondary" onclick="editSceneOverview(${index}, this)" title="씬 수정" style="padding: 6px 12px; font-size: 0.8rem;" data-state="edit" data-original-en="${existingPrompt.replace(/"/g, "&quot;")}">
+                            <button id="editSceneOverviewBtn_${index}" class="btn btn-small btn-secondary" onclick="editSceneOverview(${index}, this)" title="씬 수정" style="padding: 6px 12px; font-size: 0.8rem;" data-state="edit" data-original-en="${escapeMVAttribute(existingPrompt)}">
                                 <i class="fas fa-edit"></i> 수정
                             </button>
                             <button id="copySceneOverviewBtn_${index}" class="btn btn-small btn-success" onclick="copySceneOverviewPromptEn(${index}, event)" title="영어 프롬프트 복사" style="padding: 6px 12px; font-size: 0.8rem;">
@@ -1537,11 +1537,11 @@ window.renderSceneOverview = function (scenesArg) {
                     <div class="mv-scene-prompt-editor-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                         <div>
                             <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">⛵ 통합 프롬프트 (EN):</label>
-                            <textarea id="scene_overview_${index}_en" class="scene-overview-en" data-index="${index}" style="width: 100%; min-height: 100px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${existingPrompt}</textarea>
+                            <textarea id="scene_overview_${index}_en" class="scene-overview-en" data-index="${index}" style="width: 100%; min-height: 100px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${escapeMVTextarea(existingPrompt)}</textarea>
                         </div>
                         <div>
                             <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">⛵ 통합 프롬프트 (한글):</label>
-                            <textarea id="scene_overview_${index}_ko" class="scene-overview-ko" data-index="${index}" style="width: 100%; min-height: 100px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${existingPromptKo}</textarea>
+                            <textarea id="scene_overview_${index}_ko" class="scene-overview-ko" data-index="${index}" style="width: 100%; min-height: 100px; padding: 10px; background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${escapeMVTextarea(existingPromptKo)}</textarea>
                         </div>
                     </div>
                 </div>
