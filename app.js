@@ -3395,8 +3395,8 @@ window.showCopyIndicator = function (message) {
 // ═══════════════════════════════════════════════════════════════
 // 6단계 → 새로 시작 (전체 초기화)
 // ═══════════════════════════════════════════════════════════════
-window.resetAll = function () {
-  if (confirm("모든 내용을 초기화하시겠습니까?")) {
+window.resetAll = async function () {
+  if (await window.showConfirmAsync("모든 내용을 초기화하시겠습니까?")) {
     try {
       // 수정 모드 비활성화
       window.editMode = false;
@@ -5310,11 +5310,13 @@ window.deleteProject = function (projectId) {
     // 무시
   }
 
-  // ⚠️ setTimeout으로 confirm()을 다음 이벤트 루프로 지연
-  // 크롬에서 draggable 요소 안의 버튼 클릭 시 mousedown→confirm()→mouseup 순서로
-  // 진행되면 mouseup이 confirm 대화 상자 위에서 발생하여 자동으로 닫히는 버그 우회
-  setTimeout(() => {
-    const confirmDelete = confirm(
+  // ⚠️ setTimeout으로 확인 대화상자를 다음 이벤트 루프로 지연
+  // 크롬에서 draggable 요소 안의 버튼 클릭 시 mousedown→confirm→mouseup 순서로
+  // 진행되면 mouseup이 확인창 위에서 발생하는 문제를 우회하기 위한 안전장치.
+  // (showConfirmAsync는 네이티브 모달이 아니라 이 정확한 버그에는 영향받지
+  //  않지만, 지연 자체는 드래그 종료를 확실히 마친 뒤 열리도록 유지한다.)
+  setTimeout(async () => {
+    const confirmDelete = await window.showConfirmAsync(
       `${projectTitle} 프로젝트를 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다.`,
     );
     if (!confirmDelete) {
@@ -5520,7 +5522,7 @@ window.handleImport = function (event) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = function (e) {
+  reader.onload = async function (e) {
     try {
       const importData = JSON.parse(e.target.result);
       console.log("✅ 가져오기 파일 읽기 완료:", file.name);
@@ -5581,9 +5583,9 @@ window.handleImport = function (event) {
 
       // 가져오기 확인
       if (
-        !confirm(
+        !(await window.showConfirmAsync(
           `가져오기 파일에서 ${projects.length}개의 프로젝트를 찾았습니다.\n\n가져오시겠습니까?\n\n주의: 기존 프로젝트와 ID가 같으면 덮어씌워집니다.`,
-        )
+        ))
       ) {
         return;
       }
@@ -5837,7 +5839,7 @@ window.restoreFromBackupFile = function () {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = function (e) {
+    reader.onload = async function (e) {
       try {
         const backupData = JSON.parse(e.target.result);
         console.log("✅ 백업 파일 읽기 완료:", file.name);
@@ -5869,7 +5871,7 @@ window.restoreFromBackupFile = function () {
         }
 
         const confirmMessage = `백업 파일에서 ${projects.length}개의 프로젝트를 찾았습니다.\n\n복구하시겠습니까?\n\n주의: 기존 프로젝트와 ID가 같으면 덮어씌워집니다.`;
-        if (!confirm(confirmMessage)) {
+        if (!(await window.showConfirmAsync(confirmMessage))) {
           return;
         }
 
@@ -5995,11 +5997,11 @@ window.restoreFromBackupFile = function () {
 // ═══════════════════════════════════════════════════════════════
 // 단계 초기화 함수들
 // ═══════════════════════════════════════════════════════════════
-window.resetCurrentStep = function () {
+window.resetCurrentStep = async function () {
   if (
-    !confirm(
+    !(await window.showConfirmAsync(
       "현재 단계의 모든 데이터를 초기화하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.",
-    )
+    ))
   ) {
     return;
   }
@@ -6078,12 +6080,12 @@ window.resetCurrentStep = function () {
   }
 };
 
-window.resetAllSteps = function (skipConfirm = false) {
+window.resetAllSteps = async function (skipConfirm = false) {
   if (!skipConfirm) {
     if (
-      !confirm(
+      !(await window.showConfirmAsync(
         "모든 단계의 데이터를 초기화하고 처음부터 다시 시작하시겠습니까?\n\n⚠️ 경고: 현재 작성 중인 모든 내용이 삭제됩니다.",
-      )
+      ))
     ) {
       return;
     }
@@ -6482,7 +6484,7 @@ window.saveAPIKeys = function () {
   }
 };
 
-window.resetAPIKeys = function () {
+window.resetAPIKeys = async function () {
   const userData = typeof window.getCurrentUserData === "function" ? window.getCurrentUserData() : null;
   if (userData && userData.role !== "admin") {
     alert("⚠️ 일반 사용자는 API 키를 초기화할 수 없습니다.");
@@ -6490,7 +6492,7 @@ window.resetAPIKeys = function () {
   }
 
   if (
-    !confirm("API 키를 초기화하시겠습니까?\n\n저장된 모든 API 키가 삭제됩니다.")
+    !(await window.showConfirmAsync("API 키를 초기화하시겠습니까?\n\n저장된 모든 API 키가 삭제됩니다."))
   ) {
     return;
   }
@@ -6881,11 +6883,11 @@ window.restoreGuidelinesFromServer = async function () {
   }
 };
 
-window.resetGuidelines = function () {
+window.resetGuidelines = async function () {
   if (
-    !confirm(
+    !(await window.showConfirmAsync(
       "지침서를 기본값으로 복원하시겠습니까?\n\n현재 작성 중인 내용이 삭제됩니다.",
-    )
+    ))
   ) {
     return;
   }
@@ -7132,8 +7134,8 @@ window.initStepDragAndDrop = function () {
 };
 
 // 단계 순서 초기화
-window.resetStepOrder = function () {
-  if (!confirm("단계 순서를 기본값(1-6)으로 초기화하시겠습니까?")) {
+window.resetStepOrder = async function () {
+  if (!(await window.showConfirmAsync("단계 순서를 기본값(1-6)으로 초기화하시겠습니까?"))) {
     return;
   }
 
@@ -7455,7 +7457,7 @@ document.addEventListener("keydown", function (e) {
 // ═══════════════════════════════════════════════════════════════
 // Suno용 한 번에 복사 (가사 + 스타일)
 // ═══════════════════════════════════════════════════════════════
-window.copySunoLyricsAndStyle = function () {
+window.copySunoLyricsAndStyle = async function () {
   const lyricsEl = document.getElementById("finalLyrics");
   const styleEl = document.getElementById("finalStyle");
   const lyrics =
@@ -7476,7 +7478,7 @@ window.copySunoLyricsAndStyle = function () {
   if (typeof window.getGuidelineComplianceIssues === "function") {
     const compliance = window.getGuidelineComplianceIssues(lyrics, style);
     if (compliance.issues && compliance.issues.length > 0) {
-      const proceed = confirm(
+      const proceed = await window.showConfirmAsync(
         "제작 지침서 확인 항목이 남아 있습니다.\n\n" +
           compliance.issues.join("\n") +
           "\n\n그래도 Suno용으로 복사할까요?",
