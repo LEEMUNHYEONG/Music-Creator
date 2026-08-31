@@ -6832,8 +6832,8 @@ window.exportGuidelines = async function () {
   }
 };
 
-window.triggerImportGuidelines = function () {
-  const mode = prompt(
+window.triggerImportGuidelines = async function () {
+  const mode = await window.showPromptAsync(
     "지침서 복원 방식을 선택하세요.\n\n1: 로컬 백업 파일 선택\n2: 서버 최신 백업 복원",
     "1",
   );

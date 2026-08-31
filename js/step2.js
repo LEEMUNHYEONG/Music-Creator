@@ -32,7 +32,7 @@ window.convertToSuno = function () {
 };
 
 // --- Extracted showCustomTagInput ---
-window.showCustomTagInput = function (containerId) {
+window.showCustomTagInput = async function (containerId) {
   try {
     const container = document.getElementById(containerId);
     if (!container) {
@@ -40,7 +40,7 @@ window.showCustomTagInput = function (containerId) {
       return;
     }
 
-    const customTag = prompt("추가할 태그를 입력하세요:");
+    const customTag = await window.showPromptAsync("추가할 태그를 입력하세요:");
     if (customTag && customTag.trim()) {
       // 새 태그 버튼 생성
       const newTagBtn = document.createElement("button");

@@ -250,7 +250,7 @@
 
   // ─── 비밀번호 재설정 ────────────────────────────────────────
   window.doResetPassword = async function () {
-    const email = prompt("가입한 이메일 주소를 입력해 주세요:");
+    const email = await window.showPromptAsync("가입한 이메일 주소를 입력해 주세요:");
     if (!email) return;
     if (!isValidEmail(email))
       return window.showToast("⚠️ 올바른 이메일 형식을 입력해 주세요.", "error");

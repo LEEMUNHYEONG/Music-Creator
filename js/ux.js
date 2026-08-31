@@ -277,6 +277,132 @@
     });
   };
 
+  // 7-1. Custom Prompt Modal
+  // 네이티브 window.prompt()를 대체 — JS 실행을 막지 않는 텍스트 입력 모달.
+  window.showPrompt = function (message, defaultValue, onSubmit, onCancel) {
+    let overlay = document.getElementById("customPromptModal");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "customPromptModal";
+      overlay.style.cssText = `
+        position: fixed; inset: 0; z-index: 100000;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(0,0,0,0.5);
+        opacity: 0; transition: opacity 0.15s ease;
+      `;
+      overlay.innerHTML = `
+        <div style="
+          background: var(--bg-card, #1e1e2e); color: var(--text-primary, #fff);
+          border: 1px solid var(--border, rgba(255,255,255,0.12));
+          border-radius: 12px; padding: 20px 24px; max-width: 400px; width: 90%;
+          box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+          transform: translateY(8px); transition: transform 0.15s ease;
+        ">
+          <div id="promptMessage" style="white-space: pre-line; line-height: 1.6; margin-bottom: 14px; font-size: 0.95rem;"></div>
+          <input id="promptInput" type="text" style="
+            width: 100%; box-sizing: border-box; padding: 10px 12px; margin-bottom: 18px;
+            border-radius: 8px; border: 1px solid var(--border, rgba(255,255,255,0.2));
+            background: var(--bg-input, #12121c); color: var(--text-primary, #fff);
+            font-size: 0.95rem;
+          " />
+          <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button id="promptCancelBtn" type="button" class="btn btn-secondary" style="padding: 8px 16px; border-radius: 8px; cursor: pointer;">취소</button>
+            <button id="promptOkBtn" type="button" class="btn btn-primary" style="padding: 8px 16px; border-radius: 8px; cursor: pointer;">확인</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      // 배경 클릭으로 닫기 = 취소
+      overlay.addEventListener("click", function (e) {
+        if (e.target === overlay) overlay.__cancel && overlay.__cancel();
+      });
+    }
+
+    const box = overlay.firstElementChild;
+    const msgEl = overlay.querySelector("#promptMessage");
+    msgEl.innerText = message;
+
+    // 이전 호출에서 붙은 리스너가 누적되지 않도록 입력창/버튼을 매번
+    // 새로 교체한다 (showConfirm의 버튼 교체 방식과 동일한 정리 전략).
+    const oldInput = overlay.querySelector("#promptInput");
+    const oldOkBtn = overlay.querySelector("#promptOkBtn");
+    const oldCancelBtn = overlay.querySelector("#promptCancelBtn");
+    const inputEl = oldInput.cloneNode(true);
+    const okBtn = oldOkBtn.cloneNode(true);
+    const cancelBtn = oldCancelBtn.cloneNode(true);
+    oldInput.parentNode.replaceChild(inputEl, oldInput);
+    oldOkBtn.parentNode.replaceChild(okBtn, oldOkBtn);
+    oldCancelBtn.parentNode.replaceChild(cancelBtn, oldCancelBtn);
+
+    inputEl.value = defaultValue != null ? defaultValue : "";
+
+    overlay.style.display = "flex";
+    requestAnimationFrame(() => {
+      overlay.style.opacity = "1";
+      box.style.transform = "translateY(0)";
+      inputEl.focus();
+      inputEl.select();
+    });
+
+    let settled = false;
+    function close() {
+      overlay.style.opacity = "0";
+      box.style.transform = "translateY(8px)";
+      setTimeout(() => {
+        overlay.style.display = "none";
+      }, 150);
+    }
+    // Yes/No 버튼 클릭, 배경 클릭, Escape 중 어느 경로로 닫히든
+    // document의 Escape 리스너가 반드시 해제되도록 정리 함수를 한 곳에 모은다.
+    function handleOk(e) {
+      if (e) e.preventDefault();
+      if (settled) return;
+      settled = true;
+      document.removeEventListener("keydown", onEscKeydown);
+      const value = inputEl.value;
+      close();
+      if (onSubmit) onSubmit(value);
+    }
+    function handleCancel(e) {
+      if (e) e.preventDefault();
+      if (settled) return;
+      settled = true;
+      document.removeEventListener("keydown", onEscKeydown);
+      close();
+      if (onCancel) onCancel();
+    }
+    overlay.__cancel = handleCancel;
+
+    okBtn.onclick = handleOk;
+    cancelBtn.onclick = handleCancel;
+    // 입력창에 포커스가 있을 때 Enter로 확인 (버튼에 포커스가 있을 때는
+    // 브라우저 기본 동작에 맡긴다 - 문서 전역 리스너로 두면 Cancel 버튼에
+    // 포커스가 있어도 Enter가 확인으로 가로채지는 문제가 생기기 때문)
+    inputEl.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") handleOk(e);
+    });
+
+    // Escape 키로 취소
+    function onEscKeydown(e) {
+      if (e.key === "Escape") handleCancel();
+    }
+    document.addEventListener("keydown", onEscKeydown);
+  };
+
+  // Promise 기반 버전 — `const v = await window.showPromptAsync(msg, def);` 형태로
+  // 기존 `const v = prompt(msg, def);` 패턴을 그대로 치환할 수 있다.
+  // 네이티브 prompt()와 동일하게: 취소 시 null, 빈 입력 후 확인 시 "" 반환.
+  window.showPromptAsync = function (message, defaultValue) {
+    return new Promise((resolve) => {
+      window.showPrompt(
+        message,
+        defaultValue,
+        (value) => resolve(value),
+        () => resolve(null),
+      );
+    });
+  };
+
   // 8. Help Modal System
   window.openHelpModal = function () {
     const modal = document.getElementById("helpModal");

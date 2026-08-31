@@ -103,7 +103,9 @@ missingInHtml.forEach(({ id, locations }) => {
 
 // 2026-09 전수 조사 시점의 알려진 기준선. 이 이하로는 통과, 초과하면
 // 새로운(미검증) getElementById 참조가 추가된 것이므로 실패시켜 알린다.
-const KNOWN_BASELINE = 28;
+// 29건: customConfirmModal과 동일한 패턴으로 showPrompt()가 동적 생성하는
+// customPromptModal 추가 (prompt() → showPromptAsync() 전환, 2026-09).
+const KNOWN_BASELINE = 29;
 assert.ok(
   missingInHtml.length <= KNOWN_BASELINE,
   `DOM ID 참조 불일치가 ${missingInHtml.length}건으로 기준선(${KNOWN_BASELINE}건)을 초과했습니다. ` +
