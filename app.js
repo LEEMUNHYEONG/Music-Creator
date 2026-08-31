@@ -4202,72 +4202,41 @@ function showMarketingMVWorkspace() {
 // ═══════════════════════════════════════════════════════════════
 // 6단계: 마케팅 자료 생성 함수
 // ═══════════════════════════════════════════════════════════════
-window.generateMarketingMaterials = async function () {
-  try {
-    const marketingResult = document.getElementById("marketingResult");
-    const marketingLoading = document.getElementById("marketingLoading");
+// ═══════════════════════════════════════════════════════════════
+// generateMarketingMaterials 헬퍼 함수들 (순수 추출 리팩터링, 동작 동일)
+// ═══════════════════════════════════════════════════════════════
 
-    if (!marketingResult || !marketingLoading) {
-      console.warn("⚠️ 마케팅 UI 요소를 찾을 수 없습니다.");
-      return;
-    }
+// 화면/전역 상태에서 마케팅 자료 생성에 쓸 제목·가사·스타일을 모은다.
+function collectMarketingSourceData() {
+  const marketingData = window.marketingData || {};
+  const title =
+    marketingData.title ||
+    document.getElementById("finalTitleText")?.textContent ||
+    window.currentSunoTitle ||
+    document.getElementById("sunoTitle")?.value ||
+    document.getElementById("songTitle")?.value ||
+    "제목 없음";
 
-    // 마케팅 데이터 가져오기
-    const marketingData = window.marketingData || {};
-    const title =
-      marketingData.title ||
-      document.getElementById("finalTitleText")?.textContent ||
-      window.currentSunoTitle ||
-      document.getElementById("sunoTitle")?.value ||
-      document.getElementById("songTitle")?.value ||
-      "제목 없음";
+  const lyrics =
+    marketingData.lyrics ||
+    document.getElementById("finalLyrics")?.textContent ||
+    document.getElementById("finalizedLyrics")?.value ||
+    document.getElementById("sunoLyrics")?.value ||
+    "";
 
-    const lyrics =
-      marketingData.lyrics ||
-      document.getElementById("finalLyrics")?.textContent ||
-      document.getElementById("finalizedLyrics")?.value ||
-      document.getElementById("sunoLyrics")?.value ||
-      "";
+  const style =
+    marketingData.style ||
+    document.getElementById("finalStyle")?.textContent ||
+    document.getElementById("finalizedStyle")?.value ||
+    document.getElementById("stylePrompt")?.value ||
+    "";
 
-    const style =
-      marketingData.style ||
-      document.getElementById("finalStyle")?.textContent ||
-      document.getElementById("finalizedStyle")?.value ||
-      document.getElementById("stylePrompt")?.value ||
-      "";
+  return { title, lyrics, style };
+}
 
-    if (!lyrics.trim()) {
-      window.showToast(
-        "⚠️ 마케팅 자료를 생성할 가사가 없습니다.\n\n5단계에서 최종 가사를 확인한 후 다시 시도해주세요.", "error");
-      return;
-    }
-
-    // 로딩 화면 표시
-    marketingLoading.style.display = "block";
-    marketingResult.style.display = "none";
-
-    // Gemini API 키 확인 (공용 키 포함)
-    const geminiKey = (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || "";
-    if (!geminiKey || !geminiKey.startsWith("AIza")) {
-      showMarketingMVWorkspace();
-      marketingLoading.innerHTML = `
-                <div style="text-align: center; padding: 40px;">
-                    <div style="font-size: 3rem; margin-bottom: 15px;">⚠️</div>
-                    <h4 style="margin-bottom: 10px; color: var(--error);">Gemini API 키가 필요합니다</h4>
-                    <p style="color: var(--text-secondary); margin-bottom: 20px;">마케팅 설명 자동 생성에는 Gemini API 키가 필요합니다.<br>MV 프롬프트 탭은 계속 사용할 수 있으니 씬 구성과 프롬프트 작업을 먼저 진행할 수 있습니다.</p>
-                    <button class="btn btn-primary" onclick="if(typeof window.openAPISettings === 'function') { window.openAPISettings(); }">
-                        <i class="fas fa-key"></i> API 키 설정
-                    </button>
-                </div>
-            `;
-      return;
-    }
-
-    // 지침서 가져오기
-    const guidelines = localStorage.getItem("musicCreatorGuidelines") || "";
-
-    // 마케팅 자료 생성 프롬프트
-    const marketingPrompt = `다음 정보를 바탕으로 뮤직모리 채널용 마케팅 자료를 생성해주세요.
+// AI에게 보낼 마케팅 자료 생성 요청 프롬프트를 만든다.
+function buildMarketingMaterialsPrompt(title, lyrics, style, guidelines) {
+  return `다음 정보를 바탕으로 뮤직모리 채널용 마케팅 자료를 생성해주세요.
 
 === 곡 정보 ===
 제목: ${title}
@@ -4325,6 +4294,168 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
 }
 
 **중요**: JSON 형식만 출력하고, 다른 설명이나 텍스트는 포함하지 마세요.`;
+}
+
+// AI 응답 텍스트를 파싱해 마케팅 자료 객체로 만든다. 파싱 실패 시
+// 원본 텍스트/제목 기반 기본값으로 대체한다 (기존 동작과 동일).
+function parseMarketingMaterialsResponse(aiResponse, title) {
+  try {
+    let cleanedResponse = aiResponse.trim();
+    if (cleanedResponse.includes("```json")) {
+      cleanedResponse = cleanedResponse
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "")
+        .trim();
+    } else if (cleanedResponse.includes("```")) {
+      cleanedResponse = cleanedResponse.replace(/```\n?/g, "").trim();
+    }
+
+    const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    throw new Error("JSON 형식을 찾을 수 없습니다.");
+  } catch (parseError) {
+    console.error("JSON 파싱 오류:", parseError);
+    return {
+      youtubeDesc:
+        aiResponse.substring(0, 500) || "마케팅 자료를 생성할 수 없습니다.",
+      tiktokDesc:
+        aiResponse.substring(0, 150) || "마케팅 자료를 생성할 수 없습니다.",
+      hashtags: "#뮤직모리,#MusicMori",
+      thumbnails: [
+        `${title} - 뮤직모리`,
+        "감성적인 멜로디",
+        "깊은 울림",
+        "마음을 울리는 음악",
+        "뮤직모리 채널",
+        "새로운 음악",
+        "감동적인 스토리",
+        "음악과 함께",
+        "특별한 순간",
+        "음악의 힘",
+      ],
+    };
+  }
+}
+
+// 파싱된 마케팅 자료를 결과 화면 DOM에 반영한다 (썸네일 카드 포함).
+function renderMarketingMaterials(marketingMaterials) {
+  const youtubeDescEl = document.getElementById("youtubeDesc");
+  const tiktokDescEl = document.getElementById("tiktokDesc");
+  const hashtagsEl = document.getElementById("hashtagsContent");
+  const thumbnailsGridEl = document.getElementById("thumbnailsGrid");
+
+  if (youtubeDescEl && marketingMaterials.youtubeDesc) {
+    youtubeDescEl.textContent = marketingMaterials.youtubeDesc;
+  }
+
+  if (tiktokDescEl && marketingMaterials.tiktokDesc) {
+    tiktokDescEl.textContent = marketingMaterials.tiktokDesc;
+  }
+
+  if (hashtagsEl && marketingMaterials.hashtags) {
+    hashtagsEl.textContent = marketingMaterials.hashtags;
+  }
+
+  if (
+    thumbnailsGridEl &&
+    marketingMaterials.thumbnails &&
+    Array.isArray(marketingMaterials.thumbnails)
+  ) {
+    let thumbnailsHtml = "";
+    marketingMaterials.thumbnails.forEach((thumb, index) => {
+      const thumbnailText =
+        typeof thumb === "string"
+          ? thumb
+          : thumb.text || thumb.content || String(thumb);
+      thumbnailsHtml += `
+                    <div class="thumbnail-item" style="padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s;"
+                         onclick="if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, this.querySelector('.thumbnail-text').textContent, event); }">
+                        <div class="thumbnail-text" style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">${escapeHtml(thumbnailText)}</div>
+                        <button class="btn btn-small btn-success" onclick="event.stopPropagation(); if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, this.closest('.thumbnail-item').querySelector('.thumbnail-text').textContent, event); }">
+                            <i class="fas fa-copy"></i> 복사
+                        </button>
+                    </div>
+                `;
+    });
+    thumbnailsGridEl.innerHTML = thumbnailsHtml;
+  }
+}
+
+// 생성된 마케팅 자료를 현재 프로젝트 데이터에 저장한다.
+function saveMarketingMaterialsToProject(marketingMaterials) {
+  if (!window.currentProject) return;
+  if (!window.currentProject.data) {
+    window.currentProject.data = {};
+  }
+  if (!window.currentProject.data.marketing) {
+    window.currentProject.data.marketing = {};
+  }
+  window.currentProject.data.marketing.youtubeDesc =
+    marketingMaterials.youtubeDesc || "";
+  window.currentProject.data.marketing.tiktokDesc =
+    marketingMaterials.tiktokDesc || "";
+  window.currentProject.data.marketing.hashtags =
+    marketingMaterials.hashtags || "";
+  if (
+    marketingMaterials.thumbnails &&
+    Array.isArray(marketingMaterials.thumbnails)
+  ) {
+    window.currentProject.data.marketing.thumbnails =
+      marketingMaterials.thumbnails.map((thumb) =>
+        typeof thumb === "string"
+          ? thumb
+          : thumb.text || thumb.content || String(thumb),
+      );
+  }
+}
+
+window.generateMarketingMaterials = async function () {
+  try {
+    const marketingResult = document.getElementById("marketingResult");
+    const marketingLoading = document.getElementById("marketingLoading");
+
+    if (!marketingResult || !marketingLoading) {
+      console.warn("⚠️ 마케팅 UI 요소를 찾을 수 없습니다.");
+      return;
+    }
+
+    // 마케팅 데이터 가져오기
+    const { title, lyrics, style } = collectMarketingSourceData();
+
+    if (!lyrics.trim()) {
+      window.showToast(
+        "⚠️ 마케팅 자료를 생성할 가사가 없습니다.\n\n5단계에서 최종 가사를 확인한 후 다시 시도해주세요.", "error");
+      return;
+    }
+
+    // 로딩 화면 표시
+    marketingLoading.style.display = "block";
+    marketingResult.style.display = "none";
+
+    // Gemini API 키 확인 (공용 키 포함)
+    const geminiKey = (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || "";
+    if (!geminiKey || !geminiKey.startsWith("AIza")) {
+      showMarketingMVWorkspace();
+      marketingLoading.innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <div style="font-size: 3rem; margin-bottom: 15px;">⚠️</div>
+                    <h4 style="margin-bottom: 10px; color: var(--error);">Gemini API 키가 필요합니다</h4>
+                    <p style="color: var(--text-secondary); margin-bottom: 20px;">마케팅 설명 자동 생성에는 Gemini API 키가 필요합니다.<br>MV 프롬프트 탭은 계속 사용할 수 있으니 씬 구성과 프롬프트 작업을 먼저 진행할 수 있습니다.</p>
+                    <button class="btn btn-primary" onclick="if(typeof window.openAPISettings === 'function') { window.openAPISettings(); }">
+                        <i class="fas fa-key"></i> API 키 설정
+                    </button>
+                </div>
+            `;
+      return;
+    }
+
+    // 지침서 가져오기
+    const guidelines = localStorage.getItem("musicCreatorGuidelines") || "";
+
+    // 마케팅 자료 생성 프롬프트
+    const marketingPrompt = buildMarketingMaterialsPrompt(title, lyrics, style, guidelines);
 
     const aiResponse = await window.callAIWithTextFallback({
       prompt: marketingPrompt,
@@ -4341,123 +4472,16 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
       throw new Error("Gemini API에서 응답을 받지 못했습니다.");
     }
 
-    // JSON 파싱 시도
-    let marketingMaterials;
-    try {
-      let cleanedResponse = aiResponse.trim();
-      if (cleanedResponse.includes("```json")) {
-        cleanedResponse = cleanedResponse
-          .replace(/```json\n?/g, "")
-          .replace(/```\n?/g, "")
-          .trim();
-      } else if (cleanedResponse.includes("```")) {
-        cleanedResponse = cleanedResponse.replace(/```\n?/g, "").trim();
-      }
+    const marketingMaterials = parseMarketingMaterialsResponse(aiResponse, title);
 
-      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        marketingMaterials = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error("JSON 형식을 찾을 수 없습니다.");
-      }
-    } catch (parseError) {
-      console.error("JSON 파싱 오류:", parseError);
-      // 파싱 실패 시 기본값 사용
-      marketingMaterials = {
-        youtubeDesc:
-          aiResponse.substring(0, 500) || "마케팅 자료를 생성할 수 없습니다.",
-        tiktokDesc:
-          aiResponse.substring(0, 150) || "마케팅 자료를 생성할 수 없습니다.",
-        hashtags: "#뮤직모리,#MusicMori",
-        thumbnails: [
-          `${title} - 뮤직모리`,
-          "감성적인 멜로디",
-          "깊은 울림",
-          "마음을 울리는 음악",
-          "뮤직모리 채널",
-          "새로운 음악",
-          "감동적인 스토리",
-          "음악과 함께",
-          "특별한 순간",
-          "음악의 힘",
-        ],
-      };
-    }
-
-    // 마케팅 자료 표시
-    const youtubeDescEl = document.getElementById("youtubeDesc");
-    const tiktokDescEl = document.getElementById("tiktokDesc");
-    const hashtagsEl = document.getElementById("hashtagsContent");
-    const thumbnailsGridEl = document.getElementById("thumbnailsGrid");
-
-    if (youtubeDescEl && marketingMaterials.youtubeDesc) {
-      youtubeDescEl.textContent = marketingMaterials.youtubeDesc;
-    }
-
-    if (tiktokDescEl && marketingMaterials.tiktokDesc) {
-      tiktokDescEl.textContent = marketingMaterials.tiktokDesc;
-    }
-
-    if (hashtagsEl && marketingMaterials.hashtags) {
-      hashtagsEl.textContent = marketingMaterials.hashtags;
-    }
-
-    // 썸네일 문구 표시
-    if (
-      thumbnailsGridEl &&
-      marketingMaterials.thumbnails &&
-      Array.isArray(marketingMaterials.thumbnails)
-    ) {
-      let thumbnailsHtml = "";
-      marketingMaterials.thumbnails.forEach((thumb, index) => {
-        const thumbnailText =
-          typeof thumb === "string"
-            ? thumb
-            : thumb.text || thumb.content || String(thumb);
-        thumbnailsHtml += `
-                    <div class="thumbnail-item" style="padding: 15px; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s;"
-                         onclick="if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, this.querySelector('.thumbnail-text').textContent, event); }">
-                        <div class="thumbnail-text" style="font-weight: 600; margin-bottom: 8px; color: var(--text-primary);">${escapeHtml(thumbnailText)}</div>
-                        <button class="btn btn-small btn-success" onclick="event.stopPropagation(); if(typeof window.copyToClipboard === 'function') { window.copyToClipboard(null, this.closest('.thumbnail-item').querySelector('.thumbnail-text').textContent, event); }">
-                            <i class="fas fa-copy"></i> 복사
-                        </button>
-                    </div>
-                `;
-      });
-      thumbnailsGridEl.innerHTML = thumbnailsHtml;
-    }
+    renderMarketingMaterials(marketingMaterials);
 
     // 로딩 숨기고 결과 표시
     marketingLoading.style.display = "none";
     marketingResult.style.display = "block";
     marketingResult.classList.remove("hidden");
 
-    // 프로젝트 데이터에 저장
-    if (window.currentProject) {
-      if (!window.currentProject.data) {
-        window.currentProject.data = {};
-      }
-      if (!window.currentProject.data.marketing) {
-        window.currentProject.data.marketing = {};
-      }
-      window.currentProject.data.marketing.youtubeDesc =
-        marketingMaterials.youtubeDesc || "";
-      window.currentProject.data.marketing.tiktokDesc =
-        marketingMaterials.tiktokDesc || "";
-      window.currentProject.data.marketing.hashtags =
-        marketingMaterials.hashtags || "";
-      if (
-        marketingMaterials.thumbnails &&
-        Array.isArray(marketingMaterials.thumbnails)
-      ) {
-        window.currentProject.data.marketing.thumbnails =
-          marketingMaterials.thumbnails.map((thumb) =>
-            typeof thumb === "string"
-              ? thumb
-              : thumb.text || thumb.content || String(thumb),
-          );
-      }
-    }
+    saveMarketingMaterialsToProject(marketingMaterials);
 
     console.log("✅ 마케팅 자료 생성 완료:", marketingMaterials);
 
