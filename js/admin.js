@@ -186,7 +186,7 @@
 
   // ─── 사용자 승인 ────────────────────────────────────────────
   window.approveUser = async function (uid) {
-    if (!confirm("이 사용자를 승인하시겠습니까?")) return;
+    if (!(await window.showConfirmAsync("이 사용자를 승인하시겠습니까?"))) return;
     try {
       await window.firebaseDb
         .collection(COLLECTION_USERS)
@@ -202,7 +202,7 @@
 
   // ─── 사용자 거절 (계정 삭제 + Auth 로그인 차단) ─────────────
   window.rejectUser = async function (uid) {
-    if (!confirm("이 사용자를 거절하고 삭제하시겠습니까?")) return;
+    if (!(await window.showConfirmAsync("이 사용자를 거절하고 삭제하시겠습니까?"))) return;
     try {
       await window.firebaseDb.collection(COLLECTION_USERS).doc(uid).delete();
 
@@ -237,7 +237,7 @@
 
   // ─── 승인 취소 ──────────────────────────────────────────────
   window.revokeUser = async function (uid) {
-    if (!confirm("이 사용자의 승인을 취소하시겠습니까?")) return;
+    if (!(await window.showConfirmAsync("이 사용자의 승인을 취소하시겠습니까?"))) return;
     try {
       await window.firebaseDb
         .collection(COLLECTION_USERS)
@@ -252,7 +252,7 @@
 
   // ─── 관리자 지정 ────────────────────────────────────────────
   window.makeAdmin = async function (uid) {
-    if (!confirm("이 사용자를 관리자로 지정하시겠습니까?")) return;
+    if (!(await window.showConfirmAsync("이 사용자를 관리자로 지정하시겠습니까?"))) return;
     try {
       await window.firebaseDb
         .collection(COLLECTION_USERS)
@@ -267,7 +267,7 @@
 
   // ─── 관리자 → 일반 회원 강등 ────────────────────────────────
   window.demoteAdmin = async function (uid) {
-    if (!confirm("이 관리자를 일반 회원으로 변경하시겠습니까?")) return;
+    if (!(await window.showConfirmAsync("이 관리자를 일반 회원으로 변경하시겠습니까?"))) return;
     try {
       await window.firebaseDb
         .collection(COLLECTION_USERS)
@@ -449,9 +449,9 @@
     const { geminiModel, openaiModel } = getModelValuesFromUi("admin");
 
     if (
-      !confirm(
+      !(await window.showConfirmAsync(
         "전역 설정을 저장하시겠습니까?\n모든 사용자가 이 API 키들을 공유하게 됩니다.",
-      )
+      ))
     )
       return;
 
@@ -547,9 +547,9 @@
     const { geminiModel, openaiModel } = getModelValuesFromUi("modal");
 
     if (
-      !confirm(
+      !(await window.showConfirmAsync(
         "공용 API 키를 저장하시겠습니까?\n모든 사용자가 이 키를 공유하게 됩니다.",
-      )
+      ))
     )
       return;
 
