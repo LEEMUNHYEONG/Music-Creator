@@ -1,6 +1,14 @@
 // js/storage.js - Music Creator Data Persistence
 
 /**
+ * 새 프로젝트 ID를 생성합니다.
+ * (기존에 app.js 4곳 + 이 파일 1곳에 동일한 식이 복붙되어 있었음)
+ */
+window.generateProjectId = function () {
+  return "proj_" + Date.now() + "_" + Math.random().toString(36).substring(2, 11);
+};
+
+/**
  * ☁️ 백업 상태 UI 업데이트 함수
  */
 window.updateSaveStatusUI = function(status, message = "") {
@@ -1217,7 +1225,7 @@ window.saveCurrentProject = function () {
   try {
     let projectId = window.currentProjectId;
     if (!projectId) {
-      projectId = "proj_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+      projectId = window.generateProjectId();
       window.currentProjectId = projectId;
     }
 

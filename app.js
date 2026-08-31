@@ -920,7 +920,7 @@ window.saveAndClose = function () {
         return;
       }
       window.currentProjectId =
-        "proj_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+        window.generateProjectId();
     }
     const saved = window.saveCurrentProject();
     if (saved) {
@@ -1459,7 +1459,7 @@ window.addEventListener("beforeunload", function () {
       (document.getElementById("sunoLyrics")?.value || "").trim();
     if (hasContent) {
       window.currentProjectId =
-        "proj_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+        window.generateProjectId();
       window.saveCurrentProject();
     }
   } catch (e) {
@@ -1846,7 +1846,7 @@ ${stylePrompt}
     if (!window.currentProject) {
       const pid =
         window.currentProjectId ||
-        "proj_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+        window.generateProjectId();
       window.currentProjectId = pid;
       window.currentProject = {
         id: pid,
@@ -7251,7 +7251,7 @@ window.duplicateProject = function (projectId) {
     }
     var copy = JSON.parse(JSON.stringify(foundProject));
     copy.id =
-      "proj_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+      window.generateProjectId();
     copy.title = (foundProject.title || "제목 없음") + " (복사본)";
     copy.savedAt = new Date().toISOString();
     copy.createdAt = new Date().toISOString();
