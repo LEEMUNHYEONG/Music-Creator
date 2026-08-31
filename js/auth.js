@@ -407,22 +407,23 @@
       console.error("사용자 데이터 로드 오류:", err);
       console.warn("⚠️ 통신 에러로 인해 오프라인 사용자 모드로 임시 세팅됩니다.");
       
-      // 서버 연결 실패 시에도 기능을 작동할 수 있게 임시 사용자 세팅
-      const fallbackUserData = { 
-        uid: user.uid, 
-        name: user.displayName || user.email || '오프라인 접속자', 
-        role: 'user', 
-        approved: true 
+      // 서버 연결 실패 시 로컬 전용 임시 세팅 (승인 여부는 서버 확인 전까지 부여하지 않음)
+      const fallbackUserData = {
+        uid: user.uid,
+        name: user.displayName || user.email || '오프라인 접속자',
+        role: 'user',
+        approved: false,
+        offline: true
       };
       window.currentUserData = fallbackUserData;
-      
+
       hideAuthOverlay();
       updateHeaderUserInfo(fallbackUserData);
       buildHeaderMenu(fallbackUserData);
-      
+
       const adminMenuDropdown = document.getElementById("adminMenuDropdown");
-      if (adminMenuDropdown) adminMenuDropdown.classList.remove("d-none");
-      
+      if (adminMenuDropdown) adminMenuDropdown.classList.add("d-none");
+
       const apiKeyMenuBtn = document.getElementById("apiKeyMenuBtn");
       if (apiKeyMenuBtn) {
         apiKeyMenuBtn.classList.add("d-none");
@@ -603,7 +604,10 @@
     if (e.key === "Escape") {
       const overlay = document.getElementById("authOverlay");
       if (overlay && !overlay.classList.contains("d-none")) {
-        hideAuthOverlay();
+        // 승인된 로그인 사용자에게만 ESC 닫기 허용 (미승인/미로그인 상태의 게이트 우회 방지)
+        if (window.currentUserData && window.currentUserData.approved === true) {
+          hideAuthOverlay();
+        }
         return;
       }
     }

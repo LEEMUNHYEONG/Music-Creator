@@ -200,12 +200,34 @@
     }
   };
 
-  // ─── 사용자 거절 (계정 삭제) ────────────────────────────────
+  // ─── 사용자 거절 (계정 삭제 + Auth 로그인 차단) ─────────────
   window.rejectUser = async function (uid) {
     if (!confirm("이 사용자를 거절하고 삭제하시겠습니까?")) return;
     try {
       await window.firebaseDb.collection(COLLECTION_USERS).doc(uid).delete();
-      showAdminToast("🗑️ 사용자를 삭제했습니다.");
+
+      // Firestore 문서 삭제만으로는 Auth 계정이 남아 로그인이 가능하므로
+      // 서버 함수로 계정 자체를 비활성화한다.
+      try {
+        const token = await window.firebaseAuth.currentUser.getIdToken();
+        const resp = await fetch("/api/admin/disable", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ uid, disabled: true }),
+        });
+        if (!resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          throw new Error(data.error || `HTTP ${resp.status}`);
+        }
+        showAdminToast("🗑️ 사용자를 삭제하고 로그인도 차단했습니다.");
+      } catch (disableErr) {
+        console.error("Auth 계정 비활성화 실패:", disableErr);
+        showAdminToast("⚠️ 문서는 삭제했지만 로그인 차단에 실패했습니다: " + disableErr.message);
+      }
+
       loadPendingUsers();
       loadAllUsers();
     } catch (err) {

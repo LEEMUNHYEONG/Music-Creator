@@ -45,6 +45,10 @@
       {
         "source": "/api/gemini",
         "function": "geminiProxy"
+      },
+      {
+        "source": "/api/admin/disable",
+        "function": "adminSetUserDisabled"
       }
     ],
     "headers": [
