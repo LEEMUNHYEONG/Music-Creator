@@ -145,6 +145,127 @@
   };
 
   // --- Firestore & Storage 데이터 관리 ---
+  // 게시글은 한 번에 PAGE_SIZE개씩만 읽는다 (전체 컬렉션 조회는 글 수에
+  // 비례해 읽기 비용과 DOM이 무한히 커지던 문제가 있었음).
+  const BOARD_PAGE_SIZE = 20;
+  const boardPager = {
+    renderedIds: new Set(),
+    adminCursor: null,
+    publicCursor: null,
+    ownCursor: null,
+    exhausted: false,
+    loading: false,
+  };
+
+  function resetBoardPager() {
+    boardPager.renderedIds.clear();
+    boardPager.adminCursor = null;
+    boardPager.publicCursor = null;
+    boardPager.ownCursor = null;
+    boardPager.exhausted = false;
+    boardPager.loading = false;
+  }
+
+  async function fetchNextBoardPage() {
+    const collection = window.firebaseDb.collection(COLLECTION_BOARD);
+    const isAdmin = window.currentUserData?.role === "admin";
+    const uid = window.firebaseAuth.currentUser.uid;
+    const byId = new Map();
+
+    if (isAdmin) {
+      let query = collection.orderBy("createdAt", "desc").limit(BOARD_PAGE_SIZE);
+      if (boardPager.adminCursor) query = query.startAfter(boardPager.adminCursor);
+      const snapshot = await query.get();
+      snapshot.forEach((doc) => byId.set(doc.id, doc));
+      if (snapshot.docs.length > 0) {
+        boardPager.adminCursor = snapshot.docs[snapshot.docs.length - 1];
+      }
+      if (snapshot.docs.length < BOARD_PAGE_SIZE) boardPager.exhausted = true;
+    } else {
+      let publicQuery = collection
+        .where("isPrivate", "==", false)
+        .orderBy("createdAt", "desc")
+        .limit(BOARD_PAGE_SIZE);
+      if (boardPager.publicCursor) publicQuery = publicQuery.startAfter(boardPager.publicCursor);
+      let ownQuery = collection
+        .where("userId", "==", uid)
+        .orderBy("createdAt", "desc")
+        .limit(BOARD_PAGE_SIZE);
+      if (boardPager.ownCursor) ownQuery = ownQuery.startAfter(boardPager.ownCursor);
+
+      const [publicSnapshot, ownSnapshot] = await Promise.all([
+        publicQuery.get(),
+        ownQuery.get(),
+      ]);
+      publicSnapshot.forEach((doc) => byId.set(doc.id, doc));
+      ownSnapshot.forEach((doc) => byId.set(doc.id, doc));
+      if (publicSnapshot.docs.length > 0) {
+        boardPager.publicCursor = publicSnapshot.docs[publicSnapshot.docs.length - 1];
+      }
+      if (ownSnapshot.docs.length > 0) {
+        boardPager.ownCursor = ownSnapshot.docs[ownSnapshot.docs.length - 1];
+      }
+      if (
+        publicSnapshot.docs.length < BOARD_PAGE_SIZE &&
+        ownSnapshot.docs.length < BOARD_PAGE_SIZE
+      ) {
+        boardPager.exhausted = true;
+      }
+    }
+
+    const documents = Array.from(byId.values()).filter(
+      (doc) => !boardPager.renderedIds.has(doc.id),
+    );
+    documents.sort((a, b) => {
+      const aTime = a.data().createdAt?.seconds || 0;
+      const bTime = b.data().createdAt?.seconds || 0;
+      return bTime - aTime;
+    });
+    return documents;
+  }
+
+  function renderBoardLoadMoreButton(container) {
+    const existing = document.getElementById("boardLoadMoreBtn");
+    if (existing) existing.remove();
+    if (boardPager.exhausted) return;
+
+    const btn = document.createElement("button");
+    btn.id = "boardLoadMoreBtn";
+    btn.type = "button";
+    btn.className = "btn btn-secondary";
+    btn.style.cssText = "display:block; margin:15px auto;";
+    btn.innerHTML = '<i class="fas fa-chevron-down"></i> 더 보기';
+    btn.onclick = () => loadMoreBoardPosts();
+    container.appendChild(btn);
+  }
+
+  async function loadMoreBoardPosts() {
+    const container = document.getElementById("boardContainer");
+    if (!container || boardPager.loading || boardPager.exhausted) return;
+    boardPager.loading = true;
+    const btn = document.getElementById("boardLoadMoreBtn");
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 불러오는 중...';
+    }
+    try {
+      const documents = await fetchNextBoardPage();
+      documents.forEach((doc) => {
+        boardPager.renderedIds.add(doc.id);
+        container.appendChild(createPostCard(doc.id, doc.data()));
+      });
+      renderBoardLoadMoreButton(container);
+    } catch (err) {
+      console.error("게시판 추가 로드 오류:", err);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-chevron-down"></i> 더 보기 (오류 - 다시 시도)';
+      }
+    } finally {
+      boardPager.loading = false;
+    }
+  }
+
   async function loadBoardPosts() {
     const container = document.getElementById("boardContainer");
     if (!container) return;
@@ -161,30 +282,8 @@
     }
 
     try {
-      const collection = window.firebaseDb.collection(COLLECTION_BOARD);
-      const isAdmin = window.currentUserData?.role === "admin";
-      const uid = currentUser.uid;
-      let documents = [];
-
-      if (isAdmin) {
-        const snapshot = await collection.get();
-        snapshot.forEach((doc) => documents.push(doc));
-      } else {
-        const [publicSnapshot, ownSnapshot] = await Promise.all([
-          collection.where("isPrivate", "==", false).get(),
-          collection.where("userId", "==", uid).get(),
-        ]);
-        const byId = new Map();
-        publicSnapshot.forEach((doc) => byId.set(doc.id, doc));
-        ownSnapshot.forEach((doc) => byId.set(doc.id, doc));
-        documents = Array.from(byId.values());
-      }
-
-      documents.sort((a, b) => {
-        const aTime = a.data().createdAt?.seconds || 0;
-        const bTime = b.data().createdAt?.seconds || 0;
-        return bTime - aTime;
-      });
+      resetBoardPager();
+      const documents = await fetchNextBoardPage();
 
       if (documents.length === 0) {
         container.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--text-secondary);"><i class="fas fa-inbox fa-3x" style="opacity: 0.3; margin-bottom: 15px;"></i><br>아직 등록된 게시글이 없습니다.</div>`;
@@ -193,11 +292,13 @@
 
       container.innerHTML = "";
       documents.forEach((doc) => {
+        boardPager.renderedIds.add(doc.id);
         container.appendChild(createPostCard(doc.id, doc.data()));
       });
+      renderBoardLoadMoreButton(container);
     } catch (err) {
       console.error("게시판 로드 오류:", err);
-      container.innerHTML = `<div style="color:var(--error); text-align:center; padding:20px;">❌ 데이터를 불러오지 못했습니다: ${err.message}</div>`;
+      container.innerHTML = `<div style="color:var(--error); text-align:center; padding:20px;">❌ 데이터를 불러오지 못했습니다: ${escapeHtml(err.message)}</div>`;
     }
   }
 
