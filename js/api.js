@@ -544,18 +544,23 @@ window.changeAPI = function (value) {
 };
 
 // --- API Model Getters ---
+// 모델 기본값 단일 출처. 서버 프록시(functions/index.js)의 허용 목록과 일치해야 한다.
+window.AI_DEFAULTS = Object.freeze({
+  GEMINI_MODEL: "gemini-2.5-flash",
+  OPENAI_MODEL: "gpt-4o-mini",
+});
+
 window.getGeminiModel = function () {
-  let model = (window.globalConfig && window.globalConfig.gemini_model) || "gemini-3.5-flash";
-  if (model === "gemini-2.0-flash") {
-    model = "gemini-3.5-flash";
-  }
-  return model;
+  return (
+    (window.globalConfig && window.globalConfig.gemini_model) ||
+    window.AI_DEFAULTS.GEMINI_MODEL
+  );
 };
 
 window.getOpenAIModel = function () {
   return (
     (window.globalConfig && window.globalConfig.openai_model) ||
-    "gpt-4o-mini"
+    window.AI_DEFAULTS.OPENAI_MODEL
   );
 };
 

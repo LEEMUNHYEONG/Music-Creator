@@ -313,12 +313,13 @@
     const openaiSelect = document.getElementById(prefix + "OpenAIModelSelect");
     const openaiCustom = document.getElementById(prefix + "OpenAIModelCustom");
 
-    const geminiPresets = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-lite-preview-02-05"];
+    // 서버 프록시(functions/index.js) 허용 목록과 일치해야 한다.
+    const geminiPresets = ["gemini-2.5-flash", "gemini-2.0-flash"];
     const openaiPresets = ["gpt-4o-mini", "gpt-4o", "o1-mini", "o1"];
 
     if (geminiSelect) {
       if (!geminiModel) {
-        geminiSelect.value = "gemini-2.0-flash";
+        geminiSelect.value = "gemini-2.5-flash";
         if (geminiCustom) {
           geminiCustom.classList.add("d-none");
           geminiCustom.value = "";
@@ -394,10 +395,10 @@
     const openaiSelect = document.getElementById(prefix + "OpenAIModelSelect");
     const openaiCustom = document.getElementById(prefix + "OpenAIModelCustom");
 
-    let geminiModel = "gemini-2.0-flash";
+    let geminiModel = "gemini-2.5-flash";
     if (geminiSelect) {
       if (geminiSelect.value === "custom") {
-        geminiModel = geminiCustom?.value.trim() || "gemini-2.0-flash";
+        geminiModel = geminiCustom?.value.trim() || "gemini-2.5-flash";
       } else {
         geminiModel = geminiSelect.value;
       }

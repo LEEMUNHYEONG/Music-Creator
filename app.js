@@ -5638,19 +5638,25 @@ window.handleImport = function (event) {
           }
         });
         
-        // 설정 및 기타 데이터 복원
+        // 설정 데이터 복원 — 허용 목록에 있는 키만 복원한다.
+        // (API 키, firebase:* 세션 키 등 임의 키 덮어쓰기는 세션 탈취/키 유출 벡터)
+        const IMPORT_SETTING_ALLOWLIST = [
+          "mvSettings",
+          "musicCreatorGuidelines",
+          "selectedAPI",
+          "stepOrder",
+          "sidebarPosition",
+          "sidebarSize",
+          "projectOrder",
+        ];
         if (importData.settings) {
           Object.keys(importData.settings).forEach(k => {
-            if (typeof importData.settings[k] === 'string') localStorage.setItem(k, importData.settings[k]);
-            else localStorage.setItem(k, JSON.stringify(importData.settings[k]));
+            if (!IMPORT_SETTING_ALLOWLIST.includes(k)) return;
+            const v = importData.settings[k];
+            localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
           });
         }
-        if (importData.other) {
-          Object.keys(importData.other).forEach(k => {
-            if (typeof importData.other[k] === 'string') localStorage.setItem(k, importData.other[k]);
-            else localStorage.setItem(k, JSON.stringify(importData.other[k]));
-          });
-        }
+        // importData.other는 복원하지 않는다 (임의 localStorage 키 주입 차단)
       } 
       // 기존 백업 형식 처리
       else if (Array.isArray(importData)) {
@@ -5833,12 +5839,10 @@ window.backupFullProgram = function () {
       }
     });
 
-    // 설정 데이터 수집
+    // 설정 데이터 수집 (API 키는 백업 파일에 절대 포함하지 않는다)
     const settingKeys = [
       "mvSettings",
       "musicCreatorGuidelines",
-      "openai_api_key",
-      "gemini_api_key",
       "selectedAPI",
       "stepOrder",
       "sidebarPosition",
@@ -5857,12 +5861,15 @@ window.backupFullProgram = function () {
     });
 
     // 기타 localStorage 데이터 수집
+    // 민감 키(세션 토큰, API 키)는 백업 파일에 포함하지 않는다.
+    const EXPORT_DENYLIST = /^(firebase:|openai_api_key$|gemini_api_key$)/;
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (!key) continue;
 
-      // 이미 수집한 키는 제외
+      // 이미 수집한 키·민감 키는 제외
       if (projectKeys.includes(key) || settingKeys.includes(key)) continue;
+      if (EXPORT_DENYLIST.test(key)) continue;
 
       try {
         const data = localStorage.getItem(key);

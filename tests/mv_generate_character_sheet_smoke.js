@@ -84,7 +84,7 @@ window.callGeminiWithAutoRoute = async function callGeminiWithAutoRouteStub(prom
   // 테스트용: 실제 키를 가진 경우 generativelanguage.googleapis.com으로 직접 호출
   const key = geminiKey || "";
   const isRealKey = key && key.startsWith("AIza") && !key.includes("Proxy");
-  const model = window.getGeminiModel ? window.getGeminiModel() : "gemini-3.5-flash";
+  const model = window.getGeminiModel ? window.getGeminiModel() : "gemini-2.5-flash";
   if (isRealKey) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
     const response = await fetch(url, {
