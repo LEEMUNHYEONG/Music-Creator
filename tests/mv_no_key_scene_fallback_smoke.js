@@ -1,7 +1,7 @@
 const assert = require("assert");
 const fs = require("fs");
 
-const step6Source = fs.readFileSync("js/step6.js", "utf8");
+const step6Source = fs.readFileSync("test-results/mv_modules.compat.js", "utf8");
 
 assert.ok(
   step6Source.includes("API 키 없이 로컬 기본 방식으로 씬 생성합니다."),

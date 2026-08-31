@@ -66,7 +66,7 @@ global.document = {
 };
 
 currentContainer = makeContainer();
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 window.saveMVSettings = function saveMVSettingsStub() {
   saveCount += 1;

@@ -120,7 +120,10 @@ exports.geminiProxy = onRequest(
     const geminiKey = GEMINI_API_KEY.value();
     try {
       const body = req.body;
-      const model = body.model || "gemini-1.5-flash";
+      let model = body.model || "gemini-3.5-flash";
+      if (model === "gemini-2.0-flash") {
+        model = "gemini-3.5-flash";
+      }
       const prompt = body.prompt || body.contents;
       if (!prompt) {
         return res
@@ -140,8 +143,15 @@ exports.geminiProxy = onRequest(
           body: JSON.stringify({
             contents,
             generationConfig: {
-              maxOutputTokens: body.maxOutputTokens || 8192,
-              temperature: body.temperature ?? 0.7,
+              ...(body.generationConfig || {}),
+              maxOutputTokens:
+                body.generationConfig?.maxOutputTokens ||
+                body.maxOutputTokens ||
+                8192,
+              temperature:
+                body.generationConfig?.temperature ??
+                body.temperature ??
+                0.7,
             },
           }),
         },

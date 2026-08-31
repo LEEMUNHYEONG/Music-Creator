@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 
-const source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
+const source = fs.readFileSync(path.resolve(__dirname, "../test-results/mv_modules.compat.js"), "utf8");
 const start = source.indexOf("const MV_EMOTION_VISUAL_PRESETS = {");
 const end = source.indexOf("/**\n * 해당 씬 가사에 가장 잘 맞는 장소 유형", start);
 

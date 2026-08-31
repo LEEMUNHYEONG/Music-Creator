@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 
 const root = path.resolve(__dirname, "..");
-const files = ["app.js", "js/step6.js"];
+const files = ["app.js", "test-results/mv_modules.compat.js"];
 const definitions = new Map();
 
 for (const file of files) {
@@ -33,23 +33,23 @@ const expectedDuplicates = [];
 assert.deepStrictEqual(Object.keys(duplicates).sort(), expectedDuplicates.sort());
 
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
-const step6ScriptIndex = html.indexOf('src="js/step6.js');
 const appScriptIndex = html.indexOf('src="app.js');
-assert.ok(step6ScriptIndex !== -1, "index.html should load js/step6.js");
 assert.ok(appScriptIndex !== -1, "index.html should load app.js");
-assert.ok(
-  step6ScriptIndex < appScriptIndex,
-  "index.html should currently load js/step6.js before app.js",
-);
-
-for (const name of expectedDuplicates) {
+for (const moduleFile of [
+  "core_utilities.js",
+  "prompt_and_scene_review_rendering.js",
+  "mv_generation_flows.js",
+  "location_settings_and_character_helpers.js",
+  "prompt_persistence_and_export.js",
+  "legacy_cross-step_helpers.js",
+  "srt_export_and_preview.js",
+  "translation_regeneration_copy_and_tag_actions.js",
+]) {
+  const moduleScriptIndex = html.indexOf(`src="js/mv/${moduleFile}`);
+  assert.ok(moduleScriptIndex !== -1, `index.html should load ${moduleFile}`);
   assert.ok(
-    duplicates[name].some((entry) => entry.startsWith("app.js:")),
-    `${name} should have a current app.js definition`,
-  );
-  assert.ok(
-    duplicates[name].some((entry) => entry.startsWith("js/step6.js:")),
-    `${name} should have a current step6.js definition`,
+    moduleScriptIndex < appScriptIndex,
+    `${moduleFile} should load before app.js`,
   );
 }
 

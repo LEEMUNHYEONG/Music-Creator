@@ -57,7 +57,7 @@ window.currentScenes = [
 addElement("scene_0_en", "textarea english\twith tab");
 addElement("scene_0_ko", "textarea korean\nwith newline");
 
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 const tableText = window.buildMVScenePromptTableText();
 const rows = tableText.split("\n");

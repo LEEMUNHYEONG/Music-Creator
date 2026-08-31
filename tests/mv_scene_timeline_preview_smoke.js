@@ -4,7 +4,7 @@ const path = require("path");
 const vm = require("vm");
 
 const elements = new Map();
-const source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
+const source = fs.readFileSync(path.resolve(__dirname, "../test-results/mv_modules.compat.js"), "utf8");
 const start = source.indexOf("function getMVSceneTimelineLabel(scene, index) {");
 const end = source.indexOf("// --- UI 렌더링 함수: MV 썸네일/배경/인물 프롬프트 표시 ---", start);
 

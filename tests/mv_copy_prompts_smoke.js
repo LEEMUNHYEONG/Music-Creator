@@ -4,6 +4,7 @@ const originalConsole = { ...console };
 const elements = new Map();
 let clipboardText = "";
 let toastMessage = "";
+const confirmMessages = [];
 
 console.log = function logStub() {};
 
@@ -33,6 +34,10 @@ Object.defineProperty(globalThis, "navigator", {
 });
 global.alert = function alertStub(message) {
   throw new Error(`Unexpected alert: ${message}`);
+};
+global.confirm = function confirmStub(message) {
+  confirmMessages.push(message);
+  return true;
 };
 
 window.showCopyIndicator = function showCopyIndicator(message) {
@@ -69,7 +74,7 @@ addElement("mvCharacterDetailPromptEn", "character english");
 addElement("scene_0_en", "scene zero english from textarea");
 addElement("scene_0_ko", "씬 0 한글 textarea");
 
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 window.copyAllMVPrompts();
 
@@ -90,6 +95,11 @@ setImmediate(() => {
   assert.ok(clipboardText.includes("씬 0 한글 textarea"));
   assert.ok(clipboardText.includes("씬 2 (0:06-0:12)"));
   assert.ok(clipboardText.includes("person on rooftop looking at the sky"));
+  assert.strictEqual(confirmMessages.length, 1);
+  assert.ok(confirmMessages[0].includes("전체 MV 프롬프트 최종 확인"));
+  assert.ok(confirmMessages[0].includes("작업: 전체 MV 프롬프트 복사"));
+  assert.ok(confirmMessages[0].includes("씬 수: 전체 2개"));
+  assert.ok(confirmMessages[0].includes("포함 항목:"));
   assert.ok(toastMessage.includes("클립보드"));
   originalConsole.log("MV copy prompts smoke test: PASS");
   process.exit(0);

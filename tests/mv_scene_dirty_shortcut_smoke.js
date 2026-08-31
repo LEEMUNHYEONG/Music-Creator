@@ -96,7 +96,7 @@ window.saveCurrentProject = function saveCurrentProjectStub() {
   saveCalled += 1;
   return true;
 };
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 window.markMVScenePromptDirty(0, true);
 

@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 
-const source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
+const source = fs.readFileSync(path.resolve(__dirname, "../test-results/mv_modules.compat.js"), "utf8");
 const start = source.indexOf("function parseMVTimelineSeconds(value) {");
 const end = source.indexOf("// --- UI 렌더링 함수: MV 썸네일/배경/인물 프롬프트 표시 ---", start);
 
@@ -11,12 +11,26 @@ assert.notStrictEqual(start, -1, "timeline editor helpers should exist");
 assert.notStrictEqual(end, -1, "timeline editor helper block should end before prompt UI renderer");
 
 const elements = new Map();
+const sceneCards = [];
 const completePrompt =
   "sunrise rooftop music video frame with hopeful vocalist walking toward warm open horizon, golden sunrise backlight, slow crane-up camera movement, photorealistic cinematic detail, emotional performance, 16:9 aspect ratio, sharp focus, detailed lighting, cohesive color palette";
 global.window = global;
 global.document = {
   getElementById(id) {
     return elements.get(id) || null;
+  },
+  querySelectorAll(selector) {
+    if (selector === ".mv-scene-overview-card") {
+      return sceneCards;
+    }
+    return [];
+  },
+  querySelector(selector) {
+    const match = String(selector).match(
+      /^\.mv-scene-overview-card\[data-scene-index="(\d+)"\]$/,
+    );
+    if (!match) return null;
+    return sceneCards.find((card) => card.dataset.sceneIndex === match[1]) || null;
   },
 };
 
@@ -46,6 +60,11 @@ elements.set("scene_editor_summary_0", { textContent: "" });
 elements.set("mv_scene_quality_summary", { textContent: "" });
 elements.set("mv_scene_quality_summary_text", { textContent: "" });
 elements.set("mv_scene_quality_focus_btn", { disabled: false });
+elements.set("mv_scene_quality_review_only_btn", {
+  disabled: false,
+  textContent: "",
+});
+elements.set("mv_scene_quality_review_only_status", { textContent: "" });
 [
   "invalidTime",
   "missingLocation",
@@ -93,6 +112,9 @@ assert.strictEqual(elements.get("scene_editor_notice_0").style.display, "none");
 assert.strictEqual(elements.get("scene_editor_notice_0").attributes["aria-hidden"], "true");
 assert.ok(elements.get("scene_editor_summary_0").textContent.includes("0:08-0:17 / 9초"));
 assert.ok(elements.get("scene_editor_summary_0").textContent.includes("메타데이터 5/5"));
+assert.ok(elements.get("scene_editor_summary_0").textContent.includes("준비 완료"));
+assert.ok(elements.get("scene_editor_summary_0").textContent.includes("EN 35단어"));
+assert.ok(elements.get("scene_editor_summary_0").textContent.includes("품질 통과"));
 assert.ok(elements.get("scene_editor_summary_0").textContent.includes("가사 있음"));
 assert.ok(elements.get("scene_editor_summary_0").textContent.includes("EN 있음"));
 assert.ok(elements.get("scene_editor_summary_0").textContent.includes("KO 있음"));
@@ -100,6 +122,11 @@ assert.ok(elements.get("mv_scene_quality_summary_text").textContent.includes("�
 assert.ok(elements.get("mv_scene_quality_summary_text").textContent.includes("준비 완료 1개"));
 assert.ok(elements.get("mv_scene_quality_summary_text").textContent.includes("확인 필요 0개"));
 assert.strictEqual(elements.get("mv_scene_quality_focus_btn").disabled, true);
+assert.strictEqual(elements.get("mv_scene_quality_review_only_btn").disabled, true);
+assert.strictEqual(
+  elements.get("mv_scene_quality_review_only_status").textContent,
+  "전체 씬 표시",
+);
 assert.strictEqual(elements.get("mv_scene_quality_filter_invalidTime").disabled, true);
 assert.strictEqual(elements.get("mv_scene_quality_filter_missingLocation").disabled, true);
 assert.strictEqual(elements.get("mv_scene_quality_filter_missingCamera").disabled, true);
@@ -187,7 +214,13 @@ assert.ok(renderOverviewSource.includes('role="status"'));
 assert.ok(renderOverviewSource.includes('aria-live="polite"'));
 assert.ok(renderOverviewSource.includes('aria-describedby="scene_editor_notice_${index}"'));
 assert.ok(renderOverviewSource.includes("renderMVSceneEditorSummary(scene, index)"));
+assert.ok(source.slice(start, end).includes("mv-scene-quality-compact"));
+assert.ok(source.slice(start, end).includes("renderMVSceneQualityBadges(scene, index)"));
+assert.ok(source.slice(start, end).includes("toggleMVReviewOnlyScenes"));
+assert.ok(source.slice(start, end).includes("mv_scene_quality_review_only_btn"));
 assert.ok(renderOverviewSource.includes("renderMVSceneQualitySummary(scenes)"));
+assert.ok(renderOverviewSource.includes("applyMVReviewOnlyVisibility()"));
+assert.ok(renderOverviewSource.includes("window.currentScenes = scenes"));
 assert.ok(renderOverviewSource.includes(".scene-overview-en,.scene-overview-ko"));
 assert.ok(source.slice(start, end).includes("focusMVFirstReviewScene"));
 assert.ok(source.slice(start, end).includes("focusMVSceneIssue"));
@@ -266,6 +299,39 @@ assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "blockedTerms"), []);
 assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "duplicatePrompt"), []);
 assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "repeatedVisualPattern"), []);
 assert.deepStrictEqual(getMVSceneIssueIndexes(issueScenes, "characterConsistency"), []);
+
+sceneCards.splice(
+  0,
+  sceneCards.length,
+  { dataset: { sceneIndex: "0" }, style: {}, hidden: false },
+  { dataset: { sceneIndex: "1" }, style: {}, hidden: false },
+);
+window.currentScenes = issueScenes;
+window.currentMVReviewOnlyMode = false;
+assert.strictEqual(window.toggleMVReviewOnlyScenes(), true);
+assert.strictEqual(window.currentMVReviewOnlyMode, true);
+assert.strictEqual(sceneCards[0].hidden, true);
+assert.strictEqual(sceneCards[0].style.display, "none");
+assert.strictEqual(sceneCards[0].dataset.reviewOnlyHidden, "true");
+assert.strictEqual(sceneCards[1].hidden, false);
+assert.strictEqual(sceneCards[1].style.display, "");
+assert.ok(
+  elements.get("mv_scene_quality_review_only_btn").textContent.includes("전체 씬 보기"),
+);
+assert.ok(
+  elements
+    .get("mv_scene_quality_review_only_status")
+    .textContent.includes("확인 필요 1개 씬만 표시 중"),
+);
+assert.strictEqual(window.toggleMVReviewOnlyScenes(), false);
+assert.strictEqual(sceneCards[0].hidden, false);
+assert.strictEqual(sceneCards[0].style.display, "");
+assert.strictEqual(sceneCards[1].hidden, false);
+assert.ok(
+  elements
+    .get("mv_scene_quality_review_only_btn")
+    .textContent.includes("확인 필요만 보기"),
+);
 
 elements.set("scene_overview_1_en", { value: completePrompt });
 elements.set("scene_overview_1_ko", { value: "반복되는 옥상 장면" });

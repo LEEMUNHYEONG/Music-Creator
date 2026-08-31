@@ -1,12 +1,24 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    match /board_images/{allPaths=**} {
+    match /board_images/{userId}/{fileName} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null 
-                   && request.resource.size < 5 * 1024 * 1024 
-                   && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null; // Simplified for now
+      allow create, update: if request.auth != null
+                            && request.auth.uid == userId
+                            && request.resource.size < 5 * 1024 * 1024
+                            && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && (
+        request.auth.uid == userId
+        || firestore.get(
+          /databases/(default)/documents/users/$(request.auth.uid)
+        ).data.role == 'admin'
+      );
+    }
+
+    // 기존 한 단계 경로의 이미지는 마이그레이션 기간 동안 읽기만 허용합니다.
+    match /board_images/{legacyFileName} {
+      allow read: if request.auth != null;
+      allow write: if false;
     }
   }
 }

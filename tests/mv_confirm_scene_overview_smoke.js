@@ -138,7 +138,7 @@ global.translateEnglishToKoreanForScene = async function translateEnToKo(
   return `자동 번역: ${text}`;
 };
 
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 window.getMVLocationValues = function getMVLocationValuesStub() {
   return ["city"];
@@ -252,7 +252,7 @@ addElement("scene_camera_work_1", "slow dolly-in");
     {
       time: "0:30-0:20",
       scene: "확인 필요 장면",
-      prompt: "watermark cinematic cinematic cinematic",
+      prompt: "watermark abandoned abandoned abandoned abandoned abandoned",
       promptKo: "한글 프롬프트",
     },
   ];
@@ -265,7 +265,7 @@ addElement("scene_camera_work_1", "slow dolly-in");
   elements.set("scene_lighting_0", { value: "" });
   elements.set("scene_camera_work_0", { value: "" });
   elements.set("scene_overview_0_en", {
-    value: "watermark cinematic cinematic cinematic",
+    value: "watermark abandoned abandoned abandoned abandoned abandoned",
   });
   elements.set("scene_overview_0_ko", { value: "한글 프롬프트" });
   await window.saveAndConfirmMVPrompts();

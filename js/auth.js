@@ -52,9 +52,9 @@
   // ─── 화면 전환 ──────────────────────────────────────────────
   window.showAuthOverlay = function () {
     const overlay = document.getElementById("authOverlay");
-    const mainApp = document.getElementById("mainAppContent");
-    if (overlay) overlay.style.display = "flex";
-    if (mainApp) mainApp.style.display = "none";
+    const mainApp = document.getElementById("mainAppContent") || document.getElementById("mainWrapper");
+    if (overlay) overlay.classList.remove("d-none");
+    if (mainApp) mainApp.classList.add("d-none");
     // 화면 표시 시 버튼 상태와 비밀번호 초기화
     setButtonLoading("loginBtn", false);
     setButtonLoading("signupBtn", false);
@@ -68,9 +68,9 @@
 
   window.hideAuthOverlay = function () {
     const overlay = document.getElementById("authOverlay");
-    const mainApp = document.getElementById("mainAppContent");
-    if (overlay) overlay.style.display = "none";
-    if (mainApp) mainApp.style.display = "block";
+    const mainApp = document.getElementById("mainAppContent") || document.getElementById("mainWrapper");
+    if (overlay) overlay.classList.add("d-none");
+    if (mainApp) mainApp.classList.remove("d-none");
     // 앱 진입 시 버튼 상태 초기화
     setButtonLoading("loginBtn", false);
     setButtonLoading("signupBtn", false);
@@ -78,18 +78,20 @@
 
   window.showPendingScreen = function () {
     const overlay = document.getElementById("authOverlay");
-    if (overlay) overlay.style.display = "flex";
+    if (overlay) overlay.classList.remove("d-none");
     showAuthTab("pending");
-    const mainApp = document.getElementById("mainAppContent");
-    if (mainApp) mainApp.style.display = "none";
+    const mainApp = document.getElementById("mainAppContent") || document.getElementById("mainWrapper");
+    if (mainApp) mainApp.classList.add("d-none");
   };
 
   window.showAuthTab = function (tab) {
     document
       .querySelectorAll(".auth-panel")
-      .forEach((p) => (p.style.display = "none"));
+      .forEach((p) => p.classList.add("d-none"));
     const target = document.getElementById("auth-" + tab);
-    if (target) target.style.display = "block";
+    if (target) {
+      target.classList.remove("d-none");
+    }
 
     document
       .querySelectorAll(".auth-tab-btn")
@@ -143,6 +145,10 @@
         email,
         password,
       );
+      // 가입 요청은 실행 환경과 관계없이 항상 일반 사용자/승인 대기로 생성합니다.
+      // 에뮬레이터 관리자 계정은 Emulator UI 또는 Admin SDK로 별도 생성해야 합니다.
+      const autoApprove = false;
+      
       // Firestore에 사용자 문서 생성
       await window.firebaseDb
         .collection(COLLECTION_USERS)
@@ -155,13 +161,27 @@
           approved: false,
           role: "user",
         });
-      showAuthMessage(
-        "signupMessage",
-        "✅ 회원 가입이 완료되었습니다! 관리자 승인 후 이용 가능합니다.",
-        "success",
-      );
+
+      if (autoApprove) {
+        showAuthMessage(
+          "signupMessage",
+          "✅ [로컬 테스트] 회원 가입이 완료되었습니다! 잠시 후 로그인 화면으로 이동합니다.",
+          "success",
+        );
+      } else {
+        showAuthMessage(
+          "signupMessage",
+          "✅ 회원 가입이 완료되었습니다! 관리자 승인 후 이용 가능합니다.",
+          "success",
+        );
+      }
       // 이름 업데이트
       await cred.user.updateProfile({ displayName: name });
+      
+      // ✅ [FIX] 회원가입 시 자동 로그인된 세션을 바로 종료
+      // 이렇게 해야 사용자가 명시적으로 로그인할 때 onAuthStateChanged가 정상적으로 다시 실행되어 Firestore 데이터를 제대로 읽어옵니다.
+      await window.firebaseAuth.signOut();
+      
       setTimeout(() => showAuthTab("login"), 2000);
     } catch (err) {
       const msg = getFirebaseErrorMessage(err.code);
@@ -279,18 +299,40 @@
         .doc(user.uid)
         .get();
       if (!doc.exists) {
-        // Firestore 문서가 없는 경우 (구버전 사용자 등)
-        await window.firebaseAuth.signOut();
+        // Firestore 문서가 없는 경우 (구버전 사용자 또는 방금 가입한 경우)
+        // ⚠️ 즉시 로그아웃 대신, 잠시 대기하거나 앱에서 처리하도록 함
+        console.warn("⚠️ 사용자 정보를 Firestore에서 찾을 수 없습니다. (신규 가입 처리 중일 수 있음)");
+        
+        // 만약 로그인이 명시적으로 발생한 것이라면 (signup flow가 아니라면) 여기서 안내 메시지를 표시할 수 있습니다.
+        // 여기서는 자동 로그아웃을 제거하고, 대신 showAuthOverlay를 통해 다시 시도하도록 유도합니다.
+        // await window.firebaseAuth.signOut(); // ❌ 자동 로그아웃 제거
+        
+        updateHeaderUserInfo({ name: user.displayName || user.email, role: 'user' });
         showAuthOverlay();
         showAuthMessage(
           "loginMessage",
-          "⚠️ 계정 정보를 찾을 수 없습니다. 다시 가입해 주세요.",
+          "⚠️ 계정 정보를 Firestore에서 찾을 수 없습니다. 가입을 다시 시도하거나 잠시 기다려 주세요.",
         );
         return;
       }
 
       currentUserData = doc.data();
       window.currentUserData = currentUserData; // 전역 노출
+
+      // ─── 사용자별 제작 지침서 로드 및 로컬 저장소 동기화 ───
+      if (currentUserData && currentUserData.musicCreatorGuidelines) {
+        const serverGuidelines = currentUserData.musicCreatorGuidelines.trim();
+        if (serverGuidelines) {
+          localStorage.setItem("musicCreatorGuidelines", serverGuidelines);
+          localStorage.setItem("musicCreator_guidelines", serverGuidelines);
+          console.log("📋 서버로부터 사용자별 제작 지침서 동기화 완료");
+          
+          const guidelinesText = document.getElementById("guidelinesText");
+          if (guidelinesText) {
+            guidelinesText.value = serverGuidelines;
+          }
+        }
+      }
 
       if (!currentUserData.approved) {
         // 승인 대기 중
@@ -310,8 +352,26 @@
         window.setReadOnlyMode(false);
       }
 
-      // 공용 설정(API 키 등) 불러오기
-      fetchGlobalSettings();
+      // 공용 설정(API 키 등) 불러오기 (비동기 완료 대기)
+      await fetchGlobalSettings();
+      
+      // ☁️ [클라우드 백업] 로그인 성공 시 클라우드에서 프로젝트 동기화 (비동기, 백그라운드)
+      if (typeof window.syncProjectsFromCloud === "function") {
+        window.syncProjectsFromCloud().then(async () => {
+          // 🆕 신규 기기 감지: 클라우드에만 있는 프로젝트가 있으면 동기화 모달 팝업
+          if (typeof window.getCloudOnlyProjects === "function") {
+            const cloudOnly = await window.getCloudOnlyProjects();
+            if (cloudOnly.length > 0) {
+              // 약간의 딜레이로 앱이 완전히 로드된 후 모달 표시
+              setTimeout(() => {
+                if (typeof openCloudSyncModal === "function") {
+                  openCloudSyncModal();
+                }
+              }, 1500);
+            }
+          }
+        });
+      }
 
       // 관리자 패널 및 설정 메뉴 표시 여부
       // 도움말 버튼: 관리자/일반 사용자 모두 표시
@@ -322,16 +382,22 @@
         // 헤더 "회원관리" 버튼은 설정 메뉴 "사용자 관리"로 대체됨 — 표시 안 함
 
         const adminMenuDropdown = document.getElementById("adminMenuDropdown");
-        if (adminMenuDropdown) adminMenuDropdown.style.display = "block";
+        if (adminMenuDropdown) adminMenuDropdown.classList.remove("d-none");
 
         const apiKeyMenuBtn = document.getElementById("apiKeyMenuBtn");
-        if (apiKeyMenuBtn) apiKeyMenuBtn.style.display = "flex";
+        if (apiKeyMenuBtn) {
+          apiKeyMenuBtn.classList.remove("d-none");
+          apiKeyMenuBtn.classList.add("d-flex");
+        }
       } else {
         const adminMenuDropdown = document.getElementById("adminMenuDropdown");
-        if (adminMenuDropdown) adminMenuDropdown.style.display = "block"; // 🌟 일반 사용자도 지침서/초기화 메뉴 접근 가능
+        if (adminMenuDropdown) adminMenuDropdown.classList.remove("d-none"); // 🌟 일반 사용자도 지침서/초기화 메뉴 접근 가능
 
         const apiKeyMenuBtn = document.getElementById("apiKeyMenuBtn");
-        if (apiKeyMenuBtn) apiKeyMenuBtn.style.display = "none";
+        if (apiKeyMenuBtn) {
+          apiKeyMenuBtn.classList.add("d-none");
+          apiKeyMenuBtn.classList.remove("d-flex");
+        }
       }
 
       console.log(
@@ -339,16 +405,45 @@
       );
     } catch (err) {
       console.error("사용자 데이터 로드 오류:", err);
-      // showAuthOverlay(); // ⚠️ [변경] 자동 팝업 제거
+      console.warn("⚠️ 통신 에러로 인해 오프라인 사용자 모드로 임시 세팅됩니다.");
+      
+      // 서버 연결 실패 시에도 기능을 작동할 수 있게 임시 사용자 세팅
+      const fallbackUserData = { 
+        uid: user.uid, 
+        name: user.displayName || user.email || '오프라인 접속자', 
+        role: 'user', 
+        approved: true 
+      };
+      window.currentUserData = fallbackUserData;
+      
+      hideAuthOverlay();
+      updateHeaderUserInfo(fallbackUserData);
+      buildHeaderMenu(fallbackUserData);
+      
+      const adminMenuDropdown = document.getElementById("adminMenuDropdown");
+      if (adminMenuDropdown) adminMenuDropdown.classList.remove("d-none");
+      
+      const apiKeyMenuBtn = document.getElementById("apiKeyMenuBtn");
+      if (apiKeyMenuBtn) {
+        apiKeyMenuBtn.classList.add("d-none");
+        apiKeyMenuBtn.classList.remove("d-flex");
+      }
+      
       showAuthMessage(
         "loginMessage",
-        "❌ 서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+        "⚠️ 로컬 서버에서 파이어베이스 접속에 실패하여, 오프라인 권한으로 임시 접속되었습니다."
       );
     }
   });
 
   // ─── 공용 설정(API 키 등) 가져오기 ──────────────────────────
   async function fetchGlobalSettings() {
+    if (currentUserData?.role !== "admin") {
+      window.globalConfig = { useServerApiProxy: true };
+      console.log("⚙️ 서버 API 프록시 설정 적용 완료");
+      return;
+    }
+
     try {
       const doc = await window.firebaseDb
         .collection("config")
@@ -356,7 +451,7 @@
         .get();
       if (doc.exists) {
         window.globalConfig = doc.data();
-        console.log("⚙️ 공용 설정 로드 완료 (API 키 포함)");
+        console.log("⚙️ 관리자 공용 설정 로드 완료");
       } else {
         window.globalConfig = {};
       }
@@ -378,12 +473,8 @@
         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
       });
     } catch (err) {
-      // ⚠️ 권한 부족 등 비정상 상황이더라도 앱 동작에는 지장이 없으므로 trace 정보만 남김
-      if (err.code === "permission-denied") {
-        console.debug("📊 API 사용량 로깅 권한 없음 (무시됨)");
-      } else {
-        console.warn("📊 API 사용량 로깅 실패:", err.message);
-      }
+      // 권한 부족이나 오프라인 상태일 때 과도한 에러 출력 방지
+      // console.debug("📊 API 사용량 로깅 실패 (정상 동작 중):", err.message);
     }
   };
 
@@ -395,56 +486,57 @@
 
     const isAdmin = userData && userData.role === "admin";
 
+    // 복원 기능용 input 요소를 body에 안전하게 추가
+    if (!document.getElementById("importFile")) {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.id = "importFile";
+      input.accept = ".json";
+      input.className = "d-none";
+      input.onchange = function(event) { if (typeof window.handleImport === 'function') { window.handleImport(event); } this.value = ''; };
+      input.title = "프로젝트 복원 파일(.json) 선택";
+      document.body.appendChild(input);
+    }
+
+    const headerTitle = document.createElement("div");
+    headerTitle.className = "admin-menu-header";
+    headerTitle.textContent = isAdmin ? "관리자 설정 · 복구 · 초기화" : "설정 · 복구 · 초기화";
+    menuContent.appendChild(headerTitle);
+
     // 메뉴 항목 목록 정의
     const menuItems = [];
 
     if (isAdmin) {
       menuItems.push(
-        {
-          icon: "fas fa-users-cog",
-          label: "사용자 관리",
-          action: "openAdminPanel()",
-        },
-        {
-          icon: "fas fa-server",
-          label: "공용 API 키 관리",
-          action: "openGlobalApiKeyModal()",
-        },
-        {
-          icon: "fas fa-key",
-          label: "API 관리",
-          action: "openAPISettings()",
-          dividerAfter: true,
-        },
+        { icon: "fas fa-users-cog", label: "사용자 관리", action: "openAdminPanel()" },
+        { icon: "fas fa-server", label: "공용 API 키 관리", action: "openGlobalApiKeyModal()" },
+        { icon: "fas fa-key", label: "API 관리", action: "openAPISettings()", dividerAfter: true }
+      );
+    } else {
+      menuItems.push(
+        { icon: "fas fa-key", label: "API 설정", action: "openAPISettings()", dividerAfter: true }
       );
     }
 
     menuItems.push(
-      {
-        icon: "fas fa-book-open",
-        label: "제작 지침서",
-        action: "openGuidelinesModal()",
-      },
-      {
-        icon: "fas fa-undo-alt",
-        label: "현재단계 초기화",
-        action: "resetCurrentStep()",
-        danger: true,
-      },
-      {
-        icon: "fas fa-trash-alt",
-        label: "전체 초기화",
-        action: "resetAllSteps()",
-        danger: true,
-      },
+      { icon: "fas fa-book-open", label: "제작 지침서", action: "handleHeaderButtonClick('openGuidelinesModal', event)" },
+      { icon: "fas fa-download", label: "백업", action: "handleHeaderButtonClick('manualBackup', event)" },
+      { icon: "fas fa-history", label: "복원", action: "if(typeof openRestoreModal === 'function') { openRestoreModal(); }" },
+      { icon: "fas fa-cloud", label: "클라우드 동기화", action: "if(typeof openCloudSyncModal === 'function') { openCloudSyncModal(); }", dividerAfter: true },
+      { icon: "fas fa-undo", label: "단계 초기화", action: "handleHeaderButtonClick('resetCurrentStep', event)", danger: true },
+      { icon: "fas fa-redo", label: "전체 초기화", action: "handleHeaderButtonClick('resetAllSteps', event)", danger: true },
+      { icon: "fas fa-arrows-alt", label: "순서 초기화", action: "handleHeaderButtonClick('resetStepOrder', event)", danger: true },
+      { icon: "fas fa-question-circle", label: "도움말", action: "handleHeaderButtonClick('openStepOrderHelp', event)" }
     );
 
     menuItems.forEach(({ icon, label, action, danger, dividerAfter }) => {
       const btn = document.createElement("button");
+      btn.type = "button";
       btn.className = "admin-menu-item" + (danger ? " danger" : "");
+      
       btn.setAttribute(
         "onclick",
-        action + "; window.closeAdminMenu && window.closeAdminMenu();",
+        "event.preventDefault(); event.stopPropagation(); " + action + "; if(typeof window.closeAdminMenu === 'function') { window.closeAdminMenu(); }"
       );
       btn.innerHTML = `<i class="${icon}"></i><span>${label}</span>`;
       menuContent.appendChild(btn);
@@ -467,21 +559,24 @@
 
     if (!userData) {
       // 로그아웃 상태: 로그인 버튼 보이기, 유저정보 숨기기
-      if (loginBtn) loginBtn.style.display = "inline-flex";
-      if (userInfoDiv) userInfoDiv.style.display = "none";
+      if (loginBtn) loginBtn.classList.remove("d-none");
+      if (userInfoDiv) userInfoDiv.classList.add("d-none");
       if (userNameEl) userNameEl.textContent = "";
       if (userRoleEl) userRoleEl.textContent = "";
-      if (logoutBtn) logoutBtn.style.display = "none";
+      if (logoutBtn) logoutBtn.classList.add("d-none");
+      
+      const adminMenuDropdown = document.getElementById("adminMenuDropdown");
+      if (adminMenuDropdown) adminMenuDropdown.classList.add("d-none");
       return;
     }
 
     // 로그인 상태: 로그인 버튼 숨기기, 유저정보 보이기
-    if (loginBtn) loginBtn.style.display = "none";
-    if (userInfoDiv) userInfoDiv.style.display = "flex";
+    if (loginBtn) loginBtn.classList.add("d-none");
+    if (userInfoDiv) userInfoDiv.classList.remove("d-none");
     if (userNameEl) userNameEl.textContent = userData.name || userData.email;
     if (userRoleEl)
       userRoleEl.textContent = userData.role === "admin" ? "👑 관리자" : "";
-    if (logoutBtn) logoutBtn.style.display = "inline-flex";
+    if (logoutBtn) logoutBtn.classList.remove("d-none");
   }
 
   // ─── Firebase 오류 메시지 한글화 ────────────────────────────
@@ -505,12 +600,20 @@
 
   // ─── Enter 키 로그인 지원 ────────────────────────────────────
   document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      const overlay = document.getElementById("authOverlay");
+      if (overlay && !overlay.classList.contains("d-none")) {
+        hideAuthOverlay();
+        return;
+      }
+    }
+
     if (e.key === "Enter") {
       const loginPanel = document.getElementById("auth-login");
       const signupPanel = document.getElementById("auth-signup");
-      if (loginPanel && loginPanel.style.display !== "none") {
+      if (loginPanel && !loginPanel.classList.contains("d-none")) {
         window.doLogin();
-      } else if (signupPanel && signupPanel.style.display !== "none") {
+      } else if (signupPanel && !signupPanel.classList.contains("d-none")) {
         window.doSignup();
       }
     }

@@ -53,7 +53,7 @@ window.saveCurrentProject = function saveCurrentProjectStub() {
 addTextarea("scene_overview_0_en", "new English overview 한글혼합");
 addTextarea("scene_overview_0_ko", "");
 
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 (async () => {
   await window.syncSceneOverviewPromptTranslation(0, "en");

@@ -59,7 +59,7 @@ window.showCopyIndicator = function showCopyIndicator(message) {
   toastMessage = message;
 };
 
-const step6Source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
+const step6Source = fs.readFileSync(path.resolve(__dirname, "../test-results/mv_modules.compat.js"), "utf8");
 const start = step6Source.indexOf("window.toggleCharacterSheet = function");
 const end = step6Source.indexOf("// --- Extracted generateSRTPreview ---", start);
 assert.ok(start !== -1, "toggleCharacterSheet should exist in js/step6.js");

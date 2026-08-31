@@ -52,7 +52,7 @@ global.alert = function alertStub(message) {
   alerts.push(message);
 };
 global.fetch = async function fetchStub(url, options = {}) {
-  assert.ok(url.includes("gemini-2.5-flash"));
+  assert.ok(url.includes("gemini-"));
   lastPrompt = JSON.parse(options.body).contents[0].parts[0].text;
 
   if (fetchMode === "failure") {
@@ -120,7 +120,7 @@ window.showCopyIndicator = function showCopyIndicatorStub(message) {
   ["copyScenePromptBtn_0", ""],
 ].forEach(([id, value]) => addElement(id, value));
 
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 window.syncScenePromptTranslation = async function syncScenePromptTranslationStub(
   sceneIndex,

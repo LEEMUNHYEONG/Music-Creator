@@ -1,5 +1,778 @@
 # MV 개선작업 이력
 
+## 2026-05-07: 반복 로드 및 만료 Gemini 호출 억제
+
+### 작업 목적
+
+실사용 로그에서 같은 프로젝트가 짧은 시간에 반복 로드되고, 만료된 Gemini API 키가 계속 호출되어 400 경고가 반복되는 문제를 줄였습니다.
+
+### 변경 내용
+
+1. `js/storage.js`
+   - `loadProject()`에 같은 프로젝트 중복 로드 가드 추가
+   - 동일 프로젝트가 로딩 중이거나 1.2초 안에 다시 호출되면 중복 요청을 무시
+
+2. `js/api.js`
+   - `markGeminiTemporarilyDisabled()`, `isGeminiTemporarilyDisabled()`, `handleGeminiApiFailure()` 추가
+   - Gemini 키 만료/400/401/403 오류가 감지되면 세션 기준 일정 시간 Gemini 호출을 막고 OpenAI fallback으로 빠르게 전환
+
+3. `app.js`, `js/step4.js`
+   - 주요 Gemini 실패 catch 지점에서 `handleGeminiApiFailure()` 호출
+   - 최종 평가, 음원 분석, 마케팅 생성, 지침서 검수, 개선안 적용, 추출 가사 지시어 생성 경로에 반영
+
+4. 테스트
+   - `tests/mv_runtime_guard_smoke.js` 추가
+   - `tests/mv_chrome_runtime_check.js`에서 신규 Gemini 보호 함수 등록 확인
+
+### 검증 기준
+
+```text
+node --check app.js
+node --check js/api.js
+node --check js/storage.js
+node --check js/step4.js
+node tests/mv_runtime_guard_smoke.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV runtime guard smoke test: PASS
+MV smoke test suite: PASS (105 checks)
+```
+
+## 2026-05-07: 저장 용량 초과 및 Gemini 키 만료 오류 보강
+
+### 작업 목적
+
+실제 사용 로그에서 확인된 `QuotaExceededError`, 클라우드 업로드 실패, 만료된 Gemini API 키로 인한 400 오류를 사용자가 작업 중단으로 느끼지 않도록 복구 흐름을 보강했습니다.
+
+### 변경 내용
+
+1. `js/storage.js`
+   - `saveProjectListToLocalStorage()` 추가
+   - `musicCreatorProjects/savedProjects` 저장 시 브라우저 용량 초과가 발생하면 현재 프로젝트를 우선 보존하고 오래된 로컬 캐시를 요약/압축 저장
+   - 클라우드 동기화 병합 시에도 같은 용량 보호 저장 함수를 사용
+   - 숫자형 과거 프로젝트 ID를 Firestore 문서 ID로 쓸 때 `String(id)`로 정규화
+
+2. `js/step4.js`
+   - 지침서 자동 검수에서 Gemini 실패 시 ChatGPT로 재시도
+   - 음원 추출 가사에 Suno 지시어를 붙이는 기능도 Gemini 실패 시 ChatGPT로 재시도
+   - Gemini 키 만료 상태에서도 OpenAI 키가 있으면 원본 가사만 반영되는 fallback으로 떨어지지 않도록 개선
+
+3. 테스트
+   - `tests/mv_storage_quota_recovery_smoke.js` 추가
+   - `tests/mv_step4_ai_fallback_smoke.js` 추가
+   - 전체 MV 테스트에 위 보호 케이스 포함
+
+### 검증 기준
+
+```text
+node --check js/storage.js
+node --check js/step4.js
+node tests/mv_storage_quota_recovery_smoke.js
+node tests/mv_step4_ai_fallback_smoke.js
+npm run test:mv
+```
+
+## 2026-05-07: MV 진단 모달 첫 확인 씬 이동 추가
+
+### 작업 목적
+
+MV 진단 보고서에서 우선 확인 씬을 읽은 뒤 사용자가 다시 씬 목록을 찾아 내려가지 않아도 되도록, 진단 모달에서 첫 확인 씬으로 바로 이동하는 버튼을 추가했습니다.
+
+### 변경 내용
+
+1. `js/storage.js`
+   - 진단 생성 시 `window.__lastMarketingMVDiagnostics`에 마지막 진단 결과 보관
+   - 진단 모달 footer에 `첫 확인 씬으로 이동` 버튼 추가
+   - `focusFirstMarketingMVDiagnosticsScene()` 추가
+   - 6단계 품질 필터 함수 `focusMVFirstReviewScene()`가 있으면 우선 사용
+   - fallback으로 `focusMVSceneCard()`에 첫 우선 확인 씬 번호를 전달
+
+2. 테스트
+   - `tests/mv_marketing_diagnostics_smoke.js`에서 모달 버튼 표시, 마지막 진단 보관, 첫 확인 씬 이동 fallback 보호
+   - `tests/mv_chrome_runtime_check.js`에서 신규 이동 함수 등록 확인
+
+### 검증 기준
+
+```text
+node --check js/storage.js
+node tests/mv_marketing_diagnostics_smoke.js
+node tests/mv_chrome_runtime_check.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV marketing diagnostics smoke test: PASS
+MV Chrome runtime check: PASS
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 진단 보고서 우선 확인 씬 추가
+
+### 작업 목적
+
+실제 프로젝트 리허설 보고서에서 단순히 “확인 필요”라고만 표시하지 않고, 어느 씬을 먼저 확인해야 하는지 바로 알 수 있도록 씬별 진단 요약을 추가했습니다.
+
+### 변경 내용
+
+1. `js/storage.js`
+   - `buildMarketingMVSceneDiagnostics()` 추가
+   - 시간 오류, 장소 없음, 카메라 없음, 가사 없음, EN/KO 프롬프트 없음, 배경/구도/카메라 반복 항목을 씬별로 집계
+   - `buildMarketingMVDiagnostics()` 결과에 `sceneDiagnostics` 추가
+   - `formatMarketingMVDiagnostics()`에 `우선 확인 씬` 섹션 추가
+   - 보고서에는 최대 10개 우선 확인 씬과 항목별 개수가 표시됨
+
+2. 테스트
+   - `tests/mv_marketing_diagnostics_smoke.js`에서 씬별 진단, 반복 패턴, 보고서 표시 문구 보호
+   - `tests/mv_chrome_runtime_check.js`에서 신규 씬별 진단 함수 등록 확인
+
+### 검증 기준
+
+```text
+node --check js/storage.js
+node tests/mv_marketing_diagnostics_smoke.js
+node tests/mv_chrome_runtime_check.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV marketing diagnostics smoke test: PASS
+MV Chrome runtime check: PASS
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 리허설 진단 보고서 모달 표시 추가
+
+### 작업 목적
+
+긴 MV 리허설 진단 보고서를 브라우저 기본 `alert` 창이 아니라 앱 안의 전용 모달에서 읽고, 복사와 TXT 저장을 바로 실행할 수 있도록 개선했습니다.
+
+### 변경 내용
+
+1. `js/storage.js`
+   - `ensureMarketingMVDiagnosticsModal()` 추가
+   - `openMarketingMVDiagnosticsModal()`, `closeMarketingMVDiagnosticsModal()` 추가
+   - `copyCurrentMarketingMVDiagnosticsReport()` 추가
+   - `showMarketingMVDiagnostics()`가 보고서를 클립보드에 복사한 뒤 전용 모달로 표시하도록 변경
+   - 모달 생성이 불가능한 환경에서는 기존처럼 `alert`로 대체
+
+2. 테스트
+   - `tests/mv_marketing_diagnostics_smoke.js`에서 모달 생성, 본문 반영, 닫기, 복사 동작 보호
+   - `tests/mv_chrome_runtime_check.js`에서 신규 진단 모달 함수의 브라우저 등록 여부 확인
+
+### 검증 기준
+
+```text
+node --check js/storage.js
+node tests/mv_marketing_diagnostics_smoke.js
+node tests/mv_chrome_runtime_check.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV marketing diagnostics smoke test: PASS
+MV Chrome runtime check: PASS
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 리허설 진단 보고서 TXT 저장 추가
+
+### 작업 목적
+
+실제 프로젝트 리허설 결과를 클립보드 복사뿐 아니라 파일로도 남길 수 있도록, MV 리허설 진단 보고서 TXT 저장 기능을 추가했습니다.
+
+### 변경 내용
+
+1. `js/storage.js`
+   - `buildCurrentMarketingMVRehearsalReport()` 추가
+   - `showMarketingMVDiagnostics()`와 다운로드 기능이 같은 보고서 본문을 사용하도록 정리
+   - `downloadMarketingMVRehearsalReport()` 추가
+   - 파일명 형식: `프로젝트명-mv-rehearsal-report-YYYY-MM-DD.txt`
+
+2. `js/step6.js`
+   - 영상 생성 도구별 내보내기 영역에 `보고서 TXT` 버튼 추가
+   - 버튼 title에 현재 프로젝트의 MV 리허설 진단 보고서를 TXT로 저장한다는 설명 추가
+
+3. 테스트/문서
+   - `tests/mv_marketing_diagnostics_smoke.js`에서 보고서 다운로드 파일명, Blob 내용, 완료 안내를 보호
+   - `tests/mv_video_tool_export_templates_smoke.js`에서 버튼 문구와 호출 함수 보호
+   - `MV_수동리허설_기록지.md`에 TXT 저장 리허설 항목 기록
+
+### 검증 기준
+
+```text
+node --check js/storage.js
+node --check js/step6.js
+node tests/mv_marketing_diagnostics_smoke.js
+node tests/mv_video_tool_export_templates_smoke.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV marketing diagnostics smoke test: PASS
+MV video tool export templates smoke test: PASS
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 진단 보고서 버튼 문구 보강
+
+### 작업 목적
+
+실제 프로젝트 리허설에서 사용자가 `MV 진단` 버튼의 결과가 보고서 복사라는 점을 바로 이해할 수 있도록 버튼 문구와 안내 문장을 정리했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - 영상 생성 도구별 내보내기 설명에 `리허설 진단 보고서` 포함
+   - 버튼 문구를 `MV 진단 보고서 복사`로 변경
+   - 버튼 title에 보고서 표시와 클립보드 복사 동작 안내 추가
+
+2. 테스트/문서
+   - `tests/mv_video_tool_export_templates_smoke.js`에서 버튼 문구와 안내 문구 보호
+   - `MV_수동리허설_기록지.md`에 버튼 문구 보강 결과 기록
+
+### 검증 기준
+
+```text
+node --check js/step6.js
+node tests/mv_video_tool_export_templates_smoke.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV video tool export templates smoke test: PASS
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 실제 프로젝트 리허설 보고서 형식 보강
+
+### 작업 목적
+
+`MV 진단` 결과를 실제 수동 리허설 기록지에 바로 붙여넣을 수 있도록 보고서 형식으로 확장했습니다.
+
+### 변경 내용
+
+1. `js/storage.js`
+   - `buildMarketingMVRehearsalReport()` 추가
+   - 보고서에 생성 시각, 앱 버전, 프로젝트명, 판정, 다음 조치, 진단 요약, 저장 전/후 비교, 기록 방법 포함
+   - `showMarketingMVDiagnostics()`가 진단 요약 대신 리허설 보고서를 알림/클립보드에 사용
+
+2. 테스트/문서
+   - `tests/mv_marketing_diagnostics_smoke.js`에서 보고서 제목, 앱 버전, 기록 방법, 클립보드 내용을 보호
+   - `MV_수동리허설_기록지.md`, `MV_실제프로젝트_리허설_결과.md`에 보고서 형식 보강 기록
+
+### 검증 기준
+
+```text
+node --check js/storage.js
+node tests/mv_marketing_diagnostics_smoke.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV marketing diagnostics smoke test: PASS
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 진단 보고서 기록 편의 보강
+
+### 작업 목적
+
+실제 사용자 장기 프로젝트 리허설 때 `MV 진단` 결과를 기록지에 바로 남길 수 있도록 진단 보고서에 다음 조치를 추가하고 클립보드 자동 복사를 지원했습니다.
+
+### 변경 내용
+
+1. `js/storage.js`
+   - 리허설 판정 결과에 `nextAction` 추가
+   - `formatMarketingMVDiagnostics()`에 `다음 조치` 문구 표시
+   - `showMarketingMVDiagnostics()` 실행 시 진단 보고서 전체를 `window.__lastMarketingMVDiagnosticsText`에 보관
+   - 브라우저 클립보드 사용 가능 시 진단 보고서 자동 복사
+
+2. 테스트/문서
+   - `tests/mv_marketing_diagnostics_smoke.js`에서 다음 조치와 클립보드 복사 보호
+   - `MV_운영전_리허설_체크리스트.md`, `MV_실제프로젝트_리허설_결과.md`, `MV_수동리허설_기록지.md`에 사용 방법 기록
+
+### 검증 기준
+
+```text
+node --check js/storage.js
+node tests/mv_marketing_diagnostics_smoke.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV marketing diagnostics smoke test: PASS
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 실제 프로젝트 리허설 판정 진단 보강
+
+### 작업 목적
+
+실제 사용자 장기 프로젝트를 열었을 때 `MV 진단` 메시지만으로 리허설 진행 가능 여부를 빠르게 판단할 수 있도록 판정 섹션을 추가했습니다.
+
+### 변경 내용
+
+1. `js/storage.js`
+   - `buildMarketingMVRehearsalReadiness()` 추가
+   - 씬 데이터 존재, canonical/legacy 씬 수 동기화, 씬별 프롬프트 누락, MV 설정, 공통 프롬프트 저장 여부를 검사
+   - `formatMarketingMVDiagnostics()`에 `MV 실제 프로젝트 리허설 판정` 섹션 추가
+   - 판정은 `통과`, `보류`, `실패`로 표시
+
+2. 테스트/문서
+   - `tests/mv_marketing_diagnostics_smoke.js`에서 리허설 판정 통과/실패 흐름 보호
+   - `MV_운영전_리허설_체크리스트.md`, `MV_실제프로젝트_리허설_결과.md`, `MV_수동리허설_기록지.md`에 최신 판정 기준 기록
+
+### 검증 기준
+
+```text
+node --check js/storage.js
+node tests/mv_marketing_diagnostics_smoke.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV marketing diagnostics smoke test: PASS
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 실제 화면 리허설 - 확인 필요 보기 갱신 타이밍 보정
+
+### 작업 목적
+
+샘플 프로젝트 실제 화면 리허설 중 품질 요약은 확인 필요 씬을 표시하지만 `확인 필요만 보기` 버튼이 비활성화되는 갱신 타이밍 문제를 수정했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `renderSceneOverview(scenesArg)`가 받은 씬 목록을 렌더 시작 시 `window.currentScenes`에 먼저 동기화
+   - 품질 요약, 씬 카드 배지, 확인 필요 보기 토글이 같은 씬 목록을 기준으로 계산되도록 보정
+
+2. 테스트/문서
+   - `tests/mv_scene_timing_editor_smoke.js`에 씬 렌더링 전역 동기화 보호 추가
+   - `MV_수동리허설_기록지.md`에 실제 화면 리허설 발견 문제와 재확인 결과 기록
+
+### 검증 기준
+
+```text
+node --check js/step6.js
+node tests/mv_scene_timing_editor_smoke.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 운영 전 리허설 자동 점검 - 최신 검수/내보내기 범위 보강
+
+### 작업 목적
+
+사용자 체감 품질 개선 로드맵 완료 후 추가된 확인 필요 씬 보기와 전체 프롬프트 최종 확인 기능이 실제 브라우저 복원 리허설에서도 보호되도록 자동 점검 범위를 확장했습니다.
+
+### 변경 내용
+
+1. `tests/mv_preflight_rehearsal_runtime_check.js`
+   - 대표 프로젝트 샘플을 준비 완료 씬 1개와 확인 필요 씬 1개로 구성
+   - 품질 요약의 전체/준비 완료/확인 필요 개수 확인 추가
+   - `확인 필요만 보기` 토글 후 준비 완료 씬 숨김과 버튼 문구 확인 추가
+   - 전체 MV 프롬프트 최종 확인 메시지의 프로젝트명, 씬 수, 포함 항목 확인 추가
+
+2. 리허설 문서
+   - `MV_운영전_리허설_체크리스트.md` 최신 자동 리허설 보강 결과 기록
+   - `MV_수동리허설_기록지.md` 최신 검수/내보내기 자동 리허설 결과 기록
+   - `MV_실제프로젝트_리허설_결과.md` 최신 자동 보호 범위 기록
+
+### 검증 기준
+
+```text
+node tests/mv_preflight_rehearsal_runtime_check.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV preflight rehearsal runtime check: PASS
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 사용자 체감 품질 개선 - 전체 프롬프트 최종 확인
+
+### 작업 목적
+
+전체 MV 프롬프트를 복사하거나 TXT로 다운로드하기 직전에 프로젝트명, 씬 수, 품질 상태, 미저장 씬, 포함 항목을 한 번에 확인할 수 있도록 했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `buildMVFinalExportConfirmMessage()` 추가
+   - `confirmMVFinalPromptExport()` 추가
+   - 전체 MV 프롬프트 복사와 전체 MV 프롬프트 다운로드에 최종 확인 단계 적용
+   - 사용자가 최종 확인에서 취소하면 확인 필요 씬 또는 미저장 씬으로 이동하도록 보강
+
+2. 테스트/문서
+   - `tests/mv_copy_prompts_smoke.js`에서 전체 복사 최종 확인 메시지 보호
+   - `tests/mv_download_prompts_smoke.js`에서 전체 다운로드 최종 확인 메시지 보호
+   - `MV_사용자_체감_품질_개선_로드맵.md` 3단계 3번 완료 처리
+
+### 검증 기준
+
+```text
+node --check js/step6.js
+node tests/mv_copy_prompts_smoke.js
+node tests/mv_download_prompts_smoke.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 사용자 체감 품질 개선 - 확인 필요 씬만 보기 토글
+
+### 작업 목적
+
+씬별 세부 프롬프트 수정 화면에서 검수가 필요한 카드만 빠르게 남겨 확인하고, 점검이 끝나면 전체 씬 보기로 즉시 돌아올 수 있도록 했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - 품질 요약 영역에 `확인 필요만 보기` / `전체 씬 보기` 토글 추가
+   - 확인 필요가 없는 씬 카드는 숨기고, 확인 필요 씬만 화면에 남기는 표시 상태 적용
+   - 씬 목록이 다시 렌더링되거나 요약이 갱신되어도 토글 상태와 버튼 문구가 맞게 유지되도록 보강
+
+2. 테스트/문서
+   - `tests/mv_scene_timing_editor_smoke.js`에서 확인 필요 씬만 보기 토글, 카드 숨김/복원, 버튼 상태 보호
+   - `MV_사용자_체감_품질_개선_로드맵.md` 3단계 2번 완료 처리
+
+### 검증 기준
+
+```text
+node --check js/step6.js
+node tests/mv_scene_timing_editor_smoke.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 사용자 체감 품질 개선 - 씬별 압축 품질 배지
+
+### 작업 목적
+
+씬별 세부 프롬프트 수정 화면에서 긴 상태 문장을 읽지 않아도 각 씬의 준비 상태, EN 프롬프트 길이, 메타데이터 채움 정도, 주요 확인 항목을 빠르게 볼 수 있도록 했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - `getMVSceneCompactQualityInfo()` 추가
+   - `renderMVSceneQualityBadges()` 추가
+   - 각 씬 카드 상태 영역에 `준비 완료/확인 필요`, `EN 단어 수`, `메타 5/5`, 문제 태그 배지 표시
+   - 기존 긴 상태 문장은 유지해 상세 확인도 계속 가능하도록 보존
+
+2. 테스트/문서
+   - `tests/mv_scene_timing_editor_smoke.js`에서 압축 품질 배지 렌더링과 문구 보호
+   - `MV_사용자_체감_품질_개선_로드맵.md` 3단계 1번 완료 처리
+
+### 검증 기준
+
+```text
+node --check js/step6.js
+node tests/mv_scene_timing_editor_smoke.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 사용자 체감 품질 개선 - 캐릭터 외형 재사용
+
+### 작업 목적
+
+MV 인물 설정에서 같은 주인공의 외형을 반복 입력하지 않아도 되도록, 인물별 외형 키워드를 저장하고 다른 인물 카드나 다음 프로젝트에서 다시 적용할 수 있게 했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - 인물 카드 안에 외형 키워드 선택, `외형 저장`, `재사용` 컨트롤 추가
+   - `mvCharacterAppearancePresets` 로컬/프로젝트 저장 기능 추가
+   - 성별, 나이, 인종, 외모/스타일, 아트 스타일을 함께 저장하고 적용
+   - 인물 수 변경 후에도 저장된 외형 선택 목록이 다시 렌더링되도록 보강
+
+2. 테스트/문서
+   - `tests/mv_update_character_inputs_smoke.js`에서 외형 저장/적용 흐름 보호
+   - `MV_사용자_체감_품질_개선_로드맵.md` 2단계 3번 완료 처리
+
+### 검증 기준
+
+```text
+node --check js/step6.js
+node tests/mv_update_character_inputs_smoke.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 사용자 체감 품질 개선 - 추천 MV 조합
+
+### 작업 목적
+
+MV 설정에서 장소, 조명, 카메라, 분위기, 인물 동작 태그를 매번 따로 고르지 않아도 되도록 자주 쓰는 영상 연출 조합을 한 번에 적용할 수 있게 했습니다.
+
+### 변경 내용
+
+1. `index.html`
+   - MV 설정 영역 상단에 `추천 MV 조합` 패널 추가
+   - 기본 진입 시 `빗속 도시 감성`, `몽환 옥상 야경` 빠른 적용 버튼 표시
+
+2. `js/step6.js`
+   - `MV_SETTING_COMBO_RECOMMENDATIONS` 추천 조합 목록 추가
+   - `renderMVSettingComboRecommendations()`로 전체 추천 버튼 렌더링
+   - `applyMVSettingCombo()`로 장소 태그, 동작 태그, 조명, 카메라, 분위기를 한 번에 적용
+   - 적용 후 현재 MV 설정과 프로젝트 저장본 갱신
+
+3. 테스트/문서
+   - `tests/mv_settings_smoke.js`에서 추천 조합 렌더링과 적용 결과 보호
+   - `MV_사용자_체감_품질_개선_로드맵.md` 2단계 2번 완료 처리
+
+### 검증 기준
+
+```text
+node --check js/step6.js
+node tests/mv_settings_smoke.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 사용자 체감 품질 개선 - 설정 프리셋 저장/불러오기
+
+### 작업 목적
+
+MV를 만들 때 반복 입력이 많은 노래 길이, 장면 간격, 시대/지역, 장소/동작 태그, 조명/카메라/분위기, 인물 설정을 프리셋으로 저장하고 다시 적용할 수 있도록 했습니다.
+
+### 변경 내용
+
+1. `index.html`
+   - MV 설정 영역 상단에 프리셋 선택, 저장, 불러오기, 삭제 컨트롤 추가
+
+2. `js/step6.js`
+   - 현재 MV 설정을 스냅샷으로 수집하는 `collectMVSettingsSnapshot()` 추가
+   - 설정 스냅샷을 화면에 적용하는 `applyMVSettingsToForm()` 추가
+   - 로컬/프로젝트 저장본을 함께 쓰는 `mvSettingsPresets` 관리 기능 추가
+   - 프리셋 저장, 적용, 삭제 후 현재 프로젝트 저장과 화면 상태 갱신
+   - 기존 `saveMVSettings()`/`loadMVSettings()`가 장소 직접 입력, 동작 태그, 동작 직접 입력까지 함께 다루도록 확장
+
+3. 테스트/문서
+   - `tests/mv_settings_smoke.js`에서 프리셋 저장/적용/삭제와 확장 설정 복원 보호
+   - `MV_사용자_체감_품질_개선_로드맵.md` 2단계 1번 완료 처리
+
+### 검증 기준
+
+```text
+node --check js/step6.js
+node tests/mv_settings_smoke.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 사용자 체감 품질 개선 - 미저장 내보내기 확인
+
+### 작업 목적
+
+씬 프롬프트를 수정했지만 아직 저장하지 않은 상태에서 전체 복사/TXT 내보내기를 실행할 때, 사용자가 미저장 상태를 인지하고 저장 여부를 판단할 수 있도록 확인 단계를 추가했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - 미저장 씬 번호를 수집하는 `getMVUnsavedSceneIndexes()` 추가
+   - 복사/내보내기 전 안내 문구를 만드는 `buildMVUnsavedSceneExportMessage()` 추가
+   - 사용자가 취소하면 첫 미저장 씬으로 이동하는 `confirmMVExportWithUnsavedScenes()` 추가
+   - 씬 표 복사, 이미지 프롬프트 복사/TXT, Runway/Pika/Kling 복사/TXT, 전체 MV 프롬프트 복사/TXT에 공통 확인 적용
+
+2. 테스트/문서
+   - `tests/mv_unsaved_export_guard_smoke.js` 추가
+   - `tests/run_mv_smoke_tests.js`에 미저장 내보내기 보호 테스트 등록
+   - `MV_사용자_체감_품질_개선_로드맵.md` 1단계 3번 완료 처리
+
+### 검증 기준
+
+```text
+node --check js/step6.js
+node tests/mv_unsaved_export_guard_smoke.js
+npm run test:mv
+```
+
+실행 결과:
+
+```text
+MV smoke test suite: PASS (99 checks)
+```
+
+## 2026-05-07: MV 사용자 체감 품질 개선 - 다음 추천 버튼
+
+### 작업 목적
+
+MV 작업 상태 요약에서 현재 단계에 맞는 다음 행동을 바로 실행할 수 있도록 추천 버튼을 추가했습니다.
+
+### 변경 내용
+
+1. `index.html`
+   - MV 작업 상태 요약 패널에 다음 행동 버튼 영역 추가
+
+2. `js/step6.js`
+   - 설정 단계: `다음: 프롬프트 생성`
+   - 씬 검토 단계: `다음: 전체 저장`, `확인 필요 씬 보기`
+   - 결과 사용 단계: `다음: 이미지 번들 복사`, `씬 표 복사`
+   - 미저장 상태: `다음: 미저장 씬 저장`, `미저장 씬 보기`
+   - `runMVWorkflowAction()`, `runMVWorkflowPrimaryAction()`, `runMVWorkflowSecondaryAction()` 추가
+   - 첫 미저장 씬으로 이동하는 `focusMVFirstDirtyScene()` 추가
+
+3. 테스트/문서
+   - `tests/mv_settings_smoke.js`에서 상태별 추천 액션 보호
+   - `MV_사용자_체감_품질_개선_로드맵.md` 진행 상태 갱신
+
+### 검증 기준
+
+```text
+node --check js/step6.js
+node tests/mv_settings_smoke.js
+npm run test:mv
+```
+
+## 2026-05-07: MV 사용자 체감 품질 개선 - 작업 상태 요약
+
+### 작업 목적
+
+MV 탭에서 현재 작업이 설정 단계인지, 씬 검토 단계인지, 결과 사용 단계인지 한눈에 알 수 있도록 상단 작업 상태 요약을 추가했습니다.
+
+### 변경 내용
+
+1. `index.html`
+   - MV 프롬프트 탭 상단에 `MV 작업 상태` 요약 패널 추가
+   - 예상 이미지 수, 생성된 씬 수, 미저장 상태 배지를 표시할 영역 추가
+
+2. `js/step6.js`
+   - `updateMVWorkflowSummary()` 추가
+   - 노래 길이/장면 전환 간격 변경 시 예상 장면 수와 작업 상태 자동 갱신
+   - 씬 생성, 결과 확정, 씬 미저장 상태 변경 시 요약 패널 갱신
+
+3. 테스트/문서
+   - `tests/mv_settings_smoke.js`에서 작업 상태 요약 갱신 보호
+   - `MV_사용자_체감_품질_개선_로드맵.md` 신규 작성
+   - `MV_2차_고도화_로드맵.md` 다음 후보를 새 로드맵 진행 상태로 갱신
+
+### 검증 기준
+
+```text
+node --check js/step6.js
+node tests/mv_settings_smoke.js
+npm run test:mv
+```
+
+## 2026-05-07: MV 운영 전 리허설 자동 점검 보강
+
+### 작업 목적
+
+최신 씬 카드 작업 상태 UI가 실제 운영 전 리허설 자동 점검에도 포함되도록 보호 범위를 확장했습니다.
+
+### 변경 내용
+
+1. `tests/mv_preflight_rehearsal_runtime_check.js`
+   - 샘플 프로젝트 복원 후 씬 카드 상태 라인 렌더링 확인
+   - `씬 저장` 버튼 문구와 역할 안내 확인
+   - 복사 버튼의 저장 별개 안내 확인
+   - 재생성 버튼의 다시 생성 안내 확인
+
+2. 리허설 문서
+   - `MV_운영전_리허설_체크리스트.md`의 자동 테스트 기준을 `PASS (97 checks)`로 갱신
+   - 실제 리허설 순서에 `씬 저장`과 `현재 편집 내용 전체 저장`의 역할 확인 항목 추가
+   - `MV_수동리허설_기록지.md`와 `MV_실제프로젝트_리허설_결과.md`에 2026-05-07 자동 리허설 보강 결과 기록
+
+### 검증 기준
+
+```text
+node tests/mv_preflight_rehearsal_runtime_check.js
+MV preflight rehearsal runtime check: PASS
+
+npm run test:mv
+MV smoke test suite: PASS (97 checks)
+```
+
+## 2026-05-07: MV 2차 고도화 - 씬 카드 작업 상태 명확화
+
+### 작업 목적
+
+씬별 세부 프롬프트 편집 화면에서 `저장`, `복사`, `재생성` 버튼의 역할이 헷갈리지 않도록 각 씬 카드 안에 현재 작업 상태를 명확히 표시했습니다.
+
+### 변경 내용
+
+1. `js/step6.js`
+   - 씬 카드마다 작업 상태 라인(`저장 완료`, `수정 미저장`, `복사 완료`, `재생성 중`, `오류`) 추가
+   - 개별 저장 버튼명을 `씬 저장`으로 정리하고, 전체 저장과 역할이 다르다는 툴팁 추가
+   - 복사 버튼은 저장과 별개로 클립보드에만 보낸다는 안내 추가
+   - 복사 완료 후 버튼이 자동으로 원래 상태로 돌아오도록 보정
+   - 재생성 중 버튼 비활성화/로딩 표시와 완료·오류 상태 표시 추가
+
+2. `index.html`
+   - `현재 편집 내용 저장` 문구를 `현재 편집 내용 전체 저장`으로 정리
+   - 개별 씬 저장과 전체 MV 저장의 차이를 안내 문구에 명시
+
+3. 문서
+   - `MV_2차_고도화_로드맵.md`의 1단계 3번, 4번 완료 상태 갱신
+
+### 검증 기준
+
+```text
+node --check js/step6.js
+node tests/mv_scene_dirty_shortcut_smoke.js
+node tests/mv_save_scene_prompt_smoke.js
+npm run test:mv
+```
+
 ## 2026-05-06: MV 2차 고도화 - 내보내기 최종 품질 체크리스트
 
 ### 작업 목적
@@ -2897,6 +3670,53 @@ MV smoke test suite: PASS (65 checks)
 ```text
 npm run test:mv
 MV smoke test suite: PASS (67 checks)
+```
+
+## 2026-06-09: 운영 보안·테스트·모바일 안정화
+
+### 작업 목적
+
+운영 Firebase 권한 상승 가능성, 공용 AI 키 노출, 비공개 게시글 평문 비밀번호, MV 모듈 분리 후 테스트 중단, 모바일 레이아웃 붕괴를 우선 차단했습니다.
+
+### 변경 내용
+
+1. 인증 및 Firestore 규칙
+   - 실행 주소와 관계없이 신규 가입자는 항상 일반 사용자·승인 대기로 생성
+   - 일반 사용자가 자신의 `role`, `approved`, `uid`, 이메일을 변경하지 못하도록 제한
+   - 사용자 본인 수정 범위를 이름·제작 지침서·지침서 백업으로 한정
+
+2. AI API 보안
+   - 로그인 사용자의 OpenAI/Gemini 직접 요청을 Firebase Functions 프록시로 자동 전환
+   - 일반 사용자의 공용 설정/API 키 문서 읽기 차단
+   - API 연결 테스트도 서버 프록시 기준으로 변경
+
+3. 게시판 및 Storage
+   - 게시글 평문 비밀번호 저장과 브라우저 비밀번호 비교 제거
+   - 비공개 게시글은 작성자와 관리자만 서버에서 읽도록 변경
+   - 신규 게시판 이미지는 사용자 UID 경로에 저장하고 작성자만 쓰기 가능하도록 제한
+
+4. MV 테스트 복구
+   - 삭제된 `js/step6.js` 대신 실제 `js/mv/*.js` 모듈을 결합한 테스트 번들을 사용
+   - SRT 테스트를 현재 순수 SRT 출력 사양에 맞게 정리
+
+5. 모바일 및 UI
+   - 모바일 최초 진입 시 사이드바 자동 닫기
+   - 단계 메뉴를 화면 내부에 고정하고 본문 폭 축소 문제 해소
+   - 생성 이력과 클라우드 백업 이력 모달 ID 분리
+   - 로그인 창 닫기 버튼과 `Esc` 닫기 지원
+   - AI 생성 가사 미리보기 HTML 이스케이프 적용
+
+### 검증 결과
+
+```text
+npm run test:mv
+MV smoke test suite: PASS (105 checks)
+
+JavaScript syntax: PASS
+Firestore/Storage emulator rules load: PASS
+Mobile 390x844: sidebar closed, panel width 355px, progress width 351px
+Duplicate DOM IDs: 0
+Login close button/Escape: PASS
 ```
 
 ## 2026-05-06: 씬별 타임라인/메타데이터 내보내기 반영

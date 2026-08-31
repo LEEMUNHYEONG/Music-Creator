@@ -46,7 +46,7 @@ window.saveCurrentProject = function saveCurrentProjectStub() {
 addTextarea("mvThumbnailPromptEn", "cinematic thumbnail prompt");
 addTextarea("mvThumbnailPromptKo", "");
 
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 (async () => {
   await window.syncMVPromptTranslation("thumbnail", "en");

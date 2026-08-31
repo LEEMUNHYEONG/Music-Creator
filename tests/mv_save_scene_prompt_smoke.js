@@ -58,7 +58,7 @@ window.saveCurrentProject = function saveCurrentProjectStub() {
   }
   return true;
 };
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 window.saveScenePrompt(0);
 

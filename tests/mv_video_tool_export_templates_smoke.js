@@ -1,4 +1,6 @@
 const assert = require("assert");
+const fs = require("fs");
+const path = require("path");
 
 const originalConsole = { ...console };
 const elements = new Map();
@@ -11,6 +13,14 @@ let removed = false;
 let revokedUrl = "";
 
 console.log = function logStub() {};
+
+const step6Source = fs.readFileSync(path.resolve(__dirname, "../test-results/mv_modules.compat.js"), "utf8");
+assert.ok(step6Source.includes("MV 진단 보고서 복사"));
+assert.ok(step6Source.includes("보고서 TXT"));
+assert.ok(step6Source.includes("downloadMarketingMVRehearsalReport()"));
+assert.ok(step6Source.includes("리허설 진단 보고서를 복사"));
+assert.ok(step6Source.includes("클립보드에 복사합니다"));
+assert.ok(step6Source.includes("리허설 진단 보고서를 TXT 파일로 저장합니다"));
 
 function addElement(id, value = "") {
   elements.set(id, { id, value, textContent: value });
@@ -105,7 +115,7 @@ window.currentScenes = [
 addElement("scene_1_en", "textarea prompt for the second scene");
 addElement("scene_1_ko", "두 번째 씬 textarea 한글");
 
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 const runwayText = window.buildMVVideoToolPrompts("runway");
 assert.ok(runwayText.includes("MV Runway 영상 생성 프롬프트"));

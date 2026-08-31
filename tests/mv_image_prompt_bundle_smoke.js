@@ -109,7 +109,7 @@ addElement("mvCombinedPromptEn", "combined visual style prompt");
 addElement("scene_1_en", "textarea rooftop image prompt");
 addElement("scene_1_ko", "textarea 옥상 이미지 설명");
 
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 const bundleText = window.buildMVImagePromptBundle();
 

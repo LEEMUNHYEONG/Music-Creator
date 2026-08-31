@@ -2,7 +2,7 @@ const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
 
-const source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
+const source = fs.readFileSync(path.resolve(__dirname, "../test-results/mv_modules.compat.js"), "utf8");
 
 const expectedSections = [
   "// === MV Step 6: Core utilities ===",

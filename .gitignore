@@ -21,3 +21,16 @@ refactor.py
 scan_perf.py
 update_api_keys.py
 Music-Creator/
+test-results/
+
+# 일회성 패치/백업/로그 산출물
+fix_*.js
+index-fresh-*.html
+firestore-debug.log
+*.log
+test_sticky.js
+.agent/
+.agents/
+.cursor/
+music-creator-react/
+src/

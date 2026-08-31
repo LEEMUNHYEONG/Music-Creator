@@ -76,14 +76,28 @@ window.goToStep4AndApplyImprovements = function () {
     const improvementLoading = document.getElementById("improvementLoading");
     if (improvementCard && improvementLoading) {
       improvementLoading.style.display = "none";
+      improvementCard.classList.remove("hidden");
       improvementCard.style.display = "block";
     }
 
     // 3단계 분석 결과에서 개선안 표시
-    if (window.currentProject && window.currentProject.data) {
-      const analysisData = window.currentProject.data.analysis;
-      if (analysisData) {
-        displayImprovements(analysisData);
+    // currentProject.data.analysis 우선, 없으면 전역 백업(__lastAnalysisData) 사용
+    const analysisData =
+      (window.currentProject && window.currentProject.data && window.currentProject.data.analysis) ||
+      window.__lastAnalysisData ||
+      null;
+
+    if (analysisData) {
+      console.log("✅ 4단계 개선안 표시 - 데이터 소스:", 
+        (window.currentProject && window.currentProject.data && window.currentProject.data.analysis)
+          ? "currentProject.data.analysis" : "window.__lastAnalysisData");
+      displayImprovements(analysisData);
+    } else {
+      console.warn("⚠️ 분석 데이터 없음: 3단계에서 분석을 먼저 실행해주세요.");
+      const suggestionsContainer = document.getElementById("geminiSuggestionsSummary");
+      if (suggestionsContainer) {
+        suggestionsContainer.innerHTML =
+          '<div style="text-align: center; padding: 20px; color: var(--warning);">⚠️ 3단계에서 AI 분석을 먼저 실행한 후 이 버튼을 클릭해주세요.</div>';
       }
     }
   } catch (error) {

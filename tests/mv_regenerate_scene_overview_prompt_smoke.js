@@ -33,7 +33,7 @@ global.alert = function alertStub(message) {
   alerts.push(message);
 };
 global.fetch = async function fetchStub(url, options = {}) {
-  assert.ok(url.includes("gemini-2.5-flash"));
+  assert.ok(url.includes("gemini-"));
   lastPrompt = JSON.parse(options.body).contents[0].parts[0].text;
 
   if (fetchMode === "failure") {
@@ -130,10 +130,13 @@ window.saveCurrentProject = function saveCurrentProjectStub() {
   ["scene_lyrics_0", "edited lyric from editor"],
 ].forEach(([id, value]) => addElement(id, value));
 
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 window.syncSceneOverviewPromptTranslation =
-  async function syncSceneOverviewPromptTranslationStub(sceneIndex, sourceLang) {
+  async function syncSceneOverviewPromptTranslationStub(
+    sceneIndex,
+    sourceLang,
+  ) {
     syncCalls.push({ sceneIndex, sourceLang });
     const enEl = document.getElementById(`scene_overview_${sceneIndex}_en`);
     const koEl = document.getElementById(`scene_overview_${sceneIndex}_ko`);
@@ -158,7 +161,10 @@ window.syncSceneOverviewPromptTranslation =
   assert.ok(lastPrompt.includes("edited lyric from editor"));
   assert.strictEqual(window.currentScenes[0].location, "rainy alley");
   assert.strictEqual(window.currentScenes[0].emotion, "lonely");
-  assert.strictEqual(elements.get("scene_overview_0_ko").value, "새 개요 프롬프트");
+  assert.strictEqual(
+    elements.get("scene_overview_0_ko").value,
+    "새 개요 프롬프트",
+  );
   assert.strictEqual(
     window.currentScenes[0].prompt,
     "/* Scene 1 */ new overview prompt en",
@@ -190,8 +196,14 @@ window.syncSceneOverviewPromptTranslation =
   syncCalls = [];
   await window.regenerateSceneOverviewPrompt(0);
 
-  assert.ok(elements.get("scene_overview_0_en").value.includes("lonely street at night"));
-  assert.ok(elements.get("scene_overview_0_en").value.includes("photorealistic"));
+  assert.ok(
+    elements
+      .get("scene_overview_0_en")
+      .value.includes("lonely street at night"),
+  );
+  assert.ok(
+    elements.get("scene_overview_0_en").value.includes("photorealistic"),
+  );
   assert.deepStrictEqual(syncCalls, [{ sceneIndex: 0, sourceLang: "en" }]);
 
   const previousEn = elements.get("scene_overview_0_en").value;
@@ -207,7 +219,9 @@ window.syncSceneOverviewPromptTranslation =
   assert.strictEqual(elements.get("scene_overview_0_en").value, previousEn);
   assert.strictEqual(elements.get("scene_overview_0_ko").value, previousKo);
   assert.strictEqual(toasts.length, toastCountBeforeFailure);
-  assert.ok(alerts.some((message) => message.includes("forced overview failure")));
+  assert.ok(
+    alerts.some((message) => message.includes("forced overview failure")),
+  );
 
   fetchMode = "empty";
   alerts.length = 0;

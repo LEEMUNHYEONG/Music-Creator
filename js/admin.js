@@ -20,15 +20,16 @@
     const panel = document.getElementById("adminPanel");
     if (!panel) return;
 
-    // ⚙️ API 설정 탭 버튼 표시 여부 제어
-    const configTabBtn = document.querySelector(
-      ".admin-tab-btn[data-tab='config']",
-    );
+    const configTabBtn = document.querySelector(".admin-tab-btn[data-tab='config']");
     if (configTabBtn) {
-      configTabBtn.style.display = showConfig ? "" : "none";
+      if (showConfig) {
+        configTabBtn.classList.remove("d-none");
+      } else {
+        configTabBtn.classList.add("d-none");
+      }
     }
 
-    panel.style.display = "flex";
+    panel.classList.remove("d-none");
     loadPendingUsers();
     loadAllUsers();
 
@@ -44,12 +45,12 @@
 
   window.closeAdminPanel = function () {
     const panel = document.getElementById("adminPanel");
-    if (panel) panel.style.display = "none";
+    if (panel) panel.classList.add("d-none");
     // 닫을 때 ⚙️ API 설정 탭을 숨김 초기화 (다음 "사용자 관리" 진입 시 탭 미표시 보장)
     const configTabBtn = document.querySelector(
       ".admin-tab-btn[data-tab='config']",
     );
-    if (configTabBtn) configTabBtn.style.display = "none";
+    if (configTabBtn) configTabBtn.classList.add("d-none");
   };
 
   // ─── 승인 대기 중 사용자 목록 불러오기 ──────────────────────
@@ -268,12 +269,12 @@
   window.switchAdminTab = function (tab) {
     document
       .querySelectorAll(".admin-tab-content")
-      .forEach((c) => (c.style.display = "none"));
+      .forEach((c) => c.classList.add("d-none"));
     document
       .querySelectorAll(".admin-tab-btn")
       .forEach((b) => b.classList.remove("active"));
     const content = document.getElementById("adminTab-" + tab);
-    if (content) content.style.display = "block";
+    if (content) content.classList.remove("d-none");
     const btn = document.querySelector(`.admin-tab-btn[data-tab="${tab}"]`);
     if (btn) btn.classList.add("active");
 
@@ -282,6 +283,115 @@
       loadGlobalSettings();
     }
   };
+
+  // ─── 모델 세팅 UI 매핑 헬퍼 ──────────────────────────────────
+  function setModelUiValues(prefix, geminiModel, openaiModel) {
+    const geminiSelect = document.getElementById(prefix + "GeminiModelSelect");
+    const geminiCustom = document.getElementById(prefix + "GeminiModelCustom");
+    const openaiSelect = document.getElementById(prefix + "OpenAIModelSelect");
+    const openaiCustom = document.getElementById(prefix + "OpenAIModelCustom");
+
+    const geminiPresets = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-lite-preview-02-05"];
+    const openaiPresets = ["gpt-4o-mini", "gpt-4o", "o1-mini", "o1"];
+
+    if (geminiSelect) {
+      if (!geminiModel) {
+        geminiSelect.value = "gemini-2.0-flash";
+        if (geminiCustom) {
+          geminiCustom.classList.add("d-none");
+          geminiCustom.value = "";
+        }
+      } else if (geminiPresets.includes(geminiModel)) {
+        geminiSelect.value = geminiModel;
+        if (geminiCustom) {
+          geminiCustom.classList.add("d-none");
+          geminiCustom.value = "";
+        }
+      } else {
+        geminiSelect.value = "custom";
+        if (geminiCustom) {
+          geminiCustom.classList.remove("d-none");
+          geminiCustom.value = geminiModel;
+        }
+      }
+    }
+
+    if (openaiSelect) {
+      if (!openaiModel) {
+        openaiSelect.value = "gpt-4o-mini";
+        if (openaiCustom) {
+          openaiCustom.classList.add("d-none");
+          openaiCustom.value = "";
+        }
+      } else if (openaiPresets.includes(openaiModel)) {
+        openaiSelect.value = openaiModel;
+        if (openaiCustom) {
+          openaiCustom.classList.add("d-none");
+          openaiCustom.value = "";
+        }
+      } else {
+        openaiSelect.value = "custom";
+        if (openaiCustom) {
+          openaiCustom.classList.remove("d-none");
+          openaiCustom.value = openaiModel;
+        }
+      }
+    }
+  }
+
+  // UI 토글 함수 전역 등록
+  window.toggleCustomGeminiModelInput = function (selectEl) {
+    const isCustom = selectEl.value === "custom";
+    const prefix = selectEl.id.startsWith("modal") ? "modal" : "admin";
+    const customInput = document.getElementById(prefix + "GeminiModelCustom");
+    if (customInput) {
+      if (isCustom) {
+        customInput.classList.remove("d-none");
+      } else {
+        customInput.classList.add("d-none");
+      }
+    }
+  };
+
+  window.toggleCustomOpenAIModelInput = function (selectEl) {
+    const isCustom = selectEl.value === "custom";
+    const prefix = selectEl.id.startsWith("modal") ? "modal" : "admin";
+    const customInput = document.getElementById(prefix + "OpenAIModelCustom");
+    if (customInput) {
+      if (isCustom) {
+        customInput.classList.remove("d-none");
+      } else {
+        customInput.classList.add("d-none");
+      }
+    }
+  };
+
+  function getModelValuesFromUi(prefix) {
+    const geminiSelect = document.getElementById(prefix + "GeminiModelSelect");
+    const geminiCustom = document.getElementById(prefix + "GeminiModelCustom");
+    const openaiSelect = document.getElementById(prefix + "OpenAIModelSelect");
+    const openaiCustom = document.getElementById(prefix + "OpenAIModelCustom");
+
+    let geminiModel = "gemini-2.0-flash";
+    if (geminiSelect) {
+      if (geminiSelect.value === "custom") {
+        geminiModel = geminiCustom?.value.trim() || "gemini-2.0-flash";
+      } else {
+        geminiModel = geminiSelect.value;
+      }
+    }
+
+    let openaiModel = "gpt-4o-mini";
+    if (openaiSelect) {
+      if (openaiSelect.value === "custom") {
+        openaiModel = openaiCustom?.value.trim() || "gpt-4o-mini";
+      } else {
+        openaiModel = openaiSelect.value;
+      }
+    }
+
+    return { geminiModel, openaiModel };
+  }
 
   // ─── 전역 설정 불러오기 (API 키 등) ──────────────────────────
   async function loadGlobalSettings() {
@@ -298,6 +408,10 @@
         const data = doc.data();
         if (inputGeminiEl) inputGeminiEl.value = data.gemini_api_key || "";
         if (inputOpenAIEl) inputOpenAIEl.value = data.openai_api_key || "";
+        
+        // 모델 정보 UI 세팅
+        setModelUiValues("admin", data.gemini_model, data.openai_model);
+        
         window.globalConfig = data; // 전역 스코프에도 보관
       }
     } catch (err) {
@@ -309,6 +423,7 @@
   window.saveGlobalSettings = async function () {
     const geminiKey = document.getElementById("adminGeminiApiKey")?.value || "";
     const openaiKey = document.getElementById("adminOpenAIApiKey")?.value || "";
+    const { geminiModel, openaiModel } = getModelValuesFromUi("admin");
 
     if (
       !confirm(
@@ -322,6 +437,8 @@
         {
           gemini_api_key: geminiKey,
           openai_api_key: openaiKey,
+          gemini_model: geminiModel,
+          openai_model: openaiModel,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
           updatedBy: window.firebaseAuth.currentUser.uid,
         },
@@ -333,6 +450,8 @@
         ...window.globalConfig,
         gemini_api_key: geminiKey,
         openai_api_key: openaiKey,
+        gemini_model: geminiModel,
+        openai_model: openaiModel,
       };
     } catch (err) {
       alert("❌ 저장 오류: " + err.message);
@@ -380,24 +499,28 @@
         const geminiEl = document.getElementById("modalGeminiApiKey");
         if (openaiEl) openaiEl.value = data.openai_api_key || "";
         if (geminiEl) geminiEl.value = data.gemini_api_key || "";
+        
+        // 모델 UI 업데이트
+        setModelUiValues("modal", data.gemini_model, data.openai_model);
       }
     } catch (err) {
       console.warn("공용 API 키 불러오기 오류:", err.message);
     }
 
-    modal.style.display = "flex";
+    modal.classList.remove("d-none");
   };
 
   /** 모달 닫기 */
   window.closeGlobalApiKeyModal = function () {
     const modal = document.getElementById("globalApiKeyModal");
-    if (modal) modal.style.display = "none";
+    if (modal) modal.classList.add("d-none");
   };
 
   /** 모달에서 저장하기 */
   window.saveGlobalApiKeyModal = async function () {
     const openaiKey = document.getElementById("modalOpenAIApiKey")?.value || "";
     const geminiKey = document.getElementById("modalGeminiApiKey")?.value || "";
+    const { geminiModel, openaiModel } = getModelValuesFromUi("modal");
 
     if (
       !confirm(
@@ -411,6 +534,8 @@
         {
           openai_api_key: openaiKey,
           gemini_api_key: geminiKey,
+          gemini_model: geminiModel,
+          openai_model: openaiModel,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
           updatedBy: window.firebaseAuth.currentUser.uid,
         },
@@ -421,7 +546,20 @@
         ...window.globalConfig,
         openai_api_key: openaiKey,
         gemini_api_key: geminiKey,
+        gemini_model: geminiModel,
+        openai_model: openaiModel,
       };
+
+      // 🔒 [FIX] 공용 키를 새로 저장할 때도, 임시 비활성화 락을 강제로 해제합니다.
+      try {
+        sessionStorage.removeItem("geminiDisabledUntil");
+        sessionStorage.removeItem("geminiDisabledReason");
+        sessionStorage.removeItem("openaiDisabledUntil");
+        sessionStorage.removeItem("openaiDisabledReason");
+        window.__geminiDisabledUntil = 0;
+        window.__geminiDisabledReason = "";
+      } catch (_) {}
+
       closeGlobalApiKeyModal();
       // 기존 showAdminToast가 있으면 활용
       const toast = document.getElementById("adminToast");

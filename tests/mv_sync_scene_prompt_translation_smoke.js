@@ -53,7 +53,7 @@ window.saveCurrentProject = function saveCurrentProjectStub() {
 addTextarea("scene_0_en", "new English scene prompt");
 addTextarea("scene_0_ko", "");
 
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 (async () => {
   await window.syncScenePromptTranslation(0, "en");

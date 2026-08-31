@@ -5,6 +5,7 @@ const vm = require("vm");
 
 const elements = new Map();
 const alerts = [];
+const confirmMessages = [];
 let blobText = "";
 let createdUrl = "";
 let revokedUrl = "";
@@ -48,6 +49,10 @@ global.document = {
 global.alert = function alertStub(message) {
   alerts.push(message);
 };
+global.confirm = function confirmStub(message) {
+  confirmMessages.push(message);
+  return true;
+};
 global.Blob = class BlobStub {
   constructor(parts, options) {
     blobText = parts.join("");
@@ -64,7 +69,7 @@ global.URL = {
   },
 };
 
-const step6Source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
+const step6Source = fs.readFileSync(path.resolve(__dirname, "../test-results/mv_modules.compat.js"), "utf8");
 const start = step6Source.indexOf("window.formatMVSceneExportMetadata = function");
 const end = step6Source.indexOf("// --- Extracted generateSRTPreview ---", start);
 assert.ok(start !== -1, "MV prompt export helpers should exist in js/step6.js");
@@ -129,6 +134,11 @@ assert.ok(blobText.includes("씬 0 textarea ko"));
 assert.ok(blobText.includes("씬 2 (00:08-00:16)"));
 assert.ok(blobText.includes("scene one fallback en"));
 assert.ok(blobText.includes("씬 1 fallback ko"));
+assert.strictEqual(confirmMessages.length, 1);
+assert.ok(confirmMessages[0].includes("전체 MV 프롬프트 최종 확인"));
+assert.ok(confirmMessages[0].includes("작업: 전체 MV 프롬프트 다운로드"));
+assert.ok(confirmMessages[0].includes("프로젝트: Codex Export Song"));
+assert.ok(confirmMessages[0].includes("포함 항목:"));
 
 window.currentScenes = [];
 window.downloadMVPrompts();

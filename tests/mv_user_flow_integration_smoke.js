@@ -358,7 +358,7 @@ window.getSelectedTags = function getSelectedTagsStub(id) {
 };
 
 require("../js/storage.js");
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 const originalRenderSceneOverview = window.renderSceneOverview;
 window.renderSceneOverview = function renderSceneOverviewSpy(scenes) {

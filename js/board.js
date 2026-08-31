@@ -5,7 +5,6 @@
   let selectedFile = null;
   let isEditMode = false;
   let editingPostId = null;
-  let revealedPosts = new Set(); // 비밀번호 확인된 비공개 포스트 세션 저장
 
   // --- 전역 함수 등록 ---
   window.openBoardPanel = function () {
@@ -22,6 +21,15 @@
   };
 
   window.showBoardWriteForm = function (isEdit = false) {
+    if (!window.firebaseAuth?.currentUser) {
+      alert("게시판 글 작성은 로그인 후 이용할 수 있습니다.");
+      if (typeof window.showAuthOverlay === "function") {
+        window.showAuthOverlay();
+        window.showAuthTab?.("login");
+      }
+      return;
+    }
+
     const listSection = document.getElementById("boardListSection");
     const detailSection = document.getElementById("boardDetailSection");
     const writeForm = document.getElementById("boardWriteForm");
@@ -43,7 +51,6 @@
       // 제목이나 내용이 있을 때는 초기화를 건너뛰는 안전장치 (필요시)
       document.getElementById("boardNickname").value =
         window.currentUserData?.name || "";
-      document.getElementById("boardPassword").value = "";
       document.getElementById("boardTitle").value = "";
       document.getElementById("boardContent").value = "";
       document.getElementById("boardIsPrivate").checked = false;
@@ -82,23 +89,19 @@
     const id = window.currentBoardPostId;
     if (!data || !id) return;
 
-    // 관리자가 아니면 비밀번호 확인
     const isAdmin =
       window.currentUserData && window.currentUserData.role === "admin";
-    if (!isAdmin) {
-      const inputPwd = prompt("수정을 위해 게시글 비밀번호를 입력하세요.");
-      if (inputPwd === null) return;
-      if (inputPwd !== data.password) {
-        alert("비밀번호가 일치하지 않습니다.");
-        return;
-      }
+    const isAuthor =
+      window.firebaseAuth?.currentUser?.uid === data.userId;
+    if (!isAdmin && !isAuthor) {
+      alert("작성자 또는 관리자만 게시글을 수정할 수 있습니다.");
+      return;
     }
 
     showBoardWriteForm(true);
     editingPostId = id;
 
     document.getElementById("boardNickname").value = data.nickname || "";
-    document.getElementById("boardPassword").value = data.password || "";
     document.getElementById("boardTitle").value = data.title || "";
     document.getElementById("boardContent").value = data.content || "";
     document.getElementById("boardIsPrivate").checked = !!data.isPrivate;
@@ -146,19 +149,50 @@
     const container = document.getElementById("boardContainer");
     if (!container) return;
 
-    try {
-      const snapshot = await window.firebaseDb
-        .collection(COLLECTION_BOARD)
-        .orderBy("createdAt", "desc")
-        .get();
+    const currentUser = window.firebaseAuth?.currentUser;
+    if (!currentUser) {
+      container.innerHTML = `
+        <div style="text-align:center; padding:40px; color:var(--text-secondary);">
+          <i class="fas fa-lock fa-2x" style="opacity:0.45; margin-bottom:15px;"></i>
+          <p style="margin:0;">게시판은 로그인 후 이용할 수 있습니다.</p>
+        </div>
+      `;
+      return;
+    }
 
-      if (snapshot.empty) {
+    try {
+      const collection = window.firebaseDb.collection(COLLECTION_BOARD);
+      const isAdmin = window.currentUserData?.role === "admin";
+      const uid = currentUser.uid;
+      let documents = [];
+
+      if (isAdmin) {
+        const snapshot = await collection.get();
+        snapshot.forEach((doc) => documents.push(doc));
+      } else {
+        const [publicSnapshot, ownSnapshot] = await Promise.all([
+          collection.where("isPrivate", "==", false).get(),
+          collection.where("userId", "==", uid).get(),
+        ]);
+        const byId = new Map();
+        publicSnapshot.forEach((doc) => byId.set(doc.id, doc));
+        ownSnapshot.forEach((doc) => byId.set(doc.id, doc));
+        documents = Array.from(byId.values());
+      }
+
+      documents.sort((a, b) => {
+        const aTime = a.data().createdAt?.seconds || 0;
+        const bTime = b.data().createdAt?.seconds || 0;
+        return bTime - aTime;
+      });
+
+      if (documents.length === 0) {
         container.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--text-secondary);"><i class="fas fa-inbox fa-3x" style="opacity: 0.3; margin-bottom: 15px;"></i><br>아직 등록된 게시글이 없습니다.</div>`;
         return;
       }
 
       container.innerHTML = "";
-      snapshot.forEach((doc) => {
+      documents.forEach((doc) => {
         container.appendChild(createPostCard(doc.id, doc.data()));
       });
     } catch (err) {
@@ -209,14 +243,13 @@
     writeForm.style.display = "none";
     readForm.style.display = "block";
 
-    // 권한 확인 (관리자, 본인, 또는 비밀번호 확인됨)
+    // 비공개 글은 Firestore 규칙에서 작성자와 관리자에게만 전달됩니다.
     const isAdmin =
       window.currentUserData && window.currentUserData.role === "admin";
     const isAuthor =
       window.firebaseAuth.currentUser &&
       window.firebaseAuth.currentUser.uid === data.userId;
-    const isRevealed = revealedPosts.has(id);
-    const canView = !data.isPrivate || isAdmin || isAuthor || isRevealed;
+    const canView = !data.isPrivate || isAdmin || isAuthor;
 
     const contentArea = document.getElementById("viewBoardContent");
     const imgContainer = document.getElementById("viewBoardImageContainer");
@@ -227,7 +260,7 @@
         <div class="private-content-overlay">
           <i class="fas fa-lock fa-3x" style="color: var(--warning); margin-bottom: 15px;"></i>
           <p style="font-weight: 600; margin-bottom: 20px;">비공개 게시글입니다.</p>
-          <button class="btn btn-primary btn-small" onclick="revealPrivatePost('${id}')" style="background: var(--accent);">비밀번호 입력하고 보기</button>
+          <p style="margin:0;">작성자 또는 관리자 계정으로 로그인해 주세요.</p>
         </div>
       `;
       imgContainer.style.display = "none";
@@ -272,32 +305,18 @@
     window.currentBoardPostData = data;
   }
 
-  window.revealPrivatePost = function (id) {
-    const data = window.currentBoardPostData;
-    if (!data) return;
-    const inputPwd = prompt("게시글 비밀번호를 입력하세요.");
-    if (inputPwd === null) return;
-    if (inputPwd === data.password) {
-      revealedPosts.add(id);
-      viewPostDetail(id, data);
-    } else {
-      alert("비밀번호가 일치하지 않습니다.");
-    }
-  };
-
   window.submitBoardPost = async function () {
     if (typeof window.ensureAuthenticated === "function") {
       if (!window.ensureAuthenticated()) return;
     }
     const nickname =
       document.getElementById("boardNickname").value.trim() || "익명";
-    const password = document.getElementById("boardPassword").value.trim();
     const title = document.getElementById("boardTitle").value.trim();
     const content = document.getElementById("boardContent").value.trim();
     const isPrivate = document.getElementById("boardIsPrivate").checked;
 
-    if (!title || !content || !password) {
-      alert("모든 필드를 입력해 주세요.");
+    if (!title || !content) {
+      alert("제목과 내용을 입력해 주세요.");
       return;
     }
 
@@ -322,7 +341,8 @@
 
         try {
           const storageRef = window.firebaseStorage.ref();
-          const imageRef = storageRef.child(`board_images/${fileName}`);
+          const uid = window.firebaseAuth.currentUser.uid;
+          const imageRef = storageRef.child(`board_images/${uid}/${fileName}`);
 
           console.log(
             "📤 Storage 업로드 중... (Bucket: " +
@@ -360,7 +380,6 @@
         title,
         content,
         nickname,
-        password,
         isPrivate,
         imageUrl,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -404,15 +423,12 @@
     const postData = window.currentBoardPostData;
     if (!postId || !postData) return;
 
-    const isAdmin =
-      window.currentUserData && window.currentUserData.role === "admin";
-    if (!isAdmin) {
-      const inputPwd = prompt("삭제를 위해 비밀번호를 입력하세요.");
-      if (inputPwd === null) return;
-      if (inputPwd !== postData.password) {
-        alert("비밀번호가 일치하지 않습니다.");
-        return;
-      }
+    const isAdmin = window.currentUserData?.role === "admin";
+    const isAuthor =
+      window.firebaseAuth?.currentUser?.uid === postData.userId;
+    if (!isAdmin && !isAuthor) {
+      alert("작성자 또는 관리자만 게시글을 삭제할 수 있습니다.");
+      return;
     }
 
     if (!confirm("정말 이 게시글을 삭제하시겠습니까?")) return;

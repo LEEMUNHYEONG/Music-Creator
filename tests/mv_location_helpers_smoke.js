@@ -5,7 +5,7 @@ const vm = require("vm");
 
 global.window = global;
 
-const step6Source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
+const step6Source = fs.readFileSync(path.resolve(__dirname, "../test-results/mv_modules.compat.js"), "utf8");
 const start = step6Source.indexOf("const MV_LOCATION_MAP = {");
 const end = step6Source.indexOf("// --- Extracted getMVLocationValues ---", start);
 assert.ok(start !== -1, "MV_LOCATION_MAP should exist in js/step6.js");

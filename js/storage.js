@@ -59,6 +59,133 @@ function cloneData(value, fallback) {
   }
 }
 
+function isStorageQuotaError(error) {
+  return (
+    error &&
+    (error.name === "QuotaExceededError" ||
+      error.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+      error.code === 22 ||
+      error.code === 1014)
+  );
+}
+
+function getProjectSortTime(project) {
+  const raw = project?.updatedAt || project?.savedAt || project?.createdAt || 0;
+  const time = new Date(raw).getTime();
+  return Number.isFinite(time) ? time : 0;
+}
+
+function compactProjectForLocalStorage(project, mode = "full") {
+  const cloned = cloneData(project, project);
+  if (!cloned || mode === "full") return cloned;
+
+  const data = cloned.data || {};
+  if (mode === "summary") {
+    return {
+      id: cloned.id,
+      title: cloned.title || data.songTitle || "제목 없음",
+      savedAt: cloned.savedAt,
+      updatedAt: cloned.updatedAt,
+      createdAt: cloned.createdAt,
+      lastStep: cloned.lastStep,
+      data: {
+        songTitle: data.songTitle || cloned.title || "제목 없음",
+        finalLyrics: data.finalLyrics || data.finalizedLyrics || "",
+        finalStyle: data.finalStyle || data.finalizedStyle || "",
+        beforeScore: data.beforeScore,
+        afterScore: data.afterScore,
+        aiComment: data.aiComment,
+        marketing: data.marketing
+          ? {
+              mvSettings: data.marketing.mvSettings || data.marketing.mv?.settings || {},
+              mvPrompts: data.marketing.mvPrompts || data.marketing.mv?.prompts || {},
+              mvScenes: data.marketing.mvScenes || data.marketing.mv?.scenes || [],
+              mv: data.marketing.mv,
+            }
+          : undefined,
+      },
+    };
+  }
+
+  return cloned;
+}
+
+function dedupeAndSortProjects(projects, currentProject) {
+  const byId = new Map();
+  [...(Array.isArray(projects) ? projects : []), currentProject]
+    .filter(Boolean)
+    .forEach((project) => {
+      const id = project.id || `project_${getProjectSortTime(project)}`;
+      const prev = byId.get(id);
+      if (!prev || getProjectSortTime(project) >= getProjectSortTime(prev)) {
+        byId.set(id, project);
+      }
+    });
+
+  return Array.from(byId.values()).sort(
+    (a, b) => getProjectSortTime(b) - getProjectSortTime(a),
+  );
+}
+
+window.saveProjectListToLocalStorage = function (
+  key,
+  projects,
+  currentProject,
+  options = {},
+) {
+  const maxAttempts = options.maxAttempts || [Infinity, 80, 60, 40, 25, 15, 8, 3, 1];
+  const list = dedupeAndSortProjects(projects, currentProject);
+  const currentId = currentProject?.id;
+  let lastError = null;
+
+  for (const maxCount of maxAttempts) {
+    const kept = Number.isFinite(maxCount)
+      ? list
+          .filter((project) => project?.id !== currentId)
+          .slice(0, Math.max(maxCount - 1, 0))
+      : list.filter((project) => project?.id !== currentId);
+    if (currentProject) kept.unshift(currentProject);
+
+    for (const mode of ["full", "summary"]) {
+      const payload = kept.map((project) =>
+        project?.id === currentId
+          ? compactProjectForLocalStorage(project, mode)
+          : compactProjectForLocalStorage(project, mode === "full" ? "summary" : "summary"),
+      );
+      try {
+        localStorage.setItem(key, JSON.stringify(payload));
+        const compacted = payload.length < list.length || mode !== "full";
+        if (compacted) {
+          console.warn(
+            `${key} 저장 용량 보호: ${payload.length}개 프로젝트로 압축 저장했습니다.`,
+          );
+        }
+        return {
+          ok: true,
+          key,
+          count: payload.length,
+          compacted,
+        };
+      } catch (error) {
+        lastError = error;
+        if (!isStorageQuotaError(error)) break;
+      }
+    }
+  }
+
+  if (currentProject) {
+    try {
+      localStorage.removeItem(key);
+      localStorage.setItem(key, JSON.stringify([compactProjectForLocalStorage(currentProject, "summary")]));
+      return { ok: true, key, count: 1, compacted: true, fallback: "current-summary" };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  return { ok: false, key, error: lastError };
+};
+
 function normalizeMVPrompts(marketing) {
   const legacyPrompts =
     marketing && !Array.isArray(marketing.mvPrompts)
@@ -177,9 +304,20 @@ function normalizeMVScene(scene, index) {
     startSeconds,
     endSeconds,
     durationSeconds,
-    scene: source.scene || source.description || source.lyrics || `씬 ${index + 1}`,
-    prompt: source.prompt || source.promptEn || "",
-    promptKo: source.promptKo || "",
+    scene:
+      source.scene ||
+      source.visualDescription ||
+      source.description ||
+      `씬 ${index + 1}`,
+    visualDescription:
+      source.visualDescription || source.description || source.scene || "",
+    lyrics: source.lyrics || source.sourceLyrics || "",
+    prompt: typeof window.cleanEnglishMidjourneyPrompt === "function"
+      ? window.cleanEnglishMidjourneyPrompt(source.prompt || source.promptEn || "")
+      : (source.prompt || source.promptEn || ""),
+    promptKo: typeof window.cleanMidjourneyPrompt === "function"
+      ? window.cleanMidjourneyPrompt(source.promptKo || "")
+      : (source.promptKo || ""),
     runwayPrompt: source.runwayPrompt || "",
     runwayPromptKo: source.runwayPromptKo || "",
     location: source.location || "",
@@ -263,6 +401,91 @@ window.syncMarketingMVModel = function (marketing) {
   return marketing.mv;
 };
 
+window.buildMarketingMVSceneDiagnostics = function (scenesArg, limit = 10) {
+  const scenes = window.normalizeMVScenes(scenesArg || []);
+  const issueCounts = {};
+  const issueScenes = [];
+  const visualBuckets = new Map();
+
+  const issueLabels = {
+    invalidTime: "시간 확인",
+    missingLocation: "장소 없음",
+    missingCamera: "카메라 없음",
+    missingLyrics: "가사 없음",
+    missingEnPrompt: "EN 프롬프트 없음",
+    missingKoPrompt: "KO 프롬프트 없음",
+    repeatedVisualPattern: "배경/구도/카메라 반복",
+  };
+  const addCount = (key) => {
+    issueCounts[key] = (issueCounts[key] || 0) + 1;
+  };
+  const compact = (value) =>
+    String(value || "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  scenes.forEach((scene) => {
+    const visualKey = [
+      scene.location,
+      scene.cameraWork,
+      scene.lighting,
+      scene.scene,
+    ]
+      .map((value) => compact(value).toLowerCase())
+      .filter(Boolean)
+      .join("|");
+    if (!visualKey) return;
+    if (!visualBuckets.has(visualKey)) visualBuckets.set(visualKey, []);
+    visualBuckets.get(visualKey).push(scene.index);
+  });
+
+  const repeatedIndexes = new Set();
+  visualBuckets.forEach((indexes) => {
+    if (indexes.length > 1) {
+      indexes.forEach((index) => repeatedIndexes.add(index));
+    }
+  });
+
+  scenes.forEach((scene) => {
+    const issues = [];
+    const addIssue = (key) => {
+      issues.push(issueLabels[key]);
+      addCount(key);
+    };
+
+    const hasValidTime =
+      scene.startSeconds !== null &&
+      scene.endSeconds !== null &&
+      scene.durationSeconds !== null &&
+      scene.durationSeconds > 0;
+    if (!hasValidTime) addIssue("invalidTime");
+    if (!compact(scene.location)) addIssue("missingLocation");
+    if (!compact(scene.cameraWork)) addIssue("missingCamera");
+    if (!compact(scene.lyrics)) addIssue("missingLyrics");
+    if (!compact(scene.prompt)) addIssue("missingEnPrompt");
+    if (!compact(scene.promptKo)) addIssue("missingKoPrompt");
+    if (repeatedIndexes.has(scene.index)) addIssue("repeatedVisualPattern");
+
+    if (issues.length) {
+      issueScenes.push({
+        sceneNumber: scene.sceneNumber || scene.index + 1,
+        time: scene.time || "시간 없음",
+        scene: compact(scene.scene || scene.visualDescription) || "장면 없음",
+        issues,
+      });
+    }
+  });
+
+  return {
+    totalScenes: scenes.length,
+    issueSceneCount: issueScenes.length,
+    issueCounts,
+    issueLabels,
+    topScenes: issueScenes.slice(0, limit),
+    hasMore: issueScenes.length > limit,
+  };
+};
+
 window.buildMarketingMVDiagnostics = function (marketingArg, context = "manual") {
   const projectData = window.currentProject?.data || window.currentProject || {};
   const marketing =
@@ -298,6 +521,10 @@ window.buildMarketingMVDiagnostics = function (marketingArg, context = "manual")
   if (scenes.some((scene) => !scene.prompt && !scene.promptKo)) {
     issues.push("프롬프트가 비어 있는 씬 있음");
   }
+  const sceneDiagnostics =
+    typeof window.buildMarketingMVSceneDiagnostics === "function"
+      ? window.buildMarketingMVSceneDiagnostics(scenes)
+      : null;
 
   return {
     context,
@@ -326,13 +553,84 @@ window.buildMarketingMVDiagnostics = function (marketingArg, context = "manual")
           ),
         }
       : null,
+    sceneDiagnostics,
     updatedAt: marketing.mv?.updatedAt || "",
     issues,
   };
 };
 
+window.buildMarketingMVRehearsalReadiness = function (diagnostics) {
+  if (!diagnostics) {
+    return {
+      status: "보류",
+      summary: "진단 데이터 없음",
+      checks: ["진단 데이터를 먼저 생성해야 합니다."],
+    };
+  }
+
+  const checks = [];
+  const failures = [];
+  const warnings = [];
+  const addCheck = (passed, label, warningOnly = false) => {
+    checks.push(`${passed ? "통과" : warningOnly ? "보류" : "실패"}: ${label}`);
+    if (!passed) {
+      if (warningOnly) warnings.push(label);
+      else failures.push(label);
+    }
+  };
+
+  addCheck(diagnostics.sceneCount > 0, "MV 씬 데이터 존재");
+  addCheck(
+    diagnostics.canonicalSceneCount === diagnostics.legacySceneCount,
+    "canonical/legacy 씬 수 동기화",
+  );
+  addCheck(
+    !diagnostics.issues.some((issue) => issue.includes("프롬프트가 비어")),
+    "씬별 EN/KO 프롬프트 누락 없음",
+  );
+  addCheck(
+    diagnostics.settingsKeys.length > 0,
+    "MV 설정 저장됨",
+    true,
+  );
+  addCheck(
+    diagnostics.promptSections.length > 0,
+    "썸네일/배경/인물 등 공통 프롬프트 저장됨",
+    true,
+  );
+  addCheck(Boolean(diagnostics.firstScene), "첫 씬 복원 가능", true);
+  addCheck(Boolean(diagnostics.lastScene), "마지막 씬 복원 가능", true);
+
+  const status = failures.length ? "실패" : warnings.length ? "보류" : "통과";
+  const summary =
+    status === "통과"
+      ? "실제 프로젝트 리허설 진행 가능"
+      : status === "보류"
+        ? "리허설 가능하나 일부 확인 필요"
+        : "리허설 전 데이터 보정 필요";
+  const nextAction =
+    status === "통과"
+      ? "체크리스트에 따라 씬 2개 이상 수정, 저장, 재진입, 내보내기 리허설을 진행하세요."
+      : status === "보류"
+        ? "보류 항목을 확인한 뒤 리허설을 진행하고, 결과를 수동 리허설 기록지에 남기세요."
+        : "실패 항목을 먼저 보정한 뒤 MV 진단을 다시 실행하세요.";
+
+  return {
+    status,
+    summary,
+    nextAction,
+    checks,
+    failures,
+    warnings,
+  };
+};
+
 window.formatMarketingMVDiagnostics = function (diagnostics) {
   if (!diagnostics) return "MV 진단 데이터가 없습니다.";
+  const readiness =
+    typeof window.buildMarketingMVRehearsalReadiness === "function"
+      ? window.buildMarketingMVRehearsalReadiness(diagnostics)
+      : null;
   const lines = [
     "MV marketing.mv 진단 요약",
     `프로젝트: ${diagnostics.projectTitle}`,
@@ -356,6 +654,33 @@ window.formatMarketingMVDiagnostics = function (diagnostics) {
   lines.push(
     `확인 사항: ${diagnostics.issues.length ? diagnostics.issues.join("; ") : "없음"}`,
   );
+  if (diagnostics.sceneDiagnostics?.issueSceneCount > 0) {
+    const sceneDiagnostics = diagnostics.sceneDiagnostics;
+    const issueCountText = Object.entries(sceneDiagnostics.issueCounts || {})
+      .map(([key, count]) => `${sceneDiagnostics.issueLabels?.[key] || key} ${count}개`)
+      .join(", ");
+    lines.push(
+      "",
+      "우선 확인 씬",
+      `확인 필요 씬: ${sceneDiagnostics.issueSceneCount}/${sceneDiagnostics.totalScenes}${issueCountText ? ` (${issueCountText})` : ""}`,
+      ...sceneDiagnostics.topScenes.map((scene) =>
+        `- 씬 ${scene.sceneNumber} ${scene.time}: ${scene.issues.join(", ")} / ${scene.scene}`,
+      ),
+    );
+    if (sceneDiagnostics.hasMore) {
+      lines.push("- 추가 확인 씬은 화면의 확인 필요 필터에서 계속 확인하세요.");
+    }
+  }
+  if (readiness) {
+    lines.push(
+      "",
+      "MV 실제 프로젝트 리허설 판정",
+      `판정: ${readiness.status}`,
+      `요약: ${readiness.summary}`,
+      `다음 조치: ${readiness.nextAction}`,
+      ...readiness.checks.map((check) => `- ${check}`),
+    );
+  }
   return lines.join("\n");
 };
 
@@ -408,6 +733,58 @@ window.formatMarketingMVDiagnosticsComparison = function (comparison) {
   ].join("\n");
 };
 
+window.buildMarketingMVRehearsalReport = function (
+  diagnostics,
+  comparison = null,
+) {
+  if (!diagnostics) return "MV 리허설 보고서 데이터가 없습니다.";
+  const readiness =
+    typeof window.buildMarketingMVRehearsalReadiness === "function"
+      ? window.buildMarketingMVRehearsalReadiness(diagnostics)
+      : null;
+  const appVersion =
+    typeof document !== "undefined"
+      ? document.querySelector?.(".app-version")?.textContent || ""
+      : "";
+  const generatedAt = new Date().toISOString();
+  const lines = [
+    "MV 실제 프로젝트 리허설 보고서",
+    `생성 시각: ${generatedAt}`,
+    appVersion ? `앱 버전: ${appVersion}` : "",
+    `프로젝트: ${diagnostics.projectTitle}`,
+    readiness ? `판정: ${readiness.status}` : "",
+    readiness ? `요약: ${readiness.summary}` : "",
+    readiness ? `다음 조치: ${readiness.nextAction}` : "",
+    "",
+    window.formatMarketingMVDiagnostics(diagnostics),
+  ].filter((line) => line !== "");
+
+  if (comparison) {
+    lines.push("", window.formatMarketingMVDiagnosticsComparison(comparison));
+  }
+
+  lines.push(
+    "",
+    "기록 방법:",
+    "1. 이 보고서를 MV_수동리허설_기록지.md의 문제 기록 또는 최종 판정에 붙여넣습니다.",
+    "2. 실제 화면에서 씬 2개 이상 수정, 저장, 재진입, 내보내기 확인 결과를 이어서 기록합니다.",
+  );
+
+  return lines.join("\n");
+};
+
+window.buildCurrentMarketingMVRehearsalReport = function () {
+  const diagnostics = window.buildMarketingMVDiagnostics(null, "manual");
+  const comparison = window.__lastMarketingMVSaveComparison || null;
+  const text =
+    typeof window.buildMarketingMVRehearsalReport === "function"
+      ? window.buildMarketingMVRehearsalReport(diagnostics, comparison)
+      : window.formatMarketingMVDiagnostics(diagnostics);
+  window.__lastMarketingMVDiagnosticsText = text;
+  window.__lastMarketingMVDiagnostics = diagnostics;
+  return { diagnostics, comparison, text };
+};
+
 window.logMarketingMVDiagnostics = function (
   marketingArg,
   context = "pre-save",
@@ -423,18 +800,134 @@ window.logMarketingMVSaveComparison = function (before, after) {
   return comparison;
 };
 
-window.showMarketingMVDiagnostics = function () {
-  const diagnostics = window.buildMarketingMVDiagnostics(null, "manual");
-  const comparison = window.__lastMarketingMVSaveComparison || null;
-  let text = window.formatMarketingMVDiagnostics(diagnostics);
-  if (comparison) {
-    text += `\n\n${window.formatMarketingMVDiagnosticsComparison(comparison)}`;
+window.ensureMarketingMVDiagnosticsModal = function () {
+  if (typeof document === "undefined" || !document.body) return null;
+  let modal = document.getElementById?.("marketingMVDiagnosticsModal");
+  if (modal) return modal;
+
+  modal = document.createElement("div");
+  modal.id = "marketingMVDiagnosticsModal";
+  modal.className = "modal-overlay";
+  modal.setAttribute?.("role", "dialog");
+  modal.setAttribute?.("aria-modal", "true");
+  modal.setAttribute?.("aria-labelledby", "marketingMVDiagnosticsTitle");
+  modal.onclick = function (event) {
+    if (event.target === modal) {
+      window.closeMarketingMVDiagnosticsModal();
+    }
+  };
+  modal.innerHTML = `
+    <div class="modal" style="width: min(920px, 94vw); max-height: 88vh;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="marketingMVDiagnosticsTitle">MV 리허설 진단 보고서</h3>
+        <button type="button" class="modal-close" onclick="closeMarketingMVDiagnosticsModal()" aria-label="닫기">×</button>
+      </div>
+      <div class="modal-body" style="padding: 0;">
+        <pre id="marketingMVDiagnosticsText" style="margin: 0; padding: 20px; min-height: 320px; max-height: 62vh; overflow: auto; white-space: pre-wrap; word-break: keep-all; line-height: 1.55; color: var(--text-primary); background: var(--bg-secondary); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace; font-size: 0.86rem;"></pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="focusFirstMarketingMVDiagnosticsScene()">첫 확인 씬으로 이동</button>
+        <button type="button" class="btn btn-secondary" onclick="copyCurrentMarketingMVDiagnosticsReport()">복사</button>
+        <button type="button" class="btn btn-secondary" onclick="downloadMarketingMVRehearsalReport()">TXT 저장</button>
+        <button type="button" class="btn btn-primary" onclick="closeMarketingMVDiagnosticsModal()">닫기</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  return modal;
+};
+
+window.openMarketingMVDiagnosticsModal = function (text) {
+  const modal = window.ensureMarketingMVDiagnosticsModal();
+  if (!modal) return false;
+  const reportEl = document.getElementById?.("marketingMVDiagnosticsText");
+  if (reportEl) reportEl.textContent = text || "";
+  modal.style.display = "flex";
+  modal.style.pointerEvents = "auto";
+  modal.classList?.add("show");
+  return true;
+};
+
+window.closeMarketingMVDiagnosticsModal = function () {
+  const modal = document.getElementById?.("marketingMVDiagnosticsModal");
+  if (!modal) return;
+  modal.classList?.remove("show");
+  modal.style.display = "none";
+  modal.style.pointerEvents = "none";
+};
+
+window.copyCurrentMarketingMVDiagnosticsReport = function () {
+  const text =
+    window.__lastMarketingMVDiagnosticsText ||
+    window.buildCurrentMarketingMVRehearsalReport().text;
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {});
   }
   if (typeof window.showCopyIndicator === "function") {
-    window.showCopyIndicator("✅ MV 진단 요약이 준비되었습니다.");
+    window.showCopyIndicator("✅ MV 리허설 진단 보고서가 클립보드에 복사되었습니다.");
   }
-  alert(text);
+  return text;
+};
+
+window.focusFirstMarketingMVDiagnosticsScene = function () {
+  const diagnostics =
+    window.__lastMarketingMVDiagnostics ||
+    window.buildCurrentMarketingMVRehearsalReport().diagnostics;
+  const firstScene = diagnostics?.sceneDiagnostics?.topScenes?.[0];
+  if (!firstScene) {
+    if (typeof window.showCopyIndicator === "function") {
+      window.showCopyIndicator("확인 필요 씬이 없습니다.");
+    }
+    return false;
+  }
+
+  window.closeMarketingMVDiagnosticsModal();
+  if (typeof window.focusMVFirstReviewScene === "function") {
+    const focused = window.focusMVFirstReviewScene();
+    if (focused) return true;
+  }
+  if (typeof window.focusMVSceneCard === "function") {
+    window.focusMVSceneCard(Math.max(0, Number(firstScene.sceneNumber) - 1));
+    return true;
+  }
+  if (typeof window.showCopyIndicator === "function") {
+    window.showCopyIndicator("씬 목록 화면을 연 뒤 다시 이동을 시도하세요.");
+  }
+  return false;
+};
+
+window.showMarketingMVDiagnostics = function () {
+  const { diagnostics, text } = window.buildCurrentMarketingMVRehearsalReport();
+  window.copyCurrentMarketingMVDiagnosticsReport();
+  const opened = window.openMarketingMVDiagnosticsModal(text);
+  if (!opened && typeof alert === "function") {
+    alert(text);
+  }
   return diagnostics;
+};
+
+window.downloadMarketingMVRehearsalReport = function () {
+  const { diagnostics, text } = window.buildCurrentMarketingMVRehearsalReport();
+  const title =
+    diagnostics?.projectTitle ||
+    window.currentProject?.title ||
+    window.currentProject?.data?.songTitle ||
+    "music-creator-project";
+  const date = new Date().toISOString().slice(0, 10);
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${window.sanitizeProjectFilename(title)}-mv-rehearsal-report-${date}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  if (typeof window.showCopyIndicator === "function") {
+    window.showCopyIndicator("✅ MV 리허설 진단 보고서 TXT가 저장되었습니다.");
+  }
+  return a.download;
 };
 
 window.sanitizeProjectFilename = function (title) {
@@ -617,6 +1110,19 @@ function isNewerOrBetter(newProj, oldProj) {
  * 저장된 프로젝트를 로드하여 UI에 복원합니다.
  */
 window.loadProject = function (projectId) {
+  const now = Date.now();
+  const isSameProject = window.__lastLoadProjectId === projectId;
+  if (
+    isSameProject &&
+    (window.__isLoadingProject ||
+      now - Number(window.__lastLoadProjectStartedAt || 0) < 1200)
+  ) {
+    console.log("⏭️ 중복 프로젝트 로드 요청 무시:", projectId);
+    return;
+  }
+  window.__isLoadingProject = true;
+  window.__lastLoadProjectId = projectId;
+  window.__lastLoadProjectStartedAt = now;
   window.isInitialLoading = true;
   console.log("📂 프로젝트 로드 시작:", projectId);
   
@@ -699,12 +1205,14 @@ window.loadProject = function (projectId) {
     }
 
     window.isInitialLoading = false;
+    window.__isLoadingProject = false;
     console.log("🎊 프로젝트 로드 완료:", foundProject.title || "제목 없음");
 
   } catch (error) {
     console.error("❌ 프로젝트 로드 중 오류 발생:", error);
     alert("프로젝트 로드 중 오류가 발생했습니다.");
     window.isInitialLoading = false;
+    window.__isLoadingProject = false;
   }
 };
 
@@ -918,30 +1426,63 @@ window.saveCurrentProject = function () {
 
     // 로컬 스토리지 업데이트
     const keys = ["musicCreatorProjects", "savedProjects"];
-    keys.forEach(key => {
+    const localSaveResults = keys.map((key) => {
+      let list = [];
       try {
         const stored = localStorage.getItem(key);
-        let list = stored ? JSON.parse(stored) : [];
+        list = stored ? JSON.parse(stored) : [];
         if (!Array.isArray(list)) list = [];
-        
-        const idx = list.findIndex(p => p && p.id === projectId);
-        if (idx !== -1) {
-          list[idx] = projectToSave;
-        } else {
-          list.push(projectToSave);
-        }
-        localStorage.setItem(key, JSON.stringify(list));
-      } catch (e) {
-        console.warn(`${key} 저장 중 오류:`, e);
+      } catch (error) {
+        console.warn(`${key} 읽기 중 오류:`, error);
+        list = [];
       }
+      const attempts =
+        key === "savedProjects"
+          ? [20, 10, 5, 3, 1]
+          : [Infinity, 80, 60, 40, 25, 15, 8, 3, 1];
+      const result = window.saveProjectListToLocalStorage(
+        key,
+        list,
+        projectToSave,
+        { maxAttempts: attempts },
+      );
+      if (!result.ok) {
+        console.warn(`${key} 저장 중 오류:`, result.error);
+      }
+      return result;
     });
 
     window.currentProject = projectToSave;
-    console.log("✅ 프로젝트 로컬 저장 완료!");
+    const primarySaved = localSaveResults.find((result) => result.key === "musicCreatorProjects")?.ok;
+    if (primarySaved) {
+      const compacted = localSaveResults.some((result) => result.compacted);
+      console.log(
+        compacted
+          ? "✅ 프로젝트 로컬 저장 완료! 용량 보호를 위해 일부 오래된 로컬 캐시를 압축했습니다."
+          : "✅ 프로젝트 로컬 저장 완료!",
+      );
+      if (compacted && typeof window.showCopyIndicator === "function") {
+        window.showCopyIndicator(
+          "✅ 현재 프로젝트는 저장되었습니다. 브라우저 용량 보호를 위해 오래된 로컬 캐시 일부를 압축했습니다.",
+        );
+      }
+    } else {
+      console.error("❌ 프로젝트 로컬 저장 실패:", localSaveResults);
+      if (typeof window.updateSaveStatusUI === "function") {
+        window.updateSaveStatusUI("error");
+      }
+    }
 
     // ☁️ Firestore 클라우드 자동 백업 (백그라운드 실행) - 자동 동기화 설정에 따라
     const cloudAutoSync = localStorage.getItem('cloudAutoSync') !== 'false'; // 기본: true
-    if (cloudAutoSync && window.firebaseAuth && window.firebaseAuth.currentUser && window.firebaseDb) {
+    const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
+
+    if (cloudAutoSync && !isOnline) {
+      console.warn("☁️ 네트워크 연결이 끊겨 로컬에만 저장하고 클라우드 백업을 건너뜁니다.");
+      if (typeof window.updateSaveStatusUI === "function") {
+        window.updateSaveStatusUI("error");
+      }
+    } else if (cloudAutoSync && window.firebaseAuth && window.firebaseAuth.currentUser && window.firebaseDb) {
       const uid = window.firebaseAuth.currentUser.uid;
       try {
         window.firebaseDb.collection("users").doc(uid).collection("projects").doc(projectId)
@@ -991,7 +1532,7 @@ window.saveCurrentProject = function () {
       window.loadProjectList();
     }
     
-    return true;
+    return Boolean(primarySaved);
 
   } catch (error) {
     console.error("❌ 저장 오류:", error);
@@ -1068,8 +1609,22 @@ window.syncProjectsFromCloud = async function() {
     
     // 로컬 스토리지 갱신
     if (mergedCount > 0) {
-      localStorage.setItem(localKey, JSON.stringify(localProjects));
-      console.log(`✅ ${mergedCount}개의 클라우드 프로젝트가 로컬에 병합되었습니다.`);
+      const result =
+        typeof window.saveProjectListToLocalStorage === "function"
+          ? window.saveProjectListToLocalStorage(
+              localKey,
+              localProjects,
+              window.currentProject || null,
+            )
+          : { ok: false };
+      if (!result.ok) {
+        throw result.error || new Error("클라우드 병합 데이터를 로컬에 저장하지 못했습니다.");
+      }
+      console.log(
+        result.compacted
+          ? `✅ ${mergedCount}개의 클라우드 프로젝트를 병합했습니다. 로컬 용량 보호를 위해 ${result.count}개 캐시로 압축 저장했습니다.`
+          : `✅ ${mergedCount}개의 클라우드 프로젝트가 로컬에 병합되었습니다.`,
+      );
       // UI 갱신
       if (typeof window.loadProjectList === "function") {
         window.loadProjectList();
@@ -1364,10 +1919,11 @@ window.uploadAllLocalToCloud = async function() {
   let uploaded = 0;
   for (const p of localProjects) {
     if (!p || !p.id) continue;
+    const docId = String(p.id);
     try {
       await window.firebaseDb
         .collection("users").doc(uid)
-        .collection("projects").doc(p.id)
+        .collection("projects").doc(docId)
         .set(p, { merge: true });
       uploaded++;
     } catch(e) {

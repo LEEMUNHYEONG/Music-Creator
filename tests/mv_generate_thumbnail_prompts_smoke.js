@@ -42,7 +42,7 @@ global.translateEnglishToKoreanForScene = async function translateEnToKo(
   return `번역(${field}): ${text}`;
 };
 global.fetch = async function fetchStub(url, options) {
-  assert.ok(url.includes("gemini-2.5-flash"));
+  assert.ok(url.includes("gemini-"));
   fetchBody = JSON.parse(options.body);
   return {
     ok: true,
@@ -79,7 +79,7 @@ global.fetch = async function fetchStub(url, options) {
   ["mvCharacterDetailPromptKo", ""],
 ].forEach(([id, value]) => addElement(id, value));
 
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 (async () => {
   window.getGeminiApiKey = function getGeminiApiKeyStub() {

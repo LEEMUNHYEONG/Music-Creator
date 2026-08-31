@@ -217,7 +217,7 @@ async function cleanup() {
                     mood: "quiet negative space",
                     lighting: "blue-hour side light",
                     cameraWork: "slow dolly-in",
-                    prompt: "preflight scene 1 prompt en",
+                    prompt: "rainy neon alley music video frame with a black bob hair heroine wearing a long coat walking through blue-hour reflections, slow dolly-in camera movement, lonely emotional performance, photorealistic cinematic detail, 16:9 aspect ratio, sharp focus, detailed lighting, cohesive color palette",
                     promptKo: "운영 전 리허설 씬 1 프롬프트",
                   },
                   {
@@ -296,6 +296,45 @@ async function cleanup() {
             resultPrompts: document.querySelectorAll(".mv-prompt-item").length,
             timeline: !!document.querySelector(".mv-scene-timeline-preview"),
           },
+          sceneActionUi: {
+            statusCount: document.querySelectorAll(".mv-scene-action-status").length,
+            firstStatus: document.getElementById("scene_0_action_status")?.textContent || "",
+            firstStatusState: document.getElementById("scene_0_action_status")?.dataset?.state || "",
+            saveButtonText: document.getElementById("saveScenePromptBtn_0")?.textContent || "",
+            saveButtonTitle: document.getElementById("saveScenePromptBtn_0")?.title || "",
+            copyButtonTitle: document.getElementById("copyScenePromptBtn_0")?.title || "",
+            regenerateButtonTitle: document.getElementById("regenerateScenePromptBtn_0")?.title || "",
+          },
+          qualityUi: (() => {
+            const reviewIndexesBefore =
+              typeof window.getMVSceneReviewIndexes === "function"
+                ? window.getMVSceneReviewIndexes(window.currentScenes)
+                : [];
+            const finalConfirmMessage =
+              typeof window.buildMVFinalExportConfirmMessage === "function"
+                ? window.buildMVFinalExportConfirmMessage("전체 MV 프롬프트 복사")
+                : "";
+            const toggled =
+              typeof window.toggleMVReviewOnlyScenes === "function"
+                ? window.toggleMVReviewOnlyScenes()
+                : false;
+            const cards = Array.from(document.querySelectorAll(".mv-scene-overview-card"));
+            const hiddenIndexes = cards
+              .filter((card) => card.hidden || card.style.display === "none")
+              .map((card) => Number(card.dataset.sceneIndex));
+            return {
+              summaryText:
+                document.getElementById("mv_scene_quality_summary_text")?.textContent || "",
+              reviewIndexesBefore,
+              toggled,
+              hiddenIndexes,
+              reviewOnlyButtonText:
+                document.getElementById("mv_scene_quality_review_only_btn")?.textContent || "",
+              reviewOnlyStatus:
+                document.getElementById("mv_scene_quality_review_only_status")?.textContent || "",
+              finalConfirmMessage,
+            };
+          })(),
           storage: {
             projects: JSON.parse(localStorage.getItem("musicCreatorProjects") || "[]").length,
             hasNormalizedMv: !!JSON.parse(localStorage.getItem("musicCreatorProjects") || "[]")[0]?.data?.marketing?.mv,
@@ -331,6 +370,25 @@ async function cleanup() {
     assert.strictEqual(result.rendered.timeline, true);
     assert.ok(result.rendered.overviewCards >= 2);
     assert.ok(result.rendered.resultPrompts >= 2);
+    assert.ok(result.sceneActionUi.statusCount >= 2);
+    assert.strictEqual(result.sceneActionUi.firstStatusState, "saved");
+    assert.ok(result.sceneActionUi.firstStatus.includes("저장 완료"));
+    assert.ok(result.sceneActionUi.saveButtonText.includes("씬 저장"));
+    assert.ok(result.sceneActionUi.saveButtonTitle.includes("이 씬 카드"));
+    assert.ok(result.sceneActionUi.copyButtonTitle.includes("복사는 저장과 별개"));
+    assert.ok(result.sceneActionUi.regenerateButtonTitle.includes("다시 생성"));
+    assert.ok(result.qualityUi.summaryText.includes("전체 2개 씬"));
+    assert.ok(result.qualityUi.summaryText.includes("준비 완료 1개"));
+    assert.ok(result.qualityUi.summaryText.includes("확인 필요 1개"));
+    assert.deepStrictEqual(result.qualityUi.reviewIndexesBefore, [1]);
+    assert.strictEqual(result.qualityUi.toggled, true);
+    assert.deepStrictEqual(result.qualityUi.hiddenIndexes, [0]);
+    assert.ok(result.qualityUi.reviewOnlyButtonText.includes("전체 씬 보기"));
+    assert.ok(result.qualityUi.reviewOnlyStatus.includes("확인 필요 1개 씬만 표시 중"));
+    assert.ok(result.qualityUi.finalConfirmMessage.includes("전체 MV 프롬프트 최종 확인"));
+    assert.ok(result.qualityUi.finalConfirmMessage.includes("작업: 전체 MV 프롬프트 복사"));
+    assert.ok(result.qualityUi.finalConfirmMessage.includes("씬 수: 전체 2개 / 준비 완료 1개 / 확인 필요 1개"));
+    assert.ok(result.qualityUi.finalConfirmMessage.includes("포함 항목:"));
     assert.deepStrictEqual(result.storage, {
       projects: 1,
       hasNormalizedMv: true,

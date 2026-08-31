@@ -89,7 +89,7 @@ window.showCopyIndicator = function showCopyIndicatorStub(message) {
   toasts.push(message);
 };
 
-const step6Source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
+const step6Source = fs.readFileSync(path.resolve(__dirname, "../test-results/mv_modules.compat.js"), "utf8");
 const start = step6Source.indexOf("window.MV_RELEASE_BASELINE =");
 const end = step6Source.indexOf("// --- Extracted generateSRTPreview ---", start);
 assert.ok(start !== -1, "MV export metadata helpers should exist in js/step6.js");
@@ -126,8 +126,9 @@ setImmediate(() => {
     window.downloadSRT("win");
     assert.strictEqual(clickedDownload, "My_Song_2026.srt");
     assert.ok(blobText.includes("\r\n"));
-    assert.ok(blobText.includes("NOTE Project: Project Title From State"));
-    assert.ok(blobText.includes("NOTE Release Baseline: mv-stabilization-2026-05-06"));
+    assert.ok(!blobText.includes("NOTE Project:"));
+    assert.ok(!blobText.includes("NOTE Release Baseline:"));
+    assert.ok(blobText.startsWith("1\r\n"));
     assert.ok(blobText.includes("1\r\n00:00:00,000 --> 00:00:02,000\r\nHello"));
     assert.strictEqual(revokedUrl, "blob:srt");
     assert.ok(toasts.some((message) => message.includes("윈도우용")));

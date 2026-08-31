@@ -5,20 +5,63 @@ service cloud.firestore {
     // 관리자는 모든 문서 읽기/쓰기 가능
     match /users/{userId} {
       allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update, delete: if request.auth != null && isAdmin();
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.role == 'user'
+                    && request.resource.data.approved == false;
+      allow update: if request.auth != null && (
+        isAdmin()
+        || (
+          request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name',
+            'musicCreatorGuidelines',
+            'guidelinesBackupLatest',
+            'updatedAt'
+          ])
+        )
+      );
+      allow delete: if request.auth != null && isAdmin();
     }
 
-    // config 컬렉션: 로그인한 사용자만 읽기 가능, 관리자는 쓰기 가능
+    // users/{userId}/projects 하위 컬렉션 권한 (자동 백업용)
+    match /users/{userId}/projects/{projectId} {
+      allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+    }
+
+    // users/{userId}/projects/{projectId}/history 시간대별 백업 히스토리 권한
+    match /users/{userId}/projects/{projectId}/history/{historyId} {
+      allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+    }
+
+    // config 컬렉션: 관리자만 읽기/쓰기 가능
     match /config/{document=**} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && isAdmin();
       allow write: if request.auth != null && isAdmin();
+    }
+
+    // api_usage 컬렉션: 로그인한 사용자는 쓰기(로그 기록)만 가능, 관리자는 전체 읽기 가능
+    match /api_usage/{docId} {
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid;
+      allow read: if request.auth != null && isAdmin();
     }
 
     // board 컬렉션: 로그인한 사용자만 읽기/쓰기 가능
     match /board/{postId} {
-      allow read, create: if request.auth != null;
-      allow update, delete: if request.auth != null && (isAdmin() || request.auth.uid == resource.data.userId);
+      allow read: if request.auth != null && (
+        isAdmin()
+        || resource.data.isPrivate == false
+        || request.auth.uid == resource.data.userId
+      );
+      allow create: if request.auth != null
+                    && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null
+                    && (isAdmin() || request.auth.uid == resource.data.userId)
+                    && request.resource.data.userId == resource.data.userId;
+      allow delete: if request.auth != null
+                    && (isAdmin() || request.auth.uid == resource.data.userId);
     }
 
     function isAdmin() {

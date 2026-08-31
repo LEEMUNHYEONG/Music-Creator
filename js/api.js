@@ -1,5 +1,202 @@
 // js/api.js - Extracted Logic
 
+// AI 공급자 직접 호출을 인증된 Firebase Functions 프록시로 전환합니다.
+// 기존 기능의 요청/응답 형식은 유지하면서 공용 API 키가 브라우저에 노출되지 않게 합니다.
+(function installSecureAIProxyFetch() {
+  if (window.__secureAIProxyFetchInstalled || typeof window.fetch !== "function") return;
+
+  const nativeFetch = window.fetch.bind(window);
+  window.__nativeFetch = nativeFetch;
+  const hostedOrigin = "https://music-creator-app-92d15.web.app";
+
+  function getProxyUrl(path) {
+    const isHostedApp =
+      location.hostname === "music-creator-app-92d15.web.app" ||
+      location.hostname === "music-creator-app-92d15.firebaseapp.com";
+    return `${isHostedApp ? "" : hostedOrigin}${path}`;
+  }
+
+  async function getAuthHeaders(initHeaders) {
+    const headers = new Headers(initHeaders || {});
+    headers.set("Content-Type", "application/json");
+    const user = window.firebaseAuth?.currentUser;
+    if (user) {
+      headers.set("Authorization", `Bearer ${await user.getIdToken()}`);
+    }
+    return headers;
+  }
+
+  window.fetch = async function secureAIProxyFetch(input, init = {}) {
+    const url = typeof input === "string" ? input : input?.url || "";
+    const isOpenAI = url.startsWith(
+      "https://api.openai.com/v1/chat/completions",
+    );
+    const isGemini =
+      url.startsWith("https://generativelanguage.googleapis.com/") &&
+      url.includes(":generateContent");
+
+    if (!isOpenAI && !isGemini) {
+      return nativeFetch(input, init);
+    }
+
+    const user = window.firebaseAuth?.currentUser;
+    
+    // 로컬스토리지 또는 전역 설정에 등록된 실제 사용자 개인 API 키 확인
+    const localOpenAIKey = localStorage.getItem("openai_api_key") || (window.globalConfig && window.globalConfig.openai_api_key) || "";
+    const localGeminiKey = localStorage.getItem("gemini_api_key") || (window.globalConfig && window.globalConfig.gemini_api_key) || "";
+    
+    const hasRealLocalOpenAIKey = localOpenAIKey && localOpenAIKey.startsWith("sk-") && !localOpenAIKey.includes("proxy");
+    const hasRealLocalGeminiKey = localGeminiKey && localGeminiKey.startsWith("AIza") && !localGeminiKey.includes("proxy");
+
+    // 개인 키를 직접 사용해 브라우저 다이렉트 호출을 의도한 경우: 로그인 여부와 관계없이 nativeFetch 허용
+    if (isOpenAI && hasRealLocalOpenAIKey) {
+      return nativeFetch(input, init);
+    }
+    if (isGemini && hasRealLocalGeminiKey) {
+      return nativeFetch(input, init);
+    }
+
+    // 그렇지 않고 프록시 서버 호출이 기본값인데 로그인이 안 된 경우: 다이렉트 외부 호출 차단 및 401 Unauthorized 에러 모사 응답
+    if (!user) {
+      console.error(`[SecureAIProxy] 로그인 정보가 유실되어 다이렉트 API 호출을 차단했습니다. URL: ${url}`);
+      return new Response(JSON.stringify({
+        error: {
+          message: "로그인 세션이 유실되었거나 유효하지 않습니다. 로그인 상태를 확인해 주세요.",
+          status: "UNAUTHENTICATED"
+        }
+      }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    const headers = await getAuthHeaders(init.headers);
+    const rawBody = typeof init.body === "string" ? init.body : "{}";
+    const body = JSON.parse(rawBody || "{}");
+
+    if (isOpenAI) {
+      headers.delete("Authorization");
+      headers.set(
+        "Authorization",
+        `Bearer ${await window.firebaseAuth.currentUser.getIdToken()}`,
+      );
+      return nativeFetch(getProxyUrl("/api/chat"), {
+        ...init,
+        headers,
+        body: JSON.stringify(body),
+      });
+    }
+
+    const modelMatch = url.match(/\/models\/([^:/?]+):generateContent/);
+    return nativeFetch(getProxyUrl("/api/gemini"), {
+      ...init,
+      headers,
+      body: JSON.stringify({
+        model: modelMatch?.[1] || body.model || (window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash"),
+        contents: body.contents,
+        prompt: body.prompt,
+        generationConfig: body.generationConfig,
+      }),
+    });
+  };
+
+  window.__secureAIProxyFetchInstalled = true;
+})();
+
+window.testServerAIProxy = async function (provider, customKey = "") {
+  const isGemini = provider === "gemini";
+  const hasRealKey = isGemini 
+    ? (customKey && customKey.startsWith("AIza") && !customKey.includes("proxy"))
+    : (customKey && customKey.startsWith("sk-") && !customKey.includes("proxy"));
+
+  if (hasRealKey) {
+    const fetchFunc = window.__nativeFetch || window.fetch;
+    if (isGemini) {
+      const currentGeminiModel = window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash";
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentGeminiModel}:generateContent?key=${customKey}`;
+      const response = await fetchFunc(geminiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: "Reply with OK only." }] }],
+          generationConfig: {
+            maxOutputTokens: 8,
+            temperature: 0
+          }
+        })
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        const errMsg = data.error?.message || data.error || `${provider} API 직접 호출 오류: ${response.status}`;
+        throw new Error(errMsg);
+      }
+      return true;
+    } else {
+      const openaiUrl = "https://api.openai.com/v1/chat/completions";
+      const currentOpenAIModel = window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini";
+      const response = await fetchFunc(openaiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${customKey}`
+        },
+        body: JSON.stringify({
+          model: currentOpenAIModel,
+          messages: [{ role: "user", content: "Reply with OK only." }],
+          max_tokens: 8,
+          temperature: 0
+        })
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        const errMsg = data.error?.message || data.error || `${provider} API 직접 호출 오류: ${response.status}`;
+        throw new Error(errMsg);
+      }
+      return true;
+    }
+  }
+
+  const user = window.firebaseAuth?.currentUser;
+  if (!user) throw new Error("로그인이 필요합니다.");
+
+  const origin =
+    location.hostname === "music-creator-app-92d15.web.app" ||
+    location.hostname === "music-creator-app-92d15.firebaseapp.com"
+      ? ""
+      : "https://music-creator-app-92d15.web.app";
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${await user.getIdToken()}`,
+  };
+  const response = await fetch(`${origin}${isGemini ? "/api/gemini" : "/api/chat"}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(
+      isGemini
+        ? {
+            model: (window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash"),
+            prompt: "Reply with OK only.",
+            maxOutputTokens: 8,
+            temperature: 0,
+          }
+        : {
+            model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
+            messages: [{ role: "user", content: "Reply with OK only." }],
+            max_tokens: 8,
+            temperature: 0,
+          },
+    ),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    const errMsg = data.error?.message || data.error || `${provider} 프록시 오류: ${response.status}`;
+    throw new Error(errMsg);
+  }
+  return true;
+};
+
 // --- Extracted callAPIWithRetry ---
 window.callAPIWithRetry = async function (apiCall, context, maxRetries = 3) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -98,14 +295,12 @@ async function translateEnglishToKoreanForScene(fieldName, englishText) {
   }
 
   try {
-    // API_CONFIG가 없으면 localStorage에서 직접 가져오기
-    const openaiKey =
-      (typeof API_CONFIG !== "undefined" && API_CONFIG.openai?.key) ||
-      localStorage.getItem("openai_api_key") ||
-      "";
+    // 공용 키 또는 개인 키 가져오기 (admin 설정값 포함)
+    const openaiKey = (typeof window.getOpenAIApiKey === "function") ? window.getOpenAIApiKey() : (localStorage.getItem("openai_api_key") || "");
+    const geminiKey = (typeof window.getGeminiApiKey === "function") ? window.getGeminiApiKey() : (localStorage.getItem("gemini_api_key") || "");
 
-    if (!openaiKey || !openaiKey.startsWith("sk-")) {
-      console.warn("OpenAI API 키가 없어 번역을 건너뜁니다.");
+    if ((!openaiKey || !openaiKey.startsWith("sk-")) && (!geminiKey || !geminiKey.startsWith("AIza"))) {
+      console.warn("번역 API 키가 없어 번역을 건너뜁니다.");
       return englishText; // 번역 실패 시 원본 반환
     }
 
@@ -136,41 +331,55 @@ ${englishText}
 
 한국어:`;
 
-    // callOpenAI 함수가 없으면 직접 호출
     let translation = "";
-    if (typeof callOpenAI === "function") {
-      translation = await callOpenAI(prompt, 3);
-    } else {
-      // 직접 OpenAI API 호출
-      const response = await fetch(
-        "https://api.openai.com/v1/chat/completions",
-        {
+    try {
+      const token = (window.firebase && window.firebase.auth && window.firebase.auth().currentUser) 
+        ? await window.firebase.auth().currentUser.getIdToken() 
+        : null;
+      
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      // OpenAI 우선 사용 (기본값)
+      let useGemini = false;
+      const selectedAPI = localStorage.getItem("selectedAPI") || "openai";
+      if (selectedAPI === "gemini") useGemini = true;
+
+      if (!useGemini) {
+        const response = await fetch("/api/chat", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${openaiKey}`,
-          },
+          headers,
           body: JSON.stringify({
-            model: "gpt-4o-mini",
+            model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
             messages: [
-              {
-                role: "system",
-                content: "당신은 번역 전문가입니다. 번역만 출력하세요.",
-              },
+              { role: "system", content: "당신은 번역 전문가입니다. 번역만 출력하세요." },
               { role: "user", content: prompt },
             ],
             temperature: 0.3,
             max_tokens: 1000,
           }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(`OpenAI API 오류: ${response.status}`);
+        });
+        if (!response.ok) throw new Error(`OpenAI Proxy 오류: ${response.status}`);
+        const data = await response.json();
+        translation = data.choices?.[0]?.message?.content || "";
+      } else {
+        const response = await fetch("/api/gemini", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            prompt: prompt,
+            model: (window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash"),
+            temperature: 0.3,
+            maxOutputTokens: 1000,
+          }),
+        });
+        if (!response.ok) throw new Error(`Gemini Proxy 오류: ${response.status}`);
+        const data = await response.json();
+        translation = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
       }
-
-      const data = await response.json();
-      translation = data.choices?.[0]?.message?.content || "";
+    } catch (apiErr) {
+      console.warn("Proxy 번역 실패, 원본 유지:", apiErr);
+      return englishText;
     }
 
     translation = translation.trim();
@@ -202,14 +411,12 @@ async function translateKoreanToEnglishForScene(fieldName, koreanText) {
   if (!koreanText || !koreanText.trim()) return "";
 
   try {
-    // API_CONFIG가 없으면 localStorage에서 직접 가져오기
-    const openaiKey =
-      (typeof API_CONFIG !== "undefined" && API_CONFIG.openai?.key) ||
-      localStorage.getItem("openai_api_key") ||
-      "";
+    // 공용 키 또는 개인 키 가져오기 (admin 설정값 포함)
+    const openaiKey = (typeof window.getOpenAIApiKey === "function") ? window.getOpenAIApiKey() : (localStorage.getItem("openai_api_key") || "");
+    const geminiKey = (typeof window.getGeminiApiKey === "function") ? window.getGeminiApiKey() : (localStorage.getItem("gemini_api_key") || "");
 
-    if (!openaiKey || !openaiKey.startsWith("sk-")) {
-      console.warn("OpenAI API 키가 없어 번역을 건너뜁니다.");
+    if ((!openaiKey || !openaiKey.startsWith("sk-")) && (!geminiKey || !geminiKey.startsWith("AIza"))) {
+      console.warn("번역 API 키가 없어 번역을 건너뜁니다.");
       return koreanText; // 번역 실패 시 원본 반환
     }
 
@@ -241,41 +448,54 @@ ${koreanText}
 
 영어:`;
 
-    // callOpenAI 함수가 없으면 직접 호출
     let translation = "";
-    if (typeof callOpenAI === "function") {
-      translation = await callOpenAI(prompt, 3);
-    } else {
-      // 직접 OpenAI API 호출
-      const response = await fetch(
-        "https://api.openai.com/v1/chat/completions",
-        {
+    try {
+      const token = (window.firebase && window.firebase.auth && window.firebase.auth().currentUser) 
+        ? await window.firebase.auth().currentUser.getIdToken() 
+        : null;
+      
+      const headers = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      let useGemini = false;
+      const selectedAPI = localStorage.getItem("selectedAPI") || "openai";
+      if (selectedAPI === "gemini") useGemini = true;
+
+      if (!useGemini) {
+        const response = await fetch("/api/chat", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${openaiKey}`,
-          },
+          headers,
           body: JSON.stringify({
-            model: "gpt-4o-mini",
+            model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
             messages: [
-              {
-                role: "system",
-                content: "당신은 번역 전문가입니다. 번역만 출력하세요.",
-              },
+              { role: "system", content: "당신은 번역 전문가입니다. 번역만 출력하세요." },
               { role: "user", content: prompt },
             ],
             temperature: 0.3,
             max_tokens: 1000,
           }),
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(`OpenAI API 오류: ${response.status}`);
+        });
+        if (!response.ok) throw new Error(`OpenAI Proxy 오류: ${response.status}`);
+        const data = await response.json();
+        translation = data.choices?.[0]?.message?.content || "";
+      } else {
+        const response = await fetch("/api/gemini", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            prompt: prompt,
+            model: (window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash"),
+            temperature: 0.3,
+            maxOutputTokens: 1000,
+          }),
+        });
+        if (!response.ok) throw new Error(`Gemini Proxy 오류: ${response.status}`);
+        const data = await response.json();
+        translation = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
       }
-
-      const data = await response.json();
-      translation = data.choices?.[0]?.message?.content || "";
+    } catch (apiErr) {
+      console.warn("Proxy 번역 실패, 원본 유지:", apiErr);
+      return koreanText;
     }
 
     translation = translation.trim();
@@ -323,19 +543,73 @@ window.changeAPI = function (value) {
   }
 };
 
+// --- API Model Getters ---
+window.getGeminiModel = function () {
+  let model = (window.globalConfig && window.globalConfig.gemini_model) || "gemini-3.5-flash";
+  if (model === "gemini-2.0-flash") {
+    model = "gemini-3.5-flash";
+  }
+  return model;
+};
+
+window.getOpenAIModel = function () {
+  return (
+    (window.globalConfig && window.globalConfig.openai_model) ||
+    "gpt-4o-mini"
+  );
+};
+
 // --- API Key Getters ---
 window.getGeminiApiKey = function () {
+  if (typeof window.isGeminiTemporarilyDisabled === "function" && window.isGeminiTemporarilyDisabled()) {
+    return "";
+  }
   return (
     localStorage.getItem("gemini_api_key") ||
     (window.globalConfig && window.globalConfig.gemini_api_key) ||
+    (window.firebaseAuth?.currentUser ? "AIzaProxyAuthenticatedUser" : "") ||
     ""
   );
+};
+
+window.markGeminiTemporarilyDisabled = function (reason, durationMs = 30 * 60 * 1000) {
+  const until = Date.now() + durationMs;
+  window.__geminiDisabledUntil = until;
+  window.__geminiDisabledReason = reason || "Gemini API 오류";
+  try {
+    sessionStorage.setItem("geminiDisabledUntil", String(until));
+    sessionStorage.setItem("geminiDisabledReason", window.__geminiDisabledReason);
+  } catch (_) {}
+  console.warn(
+    `⚠️ Gemini API를 임시 비활성화합니다: ${window.__geminiDisabledReason}`,
+  );
+};
+
+window.isGeminiTemporarilyDisabled = function () {
+  const storedUntil = (() => {
+    try {
+      return Number(sessionStorage.getItem("geminiDisabledUntil") || 0);
+    } catch (_) {
+      return 0;
+    }
+  })();
+  const until = Math.max(Number(window.__geminiDisabledUntil || 0), storedUntil);
+  if (!until || Date.now() >= until) return false;
+  return true;
+};
+
+window.handleGeminiApiFailure = function (error) {
+  const message = String(error?.message || error || "");
+  if (/expired|API key|400|401|403/i.test(message)) {
+    window.markGeminiTemporarilyDisabled(message);
+  }
 };
 
 window.getOpenAIApiKey = function () {
   return (
     localStorage.getItem("openai_api_key") ||
     (window.globalConfig && window.globalConfig.openai_api_key) ||
+    (window.firebaseAuth?.currentUser ? "sk-proxy-authenticated-user" : "") ||
     ""
   );
 };
@@ -351,25 +625,33 @@ window.getOpenAIApiKey = function () {
  * @returns {Promise<string>} AI 응답 텍스트
  */
 window.callGeminiForScenes = async function (prompt, geminiKey) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`;
-  const response = await fetch(url, {
+  if (typeof window.isGeminiTemporarilyDisabled === "function" && window.isGeminiTemporarilyDisabled()) {
+    throw new Error("Gemini API가 임시 비활성화되어 ChatGPT로 전환합니다.");
+  }
+  
+  const token = (window.firebase && window.firebase.auth && window.firebase.auth().currentUser) 
+        ? await window.firebase.auth().currentUser.getIdToken() : null;
+        
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const response = await fetch("/api/gemini", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.8,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 8192,
-      },
+      prompt: prompt,
+      model: (window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash"),
+      temperature: 0.92,
+      maxOutputTokens: 8192,
     }),
   });
 
   if (!response.ok) {
-    throw new Error(
-      `Gemini API 오류: ${response.status} ${response.statusText}`,
-    );
+    const error = new Error(`Gemini Proxy 오류: ${response.status} ${response.statusText}`);
+    if (typeof window.handleGeminiApiFailure === "function") {
+      window.handleGeminiApiFailure(error);
+    }
+    throw error;
   }
 
   const data = await response.json();
@@ -387,31 +669,32 @@ window.callGeminiForScenes = async function (prompt, geminiKey) {
  * @returns {Promise<string>} AI 응답 텍스트
  */
 window.callChatGPTForScenes = async function (prompt, openaiKey) {
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const token = (window.firebase && window.firebase.auth && window.firebase.auth().currentUser) 
+        ? await window.firebase.auth().currentUser.getIdToken() : null;
+        
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const response = await fetch("/api/chat", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${openaiKey}`,
-    },
+    headers,
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
       messages: [
         {
           role: "system",
           content:
-            "당신은 MV 씬 프롬프트 생성 전문가입니다. 반드시 요청한 개수만큼 정확히 씬을 생성하고, 순수 JSON 배열만 출력하세요.",
+            "당신은 세계적인 뮤직비디오 감독이자 시각 예술 디렉터입니다. 가사의 감정과 서사를 영화적 시각 언어로 변환하는 것이 당신의 전문 영역입니다. 각 씬은 하나의 독립된 예술 작품처럼 구성하되, 전체 시퀀스는 음악의 감정 아크를 따라 유기적으로 흘러야 합니다. 단순한 배경 나열이 아니라, 빛·색채·질감·공간감을 활용한 감각적 묘사로 씬을 설계하세요. Midjourney와 Runway에서 최고 품질의 결과를 만들어내는 프롬프트 엔지니어링에 정통합니다. 반드시 요청한 개수만큼 정확히 씬을 생성하고, 순수 JSON 배열만 출력하세요.",
         },
         { role: "user", content: prompt },
       ],
-      temperature: 0.8,
+      temperature: 0.92,
       max_tokens: 8192,
     }),
   });
 
   if (!response.ok) {
-    throw new Error(
-      `ChatGPT API 오류: ${response.status} ${response.statusText}`,
-    );
+    throw new Error(`ChatGPT Proxy 오류: ${response.status} ${response.statusText}`);
   }
 
   const data = await response.json();

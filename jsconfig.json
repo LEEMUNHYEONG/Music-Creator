@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "target": "es2020",
+    "skipLibCheck": true,
+    "checkJs": false
+  },
+  "exclude": [
+    "node_modules",
+    "**/node_modules",
+    "dist",
+    ".firebase"
+  ]
+}

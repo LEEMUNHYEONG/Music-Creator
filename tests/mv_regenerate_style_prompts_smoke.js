@@ -54,7 +54,7 @@ window.saveCurrentProject = function saveCurrentProjectStub() {
   ["review_character_ko", "old character ko"],
 ].forEach(([id, value]) => addElement(id, value));
 
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 window.getMVLocationEnString = function getMVLocationEnStringStub() {
   return "neon alley";

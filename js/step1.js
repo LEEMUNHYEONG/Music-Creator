@@ -1,5 +1,14 @@
 // js/step1.js - Extracted Logic
 
+function escapeGeneratedLyricsHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 // --- Extracted insertDirectiveToLyrics ---
 window.insertDirectiveToLyrics = function (directive) {
   try {
@@ -131,8 +140,8 @@ window.generateAILyrics = async function () {
       aiLyricsOptions.style.display = "none";
     }
 
-    // ChatGPT(OpenAI) API 키 확인 (가사 생성은 항상 ChatGPT 사용)
-    const apiKey = localStorage.getItem("openai_api_key") || "";
+    // ChatGPT(OpenAI) API 키 확인 (공용 키 포함)
+    const apiKey = (typeof window.getOpenAIApiKey === "function" ? window.getOpenAIApiKey() : localStorage.getItem("openai_api_key")) || "";
 
     if (!apiKey || !apiKey.startsWith("sk-")) {
       alert(
@@ -186,7 +195,10 @@ window.generateAILyrics = async function () {
 
     // 지침서 로드 (최신 상태로 항상 확인)
     console.log("📋 제작 지침서 검토 시작...");
-    let guidelines = localStorage.getItem("musicCreatorGuidelines") || "";
+    let guidelines =
+      localStorage.getItem("musicCreatorGuidelines") ||
+      localStorage.getItem("musicCreator_guidelines") ||
+      "";
     const guidelinesLength = guidelines.length;
     const hasGuidelines = guidelines.trim().length > 0;
 
@@ -217,9 +229,24 @@ ${referenceInfo}
 ${guidelinesSection}
 
 【중요 지시사항 - 반드시 지킬 것!】
-1. '제작 지침서' 내용이 있다면 최우선적으로 존중하여 작성하세요 (작성 규칙, 금지어, 형식 등 철저히 준수).
-2. 모든 버전의 가사에는 반드시 [Intro], [Verse 1], [Chorus], [Bridge], [Outro] 등과 같은 수노(Suno) 지시어를 각 단락(섹션)의 시작 부분에 정확하게 표기하여야 합니다. 단순히 섹션을 나누는 것에 그치지 않고, 명시적인 대괄호 태그 구조를 포함하세요.
-3. 각 버전은 서로 다른 스타일, 시점 또는 분위기를 가지도록 창작하세요.
+1. '제작 지침서'가 있다면 이를 **절대적으로 적극 준수**하세요 (작성 규칙, 금지어, 말투, 형식 등 어떠한 예외 없이 철저히 반영할 것).
+2. 노래는 **최소 3절 구조** 이상으로 길고 완성도 있게 작성하세요. (예: [Intro] -> [Verse 1] -> [Chorus] -> [Verse 2] -> [Chorus] -> [Verse 3] -> [Bridge] -> [Chorus] -> [Outro] 등)
+   - 지침서에 별도 언어 규칙이 있으면 그 규칙을 우선합니다.
+   - 기본값: 한글 중심 가사, 영어는 후렴/강조/반복 훅 등 보조 표현으로만 사용하고 전체 단어의 약 20~30% 이내로 제한하세요.
+   - 곡 제목은 title 필드에만 작성하고 content 가사 본문에는 절대 넣지 마세요.
+3. **수노(Suno) 지시어(Directive) 작성 규칙**:
+   - 모든 단락(섹션) 시작 시 반드시 지시어를 사용하세요.
+   - **한 줄에는 반드시 하나의 지시어만 표기**하세요. 동일한 섹션에 여러 지시어가 필요한 경우 반드시 줄바꿈을 하여 각각 다른 줄에 작성하세요.
+   - **절대 금지**: '[Intro] [Tempo: 72 BPM]' 처럼 한 줄에 여러 지시어를 나열하는 행위.
+   - **올바른 방식**:
+     [Intro]
+     [Tempo: 72 BPM]
+     [Instruments: acoustic guitar, warm strings]
+   - 지시어는 최대한 **세밀하고 구체적으로** 작성하세요. 장르, 악기, 보컬 스타일, 효과, 템포 등을 적극 반영하세요. (예: '[Vocal: soft]', '[Final Fade: 4s slow fade]' 등)
+   - 지시어 뒤에 가사가 올 때는 반드시 줄바꿈을 하여 가사와 분리하세요.
+   - 대괄호 태그 구조 '[...]'를 정확하게 유지하세요.
+4. 각 버전은 서로 다른 스타일, 시점 또는 분위기를 가지도록 창작하세요.
+5. 모든 가사의 제목(title)은 반드시 "한글(English)" 형식을 엄격히 준수하세요. (예: "밤의 춤(Night Dance)", "기억의 조각(Pieces of Memory)")
 
 【출력 형식】
 반드시 아래 JSON 형식으로만 출력하세요 (다른 텍스트 없이):
@@ -240,7 +267,7 @@ ${guidelinesSection}
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
         messages: [
           {
             role: "system",
@@ -302,9 +329,13 @@ ${guidelinesSection}
           const card = document.createElement("div");
           card.className = "lyrics-option-card";
           card.onclick = () => window.selectLyricsOption(index);
+          const safeTitle = escapeGeneratedLyricsHtml(option.title || "제목 없음");
+          const safePreview = escapeGeneratedLyricsHtml(
+            (option.content || "").substring(0, 200),
+          ).replace(/\n/g, "<br>");
           card.innerHTML = `
-            <div class="lyrics-option-title">${option.title || "제목 없음"}</div>
-            <div class="lyrics-option-preview">${(option.content || "").substring(0, 200).replace(/\n/g, "<br>")}...</div>
+            <div class="lyrics-option-title">${safeTitle}</div>
+            <div class="lyrics-option-preview">${safePreview}...</div>
           `;
           lyricsOptionsGrid.appendChild(card);
         });
@@ -515,9 +546,20 @@ window.confirmSelectedLyrics = async function () {
     const songTitleEl = document.getElementById("songTitle");
     if (songTitleEl && editedTitle) {
       songTitleEl.value = editedTitle;
+
+      // UI 제목 즉시 업데이트
+      const headerTitleEl = document.getElementById("songTitleText");
+      if (headerTitleEl) headerTitleEl.textContent = editedTitle;
+
+      const finalTitleEl = document.getElementById("finalTitleText");
+      if (finalTitleEl) finalTitleEl.textContent = editedTitle;
+
+      // 헤더 제목 컨테이너 노출
+      const songTitleContainer = document.getElementById("currentSongTitle");
+      if (songTitleContainer) songTitleContainer.style.display = "block";
     }
 
-    const apiKey = localStorage.getItem("openai_api_key") || "";
+    const apiKey = (typeof window.getOpenAIApiKey === "function" ? window.getOpenAIApiKey() : localStorage.getItem("openai_api_key")) || "";
     let finalLyrics = editedLyrics;
     let finalStylePrompt = window.generateStylePromptFromLyrics(
       editedLyrics,
@@ -526,7 +568,10 @@ window.confirmSelectedLyrics = async function () {
 
     if (apiKey && apiKey.startsWith("sk-")) {
       try {
-        const guidelines = localStorage.getItem("musicCreatorGuidelines") || "";
+        const guidelines =
+          localStorage.getItem("musicCreatorGuidelines") ||
+          localStorage.getItem("musicCreator_guidelines") ||
+          "";
 
         let tagsInfo = "";
         const tagKeys = [
@@ -570,7 +615,9 @@ ${editedLyrics}
 
 【중요 지시사항 - 반드시 지킬 것!】
 1. '제작 지침서'가 제공되었다면 지침서의 금지어, 작성 구조, 태그 방식 등을 최우선으로 따르세요.
-2. 응답은 오직 JSON 형식으로만 해야 합니다. 추가적인 설명 텍스트를 포함하지 마세요.
+2. 가사 본문은 한글 중심을 유지하고, 영어 표현은 지침서 기준에 맞는 보조 표현으로만 제한하세요.
+3. 곡 제목은 가사 본문에 넣지 말고 전용 제목 필드에만 남기세요.
+4. 응답은 오직 JSON 형식으로만 해야 합니다. 추가적인 설명 텍스트를 포함하지 마세요.
 JSON 구조:
 {
   "style_prompt": "스타일 프롬프트 내용 (영문, 120자 이내)",
@@ -586,7 +633,7 @@ JSON 구조:
               Authorization: `Bearer ${apiKey}`,
             },
             body: JSON.stringify({
-              model: "gpt-4o-mini",
+              model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
               messages: [
                 {
                   role: "system",
@@ -829,3 +876,32 @@ window.backToOptions = function () {
 };
 
 console.log("✅ step1.js 로드 완료");
+
+// 실시간 제목 동기화 (Step 1 입력 시 헤더 및 Step 5 제목 업데이트)
+(function () {
+  const initSync = () => {
+    const songTitleEl = document.getElementById("songTitle");
+    const headerTitleEl = document.getElementById("songTitleText");
+    const finalTitleEl = document.getElementById("finalTitleText");
+
+    if (songTitleEl) {
+      songTitleEl.addEventListener("input", (e) => {
+        const newTitle = e.target.value.trim() || "제목 없음";
+        if (headerTitleEl) headerTitleEl.textContent = newTitle;
+        if (finalTitleEl) finalTitleEl.textContent = newTitle;
+
+        // 첫 글자 입력 시 헤더 제목 컨테이너 노출
+        const songTitleContainer = document.getElementById("currentSongTitle");
+        if (songTitleContainer && newTitle !== "제목 없음") {
+          songTitleContainer.style.display = "block";
+        }
+      });
+    }
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initSync);
+  } else {
+    initSync();
+  }
+})();

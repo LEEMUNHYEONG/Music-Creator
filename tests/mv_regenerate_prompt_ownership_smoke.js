@@ -77,7 +77,7 @@ window.showCopyIndicator = function showCopyIndicator(message) {
   toastMessage = message;
 };
 
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 window.regenerateSingleStylePrompt = async function regenerateSingleStylePromptStub(
   type,

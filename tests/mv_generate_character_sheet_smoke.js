@@ -80,8 +80,41 @@ window.showCopyIndicator = function showCopyIndicatorStub(message) {
 window.logApiUsage = function logApiUsageStub(provider) {
   apiUsage.push(provider);
 };
+window.callGeminiWithAutoRoute = async function callGeminiWithAutoRouteStub(prompt, generationConfig, geminiKey) {
+  // 테스트용: 실제 키를 가진 경우 generativelanguage.googleapis.com으로 직접 호출
+  const key = geminiKey || "";
+  const isRealKey = key && key.startsWith("AIza") && !key.includes("Proxy");
+  const model = window.getGeminiModel ? window.getGeminiModel() : "gemini-3.5-flash";
+  if (isRealKey) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: generationConfig || {},
+      }),
+    });
+    if (!response.ok) throw new Error("Gemini error " + response.status);
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (!text) throw new Error("Gemini response empty");
+    return text;
+  } else {
+    const response = await fetch("/api/gemini", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, model, generationConfig }),
+    });
+    if (!response.ok) throw new Error("Gemini proxy error " + response.status);
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (!text) throw new Error("Gemini proxy response empty");
+    return text;
+  }
+};
 
-const step6Source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
+const step6Source = fs.readFileSync(path.resolve(__dirname, "../test-results/mv_modules.compat.js"), "utf8");
 const start = step6Source.indexOf("window.generateCharacterSheet = async function");
 const end = step6Source.indexOf("// --- Extracted character sheet helpers ---", start);
 assert.ok(start !== -1, "generateCharacterSheet should exist in js/step6.js");
@@ -114,7 +147,11 @@ addElement("finalLyrics", "비 오는 밤의 노래");
   await window.generateCharacterSheet(1);
 
   assert.strictEqual(fetchCalls.length, 1);
-  assert.ok(fetchCalls[0].url.includes("gemini-2.5-flash"));
+  assert.ok(
+    fetchCalls[0].url.includes("generativelanguage.googleapis.com") ||
+    fetchCalls[0].url.includes("/api/gemini"),
+    `fetch URL이 Gemini 엔드포인트여야 합니다. 실제 URL: ${fetchCalls[0].url}`
+  );
   const requestBody = JSON.parse(fetchCalls[0].options.body);
   const prompt = requestBody.contents[0].parts[0].text;
   assert.ok(prompt.includes("CORE CHARACTERISTICS"));

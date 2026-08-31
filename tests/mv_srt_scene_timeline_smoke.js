@@ -33,7 +33,7 @@ window.showCopyIndicator = function showCopyIndicatorStub(message) {
   toasts.push(message);
 };
 
-const step6Source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
+const step6Source = fs.readFileSync(path.resolve(__dirname, "../test-results/mv_modules.compat.js"), "utf8");
 const start = step6Source.indexOf("window.generateSRTPreview = function () {");
 const end = step6Source.indexOf("// === MV Step 6: Translation, regeneration, copy, and tag actions ===", start);
 assert.ok(start !== -1, "generateSRTPreview should exist in js/step6.js");
@@ -69,9 +69,9 @@ window.generateSRTPreview();
 
 assert.ok(window.currentSRTContent.includes("00:00:08,000 --> 00:00:17,000"));
 assert.ok(window.currentSRTContent.includes("다시 빛을 향해 걸어간다"));
-assert.ok(window.currentSRTContent.includes("[sunrise rooftop · hopeful · warm horizon]"));
 assert.ok(window.currentSRTContent.includes("00:00:17,000 --> 00:00:25,000"));
-assert.ok(window.currentSRTContent.includes("[rainy alley · lonely]"));
+assert.ok(!window.currentSRTContent.includes("sunrise rooftop"));
+assert.ok(!window.currentSRTContent.includes("rainy alley"));
 assert.ok(toasts.some((message) => message.includes("2개 자막")));
 assert.deepStrictEqual(alerts, []);
 

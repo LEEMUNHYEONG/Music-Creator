@@ -286,25 +286,32 @@ window.goToStep = function (step, saveBefore = false, skipValidation = false) {
       }
     }
 
-    // 3단계 특별 처리: 저장된 분석 결과가 있으면 로딩 숨기고 결과 표시 (불러오기 시 정지 현상 방지)
+    // 3단계 특별 처리: UI 제어 및 2단계 데이터 동기화
     if (step === 3) {
+      const analysisResult = document.getElementById("analysisResult");
       const analysisLoading = document.getElementById("analysisLoading");
       const analysisError = document.getElementById("analysisError");
-      const analysisResult = document.getElementById("analysisResult");
+      const analysisTargetLyrics = document.getElementById("analysisTargetLyrics");
+      const analysisTargetStyle = document.getElementById("analysisTargetStyle");
 
-      const analysisTargetLyrics = document.getElementById(
-        "analysisTargetLyrics",
-      );
-      const analysisTargetStyle = document.getElementById(
-        "analysisTargetStyle",
-      );
+      // 2단계 최신 데이터를 3단계 분석 대상에 강제 동기화 (탭 전환 시 빈 화면 방지)
+      const currentSunoLyrics = document.getElementById("sunoLyrics")?.value || "";
+      const currentStylePrompt = document.getElementById("stylePrompt")?.value || "";
+      
+      if (analysisTargetLyrics && currentSunoLyrics.trim()) {
+        analysisTargetLyrics.textContent = currentSunoLyrics;
+      }
+      if (analysisTargetStyle && currentStylePrompt.trim()) {
+        analysisTargetStyle.textContent = currentStylePrompt;
+      }
+
       const hasTargetData =
         analysisTargetLyrics &&
         analysisTargetLyrics.textContent.trim() &&
         analysisTargetStyle &&
         analysisTargetStyle.textContent.trim();
 
-      // 저장된 분석 데이터가 있으면 무조건 결과 영역 표시 (로딩 메시지 정지 방지)
+      // 저장된 분석 데이터 확인
       const projectData =
         window.currentProject && window.currentProject.data
           ? window.currentProject.data
@@ -319,24 +326,14 @@ window.goToStep = function (step, saveBefore = false, skipValidation = false) {
         (projectData && (projectData.analysisScores || projectData.feedbacks))
       );
 
-      if (hasSavedAnalysis || hasTargetData) {
-        if (analysisLoading) analysisLoading.style.display = "none";
-        if (analysisError) analysisError.style.display = "none";
-        if (analysisResult) {
-          analysisResult.style.display = "block";
-          analysisResult.classList.remove("hidden");
-          console.log("✅ 3단계 분석 결과 영역 표시 완료");
-        }
-      } else {
-        // 데이터가 없어도 로딩을 보여주지 않고 결과 영역(분석 시작 UI)을 보여줌
-        // 사용자가 가사가 없는 상태임을 인지하고 2단계로 돌아가거나 할 수 있게 함
-        if (analysisLoading) analysisLoading.style.display = "none";
-        if (analysisError) analysisError.style.display = "none";
-        if (analysisResult) {
-          analysisResult.style.display = "block";
-          analysisResult.classList.remove("hidden");
-          console.log("✅ 3단계 데이터 대기 중");
-        }
+      // 로딩/에러 화면 숨기고 결과 영역은 항상 표시
+      if (analysisLoading) analysisLoading.style.display = "none";
+      if (analysisError) analysisError.style.display = "none";
+      
+      if (analysisResult) {
+        analysisResult.style.display = "block";
+        analysisResult.classList.remove("hidden");
+        console.log(hasSavedAnalysis || hasTargetData ? "✅ 3단계 분석 결과 영역 표시 완료" : "✅ 3단계 데이터 대기 중");
       }
     }
 
@@ -420,6 +417,8 @@ window.setReadOnlyMode = function (readonly) {
         "intermediateAudioFileInput",
         "mvAudioFileInput",
         "mvCustomSettings",
+        "mvLocationCustom",
+        "mvActionCustom",
       ];
       // MV 인물 외모/스타일, 기타 항목은 항상 수정 가능
       if (excludeIds.some((excludeId) => id.includes(excludeId))) {
@@ -961,6 +960,22 @@ window.toggleSidebar = function () {
   }
 };
 
+window.syncSidebarForViewport = function () {
+  if (!window.matchMedia("(max-width: 768px)").matches) return;
+  const sidebar = document.getElementById("sidebar");
+  const overlay = document.getElementById("sidebarOverlay");
+  const toggle = document.getElementById("sidebarToggle");
+  if (sidebar) sidebar.classList.remove("open");
+  if (overlay) overlay.style.display = "none";
+  if (toggle) toggle.setAttribute("aria-expanded", "false");
+};
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", window.syncSidebarForViewport);
+} else {
+  window.syncSidebarForViewport();
+}
+
 // ═══════════════════════════════════════════════════════════════
 // 사이드바 드래그 기능
 // ═══════════════════════════════════════════════════════════════
@@ -1212,8 +1227,56 @@ window.updateMainContentPosition = function () {
   const mainWrapper = document.getElementById("mainWrapper");
   const header = document.querySelector("header");
   const container = document.querySelector(".container");
+  const progressSteps = document.getElementById("progressSteps");
 
   if (!sidebar) return;
+
+  // 모바일 사이드바는 본문을 밀지 않는 오버레이이므로 데스크톱 너비 보정을 적용하지 않는다.
+  if (window.matchMedia("(max-width: 768px)").matches) {
+    if (mainWrapper) {
+      mainWrapper.style.marginLeft = "0";
+      mainWrapper.style.marginRight = "0";
+      mainWrapper.style.width = "100%";
+      mainWrapper.style.maxWidth = "none";
+      mainWrapper.style.overflowX = "clip";
+    }
+
+    if (header) {
+      header.style.marginLeft = "0";
+      header.style.width = "100%";
+      header.style.maxWidth = "none";
+      header.style.position = "fixed";
+      header.style.left = "0";
+      header.style.right = "0";
+      header.style.zIndex = "1000";
+    }
+
+    if (container) {
+      container.style.marginLeft = "0";
+      container.style.marginRight = "0";
+      container.style.width = "100%";
+      container.style.maxWidth = "100%";
+      container.style.paddingLeft = "12px";
+      container.style.paddingRight = "12px";
+      container.style.boxSizing = "border-box";
+      container.style.paddingTop = `${(header ? header.offsetHeight : 150) + 62}px`;
+    }
+
+    document.documentElement.style.setProperty(
+      "--header-height",
+      `${header ? header.offsetHeight : 150}px`,
+    );
+    document.documentElement.style.setProperty("--sidebar-width", "0px");
+
+    if (progressSteps && header) {
+      progressSteps.style.top = `${header.offsetHeight + 8}px`;
+      progressSteps.style.left = "12px";
+      progressSteps.style.right = "12px";
+      progressSteps.style.width = "auto";
+      progressSteps.style.transform = "none";
+    }
+    return;
+  }
 
   // 사이드바는 항상 좌측에 고정, 메인 화면은 우측에 고정
   const sidebarWidth = sidebar.offsetWidth || 320;
@@ -1265,7 +1328,6 @@ window.updateMainContentPosition = function () {
   );
 
   // .progress-steps (position: fixed) 위치 직접 계산
-  const progressSteps = document.getElementById("progressSteps");
   if (progressSteps && header) {
     const headerH = header.offsetHeight;
     const sw = sidebarWidth || 0;
@@ -1553,7 +1615,8 @@ ${stylePrompt}
     let aiResponse = "";
     try {
       // Gemini API 호출
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+      const currentGeminiModel = window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash";
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentGeminiModel}:generateContent?key=${geminiKey}`;
 
       // 60초 타임아웃 설정 (네트워크 지연으로 인한 무한 로딩 방지)
       const controller = new AbortController();
@@ -1589,6 +1652,9 @@ ${stylePrompt}
       const data = await response.json();
       aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     } catch (geminiError) {
+      if (typeof window.handleGeminiApiFailure === "function") {
+        window.handleGeminiApiFailure(geminiError);
+      }
       console.warn("⚠️ Gemini 분석 실패, ChatGPT로 전환하여 재시도합니다:", geminiError.message);
       const openaiKey = window.getOpenAIApiKey ? window.getOpenAIApiKey() : "";
       if (!openaiKey) {
@@ -1602,7 +1668,7 @@ ${stylePrompt}
           Authorization: `Bearer ${openaiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
           messages: [
             { role: "system", content: "You are an AI songwriter that strictly responds with valid JSON matching the user's requested format." },
             { role: "user", content: analysisPrompt },
@@ -2165,6 +2231,7 @@ window.analyzeIntermediateAudio = async function () {
 3. **가사 분석**: 추출한 가사가 원본 가사와 일치하는지 확인하고, 차이점이 있으면 알려주세요
 4. **스타일 프롬프트 분석**: 음원의 스타일이 원본 스타일 프롬프트와 일치하는지 확인해주세요
 5. **개선 제안**: 음원을 듣고 가사나 스타일 프롬프트에 대한 개선 제안을 해주세요
+6. **음원 반영 평가 점수**: 실제 업로드 음원 기준으로 최종 평가에 반영할 점수를 0-100점으로 산정해주세요
 
 ${
   sunoLyricsForCopy
@@ -2210,6 +2277,12 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
    - 스타일 프롬프트 개선 제안
    - 지침서를 참고하여 구체적인 개선 방안 제시
 
+5. **점수 산정**:
+   - audioScore: 실제 음원의 보컬 전달력, 멜로디/편곡 완성도, 음질, 몰입감 종합 점수
+   - lyricDeliveryScore: 실제 음원에서 가사가 명확하게 전달되는 정도
+   - styleMatchScore: 실제 음원과 스타일 프롬프트의 일치도
+   - recommendedFinalScore: 최종 평가 요약의 "개선 후" 점수에 반영할 권장 점수
+
 === 응답 형식 ===
 다음 JSON 형식으로 응답해주세요:
 
@@ -2220,6 +2293,10 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
   "differences": "원본과의 차이점 설명 (가사 내용, 지시어, 구조 등)",
   "styleMatches": true/false,
   "styleDifferences": "스타일 프롬프트 차이점 설명",
+  "audioScore": 88,
+  "lyricDeliveryScore": 86,
+  "styleMatchScore": 90,
+  "recommendedFinalScore": 89,
   "suggestions": [
     "가사 개선 제안 1",
     "가사 개선 제안 2",
@@ -2237,7 +2314,8 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
         let aiResponse = "";
         try {
           // Gemini API 호출 (음원 파일 포함)
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+          const currentGeminiModel = window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash";
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentGeminiModel}:generateContent?key=${geminiKey}`;
 
           const response = await fetch(geminiUrl, {
             method: "POST",
@@ -2277,6 +2355,9 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
           if (window.logApiUsage) window.logApiUsage("gemini");
           aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
         } catch (geminiError) {
+          if (typeof window.handleGeminiApiFailure === "function") {
+            window.handleGeminiApiFailure(geminiError);
+          }
           console.warn("⚠️ Gemini 음원 분석 실패, ChatGPT로 전환하여 재시도합니다:", geminiError.message);
           const openaiKey = window.getOpenAIApiKey ? window.getOpenAIApiKey() : "";
           if (!openaiKey) {
@@ -2290,7 +2371,7 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
               Authorization: `Bearer ${openaiKey}`,
             },
             body: JSON.stringify({
-              model: "gpt-4o-mini",
+              model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
               messages: [
                 { role: "system", content: "You are an AI music analyzer. (Note: Audio file input not supported over text chat fallback, please rely on the provided text prompt details to formulate the evaluation)." },
                 { role: "user", content: prompt + "\n\n(Note: Audio data omitted in fallback)" },
@@ -2401,7 +2482,19 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
             </div>`;
         }
 
-
+        const audioScoreValue = getAudioAnalysisScoreValue(analysisData, 0);
+        if (audioScoreValue) {
+          resultHtml += `
+            <div style="margin-bottom: 20px; padding: 15px; background: var(--bg-input); border-radius: 8px;">
+              <h5 style="margin-bottom: 10px; color: var(--accent);">📈 음원 반영 평가 점수</h5>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
+                <div><strong>${audioScoreValue}</strong>점<br><span style="color:var(--text-secondary);font-size:0.85rem;">최종 반영 권장</span></div>
+                <div><strong>${analysisData.audioScore ?? "-"}</strong>점<br><span style="color:var(--text-secondary);font-size:0.85rem;">음원 종합</span></div>
+                <div><strong>${analysisData.lyricDeliveryScore ?? "-"}</strong>점<br><span style="color:var(--text-secondary);font-size:0.85rem;">가사 전달</span></div>
+                <div><strong>${analysisData.styleMatchScore ?? "-"}</strong>점<br><span style="color:var(--text-secondary);font-size:0.85rem;">스타일 일치</span></div>
+              </div>
+            </div>`;
+        }
 
         if (analysisData.matchesOriginal !== undefined) {
           resultHtml += `
@@ -2464,7 +2557,7 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
 
           resultHtml += `
                         <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
-                            <button class="btn btn-success" onclick="if(typeof window.applyExtractedLyrics === 'function') { window.applyExtractedLyrics(); } else { alert('⚠️ 기능을 사용할 수 없습니다.'); }" style="width: 100%;">
+                            <button class="btn btn-success" onclick="if(typeof window.applyExtractedLyrics === 'function') { window.applyExtractedLyrics(this); } else { alert('⚠️ 기능을 사용할 수 없습니다.'); }" style="width: 100%;">
                                 ✅ 추출된 가사를 최종 가사에 반영
                             </button>
                         </div>
@@ -2476,12 +2569,28 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
 
         // 분석 결과를 전역 변수에 저장
         window.intermediateAudioAnalysis = analysisData;
+        if (window.currentProject) {
+          if (!window.currentProject.data) window.currentProject.data = {};
+          window.currentProject.data.intermediateAudioAnalysis = analysisData;
+        }
 
         // 버튼 복원
         analyzeBtn.disabled = false;
         analyzeBtn.innerHTML = "🔍 음원 분석 및 최종 가사 반영";
 
         console.log("✅ 음원 분석 완료:", analysisData);
+
+        if (typeof window.updateIntermediateAudioFeedback === "function") {
+          window.updateIntermediateAudioFeedback(analysisData);
+        }
+
+        if (typeof window.requestFinalEvaluationRefresh === "function") {
+          window.requestFinalEvaluationRefresh("audio-analysis-complete", {
+            audioAnalysisData: analysisData,
+            message:
+              "음원 분석이 완료되었습니다. 최신 음원 분석 결과를 반영해 평가 점수를 다시 계산 중입니다...",
+          });
+        }
 
         if (typeof window.showCopyIndicator === "function") {
           window.showCopyIndicator("✅ 음원 분석이 완료되었습니다!");
@@ -2564,6 +2673,115 @@ function getGradeFromScore(score) {
   return "F";
 }
 
+function clampEvaluationScore(score, fallback) {
+  const parsed = parseInt(score, 10);
+  if (Number.isFinite(parsed)) {
+    return Math.min(100, Math.max(0, parsed));
+  }
+  const fallbackParsed = parseInt(fallback, 10);
+  return Number.isFinite(fallbackParsed)
+    ? Math.min(100, Math.max(0, fallbackParsed))
+    : 0;
+}
+
+function getAudioAnalysisScoreValue(audioAnalysisData, fallbackScore) {
+  if (!audioAnalysisData || typeof audioAnalysisData !== "object") {
+    return clampEvaluationScore(fallbackScore, 0);
+  }
+
+  const directScore =
+    audioAnalysisData.recommendedFinalScore ??
+    audioAnalysisData.audioScore ??
+    audioAnalysisData.overallScore ??
+    audioAnalysisData.score ??
+    audioAnalysisData.scores?.overall ??
+    audioAnalysisData.scores?.audio ??
+    audioAnalysisData.scores?.performance;
+
+  if (directScore !== undefined && directScore !== null && directScore !== "") {
+    return clampEvaluationScore(directScore, fallbackScore);
+  }
+
+  let estimated = clampEvaluationScore(fallbackScore, 82);
+  if (audioAnalysisData.matchesOriginal === true) estimated += 3;
+  if (audioAnalysisData.matchesOriginal === false) estimated -= 4;
+  if (audioAnalysisData.styleMatches === true) estimated += 3;
+  if (audioAnalysisData.styleMatches === false) estimated -= 4;
+  if (Array.isArray(audioAnalysisData.suggestions)) {
+    estimated -= Math.min(6, audioAnalysisData.suggestions.length);
+  }
+  if (audioAnalysisData.differences) estimated -= 2;
+  if (audioAnalysisData.styleDifferences) estimated -= 2;
+
+  return Math.min(100, Math.max(0, estimated));
+}
+
+function buildAudioAnalysisEvaluationComment(audioAnalysisData) {
+  if (!audioAnalysisData || typeof audioAnalysisData !== "object") {
+    return "";
+  }
+
+  const parts = [];
+  const score = getAudioAnalysisScoreValue(audioAnalysisData, null);
+  if (score) parts.push(`음원 분석 반영 점수: ${score}점`);
+  if (audioAnalysisData.matchesOriginal !== undefined) {
+    parts.push(
+      audioAnalysisData.matchesOriginal
+        ? "가사는 원본과 대체로 일치합니다."
+        : "가사에 원본과 다른 지점이 감지되었습니다.",
+    );
+  }
+  if (audioAnalysisData.styleMatches !== undefined) {
+    parts.push(
+      audioAnalysisData.styleMatches
+        ? "스타일 프롬프트와 음원 분위기가 대체로 일치합니다."
+        : "스타일 프롬프트와 실제 음원 사이에 차이가 있습니다.",
+    );
+  }
+  if (audioAnalysisData.analysis) {
+    parts.push(String(audioAnalysisData.analysis).slice(0, 220));
+  }
+  return parts.join(" ");
+}
+
+window.updateIntermediateAudioFeedback = function (analysisData) {
+  const feedbackEl = document.getElementById("intermediateAudioFeedback");
+  if (!feedbackEl) return;
+
+  if (!analysisData || typeof analysisData !== "object") {
+    feedbackEl.textContent = "업로드된 음원 분석 결과가 아직 없습니다.";
+    return;
+  }
+
+  const score = getAudioAnalysisScoreValue(
+    analysisData,
+    document.getElementById("afterScore")?.textContent || 0,
+  );
+  const suggestions = Array.isArray(analysisData.suggestions)
+    ? analysisData.suggestions.slice(0, 3)
+    : [];
+
+  feedbackEl.innerHTML = `
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+      <strong style="color:var(--accent);">음원 반영 평가 ${score}점</strong>
+      <span>${analysisData.matchesOriginal === false ? "가사 차이 감지" : "가사 확인 완료"}</span>
+      <span>${analysisData.styleMatches === false ? "스타일 차이 감지" : "스타일 확인 완료"}</span>
+    </div>
+    ${
+      analysisData.analysis
+        ? `<div style="margin-bottom:8px;">${escapeHtml(String(analysisData.analysis).slice(0, 350))}</div>`
+        : ""
+    }
+    ${
+      suggestions.length
+        ? `<ul style="margin:8px 0 0;padding-left:20px;">${suggestions
+            .map((item) => `<li>${escapeHtml(item)}</li>`)
+            .join("")}</ul>`
+        : ""
+    }
+  `;
+};
+
 /** 최종 평가 요약 UI만 갱신 (수치, 등급, 프로그레스 바) */
 window.updateFinalEvaluationUI = function (
   beforeScoreVal,
@@ -2587,7 +2805,59 @@ window.updateFinalEvaluationUI = function (
     aiCommentEl.textContent = aiCommentText;
 };
 
-window.generateFinalEvaluation = async function () {
+function getCurrentFinalEvaluationScores() {
+  const beforeScore =
+    window.currentProject?.data?.beforeScore ??
+    document.getElementById("beforeScore")?.textContent ??
+    0;
+  const afterScore =
+    window.currentProject?.data?.afterScore ??
+    document.getElementById("afterScore")?.textContent ??
+    beforeScore;
+  return { beforeScore, afterScore };
+}
+
+window.requestFinalEvaluationRefresh = function (reason, options) {
+  const delay = Math.max(0, Number(options?.delay ?? 80));
+  const message =
+    options?.message ||
+    "음원 분석 결과를 반영해 최종 평가 점수를 다시 계산 중입니다...";
+  const { beforeScore, afterScore } = getCurrentFinalEvaluationScores();
+  const audioAnalysisData =
+    options?.audioAnalysisData ||
+    window.intermediateAudioAnalysis ||
+    window.currentProject?.data?.intermediateAudioAnalysis ||
+    null;
+  const immediateAfterScore = audioAnalysisData
+    ? getAudioAnalysisScoreValue(audioAnalysisData, afterScore)
+    : afterScore;
+  const immediateComment =
+    audioAnalysisData
+      ? buildAudioAnalysisEvaluationComment(audioAnalysisData) || message
+      : message;
+
+  if (typeof window.updateFinalEvaluationUI === "function") {
+    window.updateFinalEvaluationUI(
+      beforeScore,
+      immediateAfterScore,
+      immediateComment,
+    );
+  }
+
+  clearTimeout(window.__finalEvaluationRefreshTimer);
+  window.__finalEvaluationRefreshTimer = setTimeout(() => {
+    if (typeof window.generateFinalEvaluation === "function") {
+      window.generateFinalEvaluation({ reason: reason || "manual-refresh" });
+    }
+  }, delay);
+};
+
+window.generateFinalEvaluation = async function (options) {
+  const evaluationRunId = (window.__finalEvaluationRunId || 0) + 1;
+  window.__finalEvaluationRunId = evaluationRunId;
+  const isLatestEvaluationRun = () =>
+    window.__finalEvaluationRunId === evaluationRunId;
+
   try {
     const beforeScoreEl = document.getElementById("beforeScore");
     const afterScoreEl = document.getElementById("afterScore");
@@ -2603,6 +2873,16 @@ window.generateFinalEvaluation = async function () {
     const analysisData = window.currentProject?.data?.analysis;
     const beforeScore =
       analysisData?.scores?.overall || analysisData?.scores?.overallScore || 0;
+    const audioAnalysisData =
+      window.intermediateAudioAnalysis ||
+      window.currentProject?.data?.intermediateAudioAnalysis ||
+      null;
+    if (
+      audioAnalysisData &&
+      typeof window.updateIntermediateAudioFeedback === "function"
+    ) {
+      window.updateIntermediateAudioFeedback(audioAnalysisData);
+    }
 
     // 현재 최종 가사와 스타일 가져오기
     const finalLyrics =
@@ -2693,11 +2973,18 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
 
 `
         : ""
+    }${
+      audioAnalysisData
+        ? `=== 업로드 음원 분석 결과 (최신 반영 대상) ===
+${JSON.stringify(audioAnalysisData).substring(0, 1800)}
+
+`
+        : ""
     }=== 평가 요청 사항 ===
 
 1. **개선 전 점수 (beforeScore)**: 3단계 분석 결과의 종합 점수를 사용하거나, 개선 전 가사와 스타일을 평가하여 0-100점으로 점수를 매겨주세요.
 
-2. **개선 후 점수 (afterScore)**: 개선 후 최종 가사와 스타일 프롬프트를 평가하여 0-100점으로 점수를 매겨주세요. 개선안이 잘 반영되었는지, 가사의 품질이 향상되었는지를 종합적으로 평가해주세요.
+2. **개선 후 점수 (afterScore)**: 개선 후 최종 가사와 스타일 프롬프트를 평가하여 0-100점으로 점수를 매겨주세요. 업로드 음원 분석 결과가 제공된 경우, 실제 음원에서 추출된 가사/스타일 일치 여부/차이점/개선 제안까지 반드시 반영해 점수를 재산정해주세요.
 
 3. **AI 최종 코멘트**: 개선 전후의 변화를 분석하고, 장점과 개선점을 포함한 격려와 조언이 담긴 코멘트를 작성해주세요.
 
@@ -2715,7 +3002,8 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
     let aiResponse = "";
     try {
       // Gemini API 호출
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+      const currentGeminiModel = window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash";
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentGeminiModel}:generateContent?key=${geminiKey}`;
 
       const response = await fetch(geminiUrl, {
         method: "POST",
@@ -2743,6 +3031,9 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
       if (window.logApiUsage) window.logApiUsage("gemini");
       aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     } catch (geminiError) {
+      if (typeof window.handleGeminiApiFailure === "function") {
+        window.handleGeminiApiFailure(geminiError);
+      }
       console.warn("⚠️ Gemini 최종 평가 실패, ChatGPT로 전환하여 재시도합니다:", geminiError.message);
       const openaiKey = window.getOpenAIApiKey ? window.getOpenAIApiKey() : "";
       if (!openaiKey) {
@@ -2756,7 +3047,7 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
           Authorization: `Bearer ${openaiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
           messages: [
             { role: "system", content: "You are an AI songwriter evaluating lyrics quality." },
             { role: "user", content: evaluationPrompt },
@@ -2829,16 +3120,39 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
       100,
       Math.max(0, parseInt(evaluationData.beforeScore ?? beforeScore, 10) || 0),
     );
+    const audioScoreValue = audioAnalysisData
+      ? getAudioAnalysisScoreValue(audioAnalysisData, evaluationData.afterScore)
+      : null;
     const afterScoreValue = Math.min(
       100,
-      Math.max(0, parseInt(evaluationData.afterScore ?? beforeScore, 10) || 0),
+      Math.max(
+        0,
+        parseInt(
+          audioScoreValue ?? evaluationData.afterScore ?? beforeScore,
+          10,
+        ) || 0,
+      ),
     );
+    const audioComment = audioAnalysisData
+      ? buildAudioAnalysisEvaluationComment(audioAnalysisData)
+      : "";
+    const finalEvaluationComment = audioComment
+      ? `${audioComment}\n\n${evaluationData.aiComment || ""}`.trim()
+      : evaluationData.aiComment || "";
+
+    if (!isLatestEvaluationRun()) {
+      console.log("ℹ️ 이전 최종 평가 응답은 최신 요청이 아니어서 무시합니다.", {
+        reason: options?.reason || "auto",
+        runId: evaluationRunId,
+      });
+      return;
+    }
 
     if (typeof window.updateFinalEvaluationUI === "function") {
       window.updateFinalEvaluationUI(
         beforeScoreValue,
         afterScoreValue,
-        evaluationData.aiComment || "평가 코멘트를 생성할 수 없습니다.",
+        finalEvaluationComment || "평가 코멘트를 생성할 수 없습니다.",
       );
     } else {
       if (beforeScoreEl) beforeScoreEl.textContent = beforeScoreValue;
@@ -2847,7 +3161,7 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
         finalGradeEl.textContent = getGradeFromScore(afterScoreValue);
       if (aiCommentEl)
         aiCommentEl.textContent =
-          evaluationData.aiComment || "평가 코멘트를 생성할 수 없습니다.";
+          finalEvaluationComment || "평가 코멘트를 생성할 수 없습니다.";
     }
 
     // 프로젝트 데이터에 저장
@@ -2857,7 +3171,11 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
       }
       window.currentProject.data.beforeScore = beforeScoreValue;
       window.currentProject.data.afterScore = afterScoreValue;
-      window.currentProject.data.aiComment = evaluationData.aiComment || "";
+      window.currentProject.data.aiComment = finalEvaluationComment || "";
+      if (audioAnalysisData) {
+        window.currentProject.data.intermediateAudioAnalysis =
+          audioAnalysisData;
+      }
     }
 
     console.log("✅ 최종 평가 요약 생성 완료:", {
@@ -2865,6 +3183,13 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
       afterScore: afterScoreValue,
     });
   } catch (error) {
+    if (!isLatestEvaluationRun()) {
+      console.log("ℹ️ 이전 최종 평가 오류 응답은 최신 요청이 아니어서 무시합니다.", {
+        reason: options?.reason || "auto",
+        runId: evaluationRunId,
+      });
+      return;
+    }
     console.error("❌ 최종 평가 생성 오류:", error);
     const analysisData = window.currentProject?.data?.analysis;
     const defaultScore = Math.min(
@@ -3423,7 +3748,7 @@ K-Pop Ballad, emotional, melancholic, 75 BPM, soft female vocals, breathy tone, 
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
         messages: [
           {
             role: "system",
@@ -3796,7 +4121,7 @@ window.generateStylePromptTranslation = async function () {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
         messages: [
           {
             role: "system",
@@ -4135,7 +4460,8 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
     let aiResponse = "";
     try {
       // Gemini API 호출
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+      const currentGeminiModel = window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash";
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentGeminiModel}:generateContent?key=${geminiKey}`;
 
       const response = await fetch(geminiUrl, {
         method: "POST",
@@ -4162,6 +4488,9 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
       if (window.logApiUsage) window.logApiUsage("gemini");
       aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     } catch (geminiError) {
+      if (typeof window.handleGeminiApiFailure === "function") {
+        window.handleGeminiApiFailure(geminiError);
+      }
       console.warn("⚠️ Gemini 마케팅 생성 실패, ChatGPT로 전환하여 재시도합니다:", geminiError.message);
       const openaiKey = window.getOpenAIApiKey ? window.getOpenAIApiKey() : "";
       if (!openaiKey) {
@@ -4175,7 +4504,7 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
           Authorization: `Bearer ${openaiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
           messages: [
             { role: "system", content: "You are an AI marketer creating promotional texts matching the requested JSON format." },
             { role: "user", content: marketingPrompt },
@@ -5944,12 +6273,20 @@ window.resetAllSteps = function (skipConfirm = false) {
 
 window.testAPIConnection = async function () {
   try {
-    // API 키: localStorage 우선, 없으면 Firebase globalConfig(서버 키) 사용
     const gc = window.globalConfig || {};
+    
+    // 💡 [FIX] 모달 창에 사용자가 방금 입력한 값이 있다면, 저장(localStorage)된 값보다 우선해서 테스트합니다.
+    const openaiInput = document.getElementById("openaiKeyInput");
+    const geminiInput = document.getElementById("geminiKeyInput");
+    
+    // .offsetParent !== null 은 모달이 화면에 표시되어 있는 상태인지 확인하는 용도입니다.
+    const inputOpenAIVal = (openaiInput && openaiInput.offsetParent !== null) ? openaiInput.value.trim() : "";
+    const inputGeminiVal = (geminiInput && geminiInput.offsetParent !== null) ? geminiInput.value.trim() : "";
+
     const openaiKey =
-      (typeof window.getOpenAIApiKey === "function" ? window.getOpenAIApiKey() : localStorage.getItem("openai_api_key")) || gc.openai_api_key || "";
+      inputOpenAIVal || (typeof window.getOpenAIApiKey === "function" ? window.getOpenAIApiKey() : localStorage.getItem("openai_api_key")) || gc.openai_api_key || "";
     const geminiKey =
-      (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || gc.gemini_api_key || "";
+      inputGeminiVal || (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || gc.gemini_api_key || "";
 
     if (!openaiKey && !geminiKey) {
       alert(
@@ -5972,23 +6309,11 @@ window.testAPIConnection = async function () {
     let results = [];
     let allSuccess = true;
 
-    // OpenAI API 테스트
+    // OpenAI 서버 프록시 테스트
     if (openaiKey) {
       try {
-        const response = await fetch("https://api.openai.com/v1/models", {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${openaiKey}`,
-            "Content-Type": "application/json",
-          },
-        });
-
-        if (response.ok) {
-          results.push("✅ ChatGPT API: 연결 성공");
-        } else {
-          results.push(`❌ ChatGPT API: 연결 실패 (${response.status})`);
-          allSuccess = false;
-        }
+        await window.testServerAIProxy("openai", openaiKey);
+        results.push("✅ ChatGPT API: 연결 성공");
       } catch (error) {
         results.push(`❌ ChatGPT API: 오류 발생 - ${error.message}`);
         allSuccess = false;
@@ -5997,25 +6322,11 @@ window.testAPIConnection = async function () {
       results.push("⚠️ ChatGPT API: 키가 설정되지 않음");
     }
 
-    // Gemini API 테스트
+    // Gemini 서버 프록시 테스트
     if (geminiKey) {
       try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1/models?key=${geminiKey}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          },
-        );
-
-        if (response.ok) {
-          results.push("✅ Gemini API: 연결 성공");
-        } else {
-          results.push(`❌ Gemini API: 연결 실패 (${response.status})`);
-          allSuccess = false;
-        }
+        await window.testServerAIProxy("gemini", geminiKey);
+        results.push("✅ Gemini API: 연결 성공");
       } catch (error) {
         results.push(`❌ Gemini API: 오류 발생 - ${error.message}`);
         allSuccess = false;
@@ -6235,6 +6546,16 @@ window.saveAPIKeys = function () {
       localStorage.removeItem("gemini_api_key");
     }
 
+    // 🔒 [FIX] API 키를 새로 저장할 때, 임시 비활성화 락을 강제로 해제합니다.
+    try {
+      sessionStorage.removeItem("geminiDisabledUntil");
+      sessionStorage.removeItem("geminiDisabledReason");
+      sessionStorage.removeItem("openaiDisabledUntil");
+      sessionStorage.removeItem("openaiDisabledReason");
+      window.__geminiDisabledUntil = 0;
+      window.__geminiDisabledReason = "";
+    } catch (_) {}
+
     // API_CONFIG 업데이트 (전역 객체가 있는 경우)
     if (typeof API_CONFIG !== "undefined") {
       if (API_CONFIG.openai) {
@@ -6436,7 +6757,7 @@ window.closeGuidelinesModal = function () {
   }
 };
 
-window.saveGuidelines = function () {
+window.saveGuidelines = async function () {
   try {
     const guidelinesText = document.getElementById("guidelinesText");
     if (!guidelinesText) {
@@ -6446,11 +6767,209 @@ window.saveGuidelines = function () {
 
     const guidelines = guidelinesText.value.trim();
     localStorage.setItem("musicCreatorGuidelines", guidelines);
+    localStorage.setItem("musicCreator_guidelines", guidelines);
+
+    // 로그인된 사용자 정보가 있으면 Firestore에도 동기화 저장
+    const user = window.firebaseAuth?.currentUser;
+    if (user && window.firebaseDb) {
+      const saveBtn = document.querySelector("#guidelinesModal .modal-footer .btn-primary");
+      let originalText = "💾 저장";
+      
+      try {
+        if (saveBtn) {
+          originalText = saveBtn.innerHTML;
+          saveBtn.disabled = true;
+          saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 저장 중...';
+        }
+
+        await window.firebaseDb.collection("users").doc(user.uid).set({
+          musicCreatorGuidelines: guidelines,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        console.log("☁️ 지침서가 Firestore에 동기화 저장되었습니다.");
+        
+        // 메모리 상의 사용자 데이터도 최신화
+        if (window.currentUserData) {
+          window.currentUserData.musicCreatorGuidelines = guidelines;
+        }
+      } catch (err) {
+        console.error("서버 지침서 저장 실패:", err);
+        alert("⚠️ 로컬에는 저장되었으나, 서버 동기화에 실패했습니다: " + err.message);
+      } finally {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.innerHTML = originalText;
+        }
+      }
+    }
 
     alert("✅ 지침서가 저장되었습니다.");
+    if (typeof window.closeGuidelinesModal === "function") {
+      window.closeGuidelinesModal();
+    }
   } catch (error) {
     console.error("지침서 저장 오류:", error);
     alert("지침서 저장 중 오류가 발생했습니다:\n\n" + error.message);
+  }
+};
+
+window.getGuidelinesBackupPayload = function () {
+  const guidelinesText = document.getElementById("guidelinesText");
+  const content = String(
+    guidelinesText?.value ||
+      localStorage.getItem("musicCreatorGuidelines") ||
+      localStorage.getItem("musicCreator_guidelines") ||
+      "",
+  );
+  return {
+    type: "music-creator-guidelines-backup",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    title: "뮤직모리 제작 지침서",
+    content,
+  };
+};
+
+window.applyGuidelinesBackupPayload = function (payload) {
+  const content =
+    typeof payload === "string"
+      ? payload
+      : payload?.content || payload?.guidelines || payload?.text || "";
+  if (!String(content).trim()) {
+    throw new Error("복원할 지침서 내용이 비어 있습니다.");
+  }
+
+  const guidelinesText = document.getElementById("guidelinesText");
+  if (guidelinesText) {
+    guidelinesText.value = content;
+  }
+  localStorage.setItem("musicCreatorGuidelines", content);
+  localStorage.setItem("musicCreator_guidelines", content);
+  return content;
+};
+
+window.saveGuidelinesBackupToServer = async function (payload) {
+  const user = window.firebaseAuth?.currentUser;
+  if (!user || !window.firebaseDb) {
+    return { ok: false, reason: "로그인 후 서버 백업을 사용할 수 있습니다." };
+  }
+
+  const backupId = `guidelines_${Date.now()}`;
+  const backup = {
+    ...payload,
+    id: backupId,
+    userId: user.uid,
+    savedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  await window.firebaseDb
+    .collection("users")
+    .doc(user.uid)
+    .set({
+      guidelinesBackupLatest: backup,
+    }, { merge: true });
+  return { ok: true, id: backupId };
+};
+
+window.exportGuidelines = async function () {
+  try {
+    const payload = window.getGuidelinesBackupPayload();
+    if (!payload.content.trim()) {
+      alert("백업할 지침서 내용이 없습니다.");
+      return;
+    }
+
+    localStorage.setItem("musicCreatorGuidelines", payload.content);
+    localStorage.setItem("musicCreator_guidelines", payload.content);
+
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const date = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `music-creator-guidelines-backup-${date}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    const serverResult = await window.saveGuidelinesBackupToServer(payload);
+    if (serverResult.ok) {
+      alert("✅ 지침서를 로컬 파일과 서버에 백업했습니다.");
+    } else {
+      alert(`✅ 지침서를 로컬 파일로 백업했습니다.\n\n⚠️ 서버 백업: ${serverResult.reason}`);
+    }
+  } catch (error) {
+    console.error("지침서 백업 오류:", error);
+    alert("지침서 백업 중 오류가 발생했습니다:\n\n" + error.message);
+  }
+};
+
+window.triggerImportGuidelines = function () {
+  const mode = prompt(
+    "지침서 복원 방식을 선택하세요.\n\n1: 로컬 백업 파일 선택\n2: 서버 최신 백업 복원",
+    "1",
+  );
+  if (mode === null) return;
+  if (mode.trim() === "2") {
+    window.restoreGuidelinesFromServer();
+    return;
+  }
+
+  const input = document.getElementById("importGuidelinesFile");
+  if (!input) {
+    alert("지침서 백업 파일 입력 요소를 찾을 수 없습니다.");
+    return;
+  }
+  input.value = "";
+  input.click();
+};
+
+window.handleImportGuidelines = function (event) {
+  const file = event?.target?.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function (loadEvent) {
+    try {
+      const text = String(loadEvent.target?.result || "");
+      const payload = JSON.parse(text);
+      window.applyGuidelinesBackupPayload(payload);
+      alert("✅ 로컬 백업 파일에서 지침서를 복원했습니다.");
+    } catch (error) {
+      console.error("지침서 로컬 복원 오류:", error);
+      alert("지침서 복원 중 오류가 발생했습니다:\n\n" + error.message);
+    }
+  };
+  reader.readAsText(file, "utf-8");
+};
+
+window.restoreGuidelinesFromServer = async function () {
+  try {
+    const user = window.firebaseAuth?.currentUser;
+    if (!user || !window.firebaseDb) {
+      alert("서버 백업을 복원하려면 먼저 로그인해야 합니다.");
+      return;
+    }
+
+    const doc = await window.firebaseDb
+      .collection("users")
+      .doc(user.uid)
+      .get();
+    const backup = doc.data()?.guidelinesBackupLatest;
+
+    if (!backup?.content) {
+      alert("서버에 저장된 지침서 백업이 없습니다.");
+      return;
+    }
+
+    window.applyGuidelinesBackupPayload(backup);
+    alert(`✅ 서버 백업에서 지침서를 복원했습니다.\n\n백업 시각: ${backup.savedAt || "알 수 없음"}`);
+  } catch (error) {
+    console.error("지침서 서버 복원 오류:", error);
+    alert("서버 지침서 복원 중 오류가 발생했습니다:\n\n" + error.message);
   }
 };
 
@@ -7042,6 +7561,20 @@ window.copySunoLyricsAndStyle = function () {
       alert("복사할 가사 또는 스타일이 없습니다.");
     }
     return;
+  }
+  if (typeof window.renderGuidelineComplianceStatus === "function") {
+    window.renderGuidelineComplianceStatus(lyrics, style, "Suno 복사 직전");
+  }
+  if (typeof window.getGuidelineComplianceIssues === "function") {
+    const compliance = window.getGuidelineComplianceIssues(lyrics, style);
+    if (compliance.issues && compliance.issues.length > 0) {
+      const proceed = confirm(
+        "제작 지침서 확인 항목이 남아 있습니다.\n\n" +
+          compliance.issues.join("\n") +
+          "\n\n그래도 Suno용으로 복사할까요?",
+      );
+      if (!proceed) return;
+    }
   }
   const text = "【가사】\n" + lyrics + "\n\n【스타일】\n" + style;
   try {

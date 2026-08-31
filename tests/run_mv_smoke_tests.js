@@ -1,8 +1,17 @@
 const { spawnSync } = require("child_process");
 
+const buildResult = spawnSync(process.execPath, ["tests/build_mv_compat_bundle.js"], {
+  cwd: process.cwd(),
+  encoding: "utf8",
+  stdio: "inherit",
+});
+if (buildResult.status !== 0) {
+  process.exit(buildResult.status || 1);
+}
+
 const checks = [
   ["Syntax: app.js", ["--check", "app.js"]],
-  ["Syntax: js/step6.js", ["--check", "js/step6.js"]],
+  ["Syntax: MV compatibility bundle", ["--check", "test-results/mv_modules.compat.js"]],
   ["Syntax: MV smoke tests", ["--check", __filename]],
 ];
 
@@ -44,16 +53,21 @@ const tests = [
   "tests/mv_model_storage_smoke.js",
   "tests/mv_scene_model_normalization_smoke.js",
   "tests/mv_marketing_diagnostics_smoke.js",
+  "tests/mv_storage_quota_recovery_smoke.js",
+  "tests/mv_step4_ai_fallback_smoke.js",
+  "tests/mv_runtime_guard_smoke.js",
   "tests/mv_single_project_json_smoke.js",
   "tests/mv_restore_step6_smoke.js",
   "tests/mv_step6_section_order_check.js",
   "tests/mv_copy_prompts_smoke.js",
+  "tests/mv_unsaved_export_guard_smoke.js",
   "tests/mv_image_prompt_bundle_smoke.js",
   "tests/mv_scene_prompt_table_copy_smoke.js",
   "tests/mv_video_tool_export_templates_smoke.js",
   "tests/mv_save_scene_prompt_smoke.js",
   "tests/mv_scene_dirty_shortcut_smoke.js",
   "tests/mv_tag_buttons_smoke.js",
+  "tests/mv_clean_midjourney_prompt_smoke.js",
 ];
 
 for (const testFile of tests) {

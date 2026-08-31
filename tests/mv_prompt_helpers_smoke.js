@@ -47,15 +47,17 @@ Object.defineProperty(globalThis, "navigator", {
 global.alert = function alertStub(message) {
   alerts.push(message);
 };
-global.translateKoreanToEnglishForScene = async function translateStub(text) {
-  translatedText = text;
-  return `translated: ${text}`;
+global.translateKoreanToEnglishForScene = async function translateStub(fieldName, koreanText) {
+  // fieldName은 "prompt", "location" 등 필드 식별자이고 koreanText가 실제 번역 대상
+  const textToTranslate = koreanText !== undefined ? koreanText : fieldName;
+  translatedText = textToTranslate;
+  return `translated: ${textToTranslate}`;
 };
 window.showCopyIndicator = function showCopyIndicatorStub(message) {
   toasts.push(message);
 };
 
-const step6Source = fs.readFileSync(path.resolve(__dirname, "../js/step6.js"), "utf8");
+const step6Source = fs.readFileSync(path.resolve(__dirname, "../test-results/mv_modules.compat.js"), "utf8");
 const start = step6Source.indexOf("window.updateMVPromptTranslation = async function");
 const end = step6Source.indexOf("// --- Extracted generateSRTPreview ---", start);
 assert.ok(start !== -1, "updateMVPromptTranslation should exist in js/step6.js");

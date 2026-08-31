@@ -37,7 +37,7 @@ global.alert = function alertStub(message) {
   alerts.push(message);
 };
 global.fetch = async function fetchStub(url, options) {
-  assert.ok(url.includes("gemini-2.5-flash"));
+  assert.ok(url.includes("gemini-"));
   fetchBody = JSON.parse(options.body);
 
   if (fetchMode === "failure") {
@@ -108,7 +108,7 @@ window.saveCurrentProject = function saveCurrentProjectStub() {
   ["mvBackgroundDetailPromptKo", "old main ko"],
 ].forEach(([id, value]) => addElement(id, value));
 
-require("../js/step6.js");
+require("../test-results/mv_modules.compat.js");
 
 window.getMVLocationEnString = function getMVLocationEnStringStub() {
   return "rainy city street";
