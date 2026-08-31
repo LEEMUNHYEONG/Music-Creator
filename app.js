@@ -1613,80 +1613,15 @@ ${stylePrompt}
 
 **중요**: JSON 형식만 출력하고, 다른 설명이나 텍스트는 포함하지 마세요.`;
 
-    let aiResponse = "";
-    try {
-      // Gemini API 호출
-      const currentGeminiModel = window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash";
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentGeminiModel}:generateContent?key=${geminiKey}`;
-
-      // 60초 타임아웃 설정 (네트워크 지연으로 인한 무한 로딩 방지)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        controller.abort();
-      }, 60000);
-
-      const response = await fetch(geminiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: analysisPrompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 6000,
-            responseMimeType: "application/json",
-          },
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error?.message || `API 오류: ${response.status}`,
-        );
-      }
-
-      const data = await response.json();
-      aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    } catch (geminiError) {
-      if (typeof window.handleGeminiApiFailure === "function") {
-        window.handleGeminiApiFailure(geminiError);
-      }
-      console.warn("⚠️ Gemini 분석 실패, ChatGPT로 전환하여 재시도합니다:", geminiError.message);
-      const openaiKey = window.getOpenAIApiKey ? window.getOpenAIApiKey() : "";
-      if (!openaiKey) {
-        throw new Error(`Gemini 분석 실패 (${geminiError.message}) 후 ChatGPT 폴백을 시도했으나 OpenAI API 키가 없습니다.`);
-      }
-      
-      const chatGPTResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${openaiKey}`,
-        },
-        body: JSON.stringify({
-          model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
-          messages: [
-            { role: "system", content: "You are an AI songwriter that strictly responds with valid JSON matching the user's requested format." },
-            { role: "user", content: analysisPrompt },
-          ],
-          temperature: 0.7,
-          response_format: { type: "json_object" },
-        }),
-      });
-      
-      if (!chatGPTResponse.ok) {
-        const errorData = await chatGPTResponse.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || `ChatGPT API 오류: ${chatGPTResponse.status}`);
-      }
-      
-      const chatGPTData = await chatGPTResponse.json();
-      aiResponse = chatGPTData.choices?.[0]?.message?.content || "";
-    }
+    const aiResponse = await window.callAIWithTextFallback({
+      prompt: analysisPrompt,
+      geminiKey,
+      contextLabel: "분석",
+      temperature: 0.7,
+      maxOutputTokens: 6000,
+      openaiSystemMessage:
+        "You are an AI songwriter that strictly responds with valid JSON matching the user's requested format.",
+    });
 
     if (!aiResponse.trim()) {
       throw new Error("Gemini API에서 응답을 받지 못했습니다.");
@@ -2019,6 +1954,110 @@ function escapeHtml(text) {
   });
 }
 window.escapeHtml = escapeHtml;
+
+// ═══════════════════════════════════════════════════════════════
+// 공용 AI 호출 헬퍼: Gemini 시도 → 실패 시 ChatGPT 폴백
+// (기존에 동일 구조의 폴백 블록이 함수마다 복붙되어 타임아웃/사용량 로깅이
+//  제각각이던 것을 단일 경로로 통합. 텍스트 프롬프트 전용 — 오디오 등
+//  멀티모달 입력은 폴백이 불가능하므로 이 헬퍼를 쓰지 않는다.)
+// ═══════════════════════════════════════════════════════════════
+window.callAIWithTextFallback = async function ({
+  prompt,
+  geminiKey,
+  contextLabel = "AI 요청",
+  temperature = 0.7,
+  maxOutputTokens = 3000,
+  geminiJsonMime = true,
+  openaiSystemMessage = "You are an AI assistant that strictly responds with valid JSON matching the user's requested format.",
+  timeoutMs = 60000,
+}) {
+  try {
+    if (!geminiKey || !geminiKey.startsWith("AIza")) {
+      throw new Error("Gemini API 키가 없습니다.");
+    }
+    const currentGeminiModel = window.getGeminiModel
+      ? window.getGeminiModel()
+      : "gemini-2.5-flash";
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentGeminiModel}:generateContent?key=${geminiKey}`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    let response;
+    try {
+      response = await fetch(geminiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens,
+            ...(geminiJsonMime ? { responseMimeType: "application/json" } : {}),
+          },
+        }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || `API 오류: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (window.logApiUsage) window.logApiUsage("gemini");
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (!text.trim()) throw new Error("Gemini 응답이 비어있습니다.");
+    return text;
+  } catch (geminiError) {
+    if (typeof window.handleGeminiApiFailure === "function") {
+      window.handleGeminiApiFailure(geminiError);
+    }
+    console.warn(`⚠️ Gemini ${contextLabel} 실패, ChatGPT로 전환하여 재시도합니다:`, geminiError.message);
+    const openaiKey = window.getOpenAIApiKey ? window.getOpenAIApiKey() : "";
+    if (!openaiKey) {
+      throw new Error(`Gemini ${contextLabel} 실패 (${geminiError.message}) 후 ChatGPT 폴백을 시도했으나 OpenAI API 키가 없습니다.`);
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    let chatGPTResponse;
+    try {
+      chatGPTResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify({
+          model: window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini",
+          messages: [
+            { role: "system", content: openaiSystemMessage },
+            { role: "user", content: prompt },
+          ],
+          temperature,
+          response_format: { type: "json_object" },
+        }),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    if (!chatGPTResponse.ok) {
+      const errorData = await chatGPTResponse.json().catch(() => ({}));
+      throw new Error(errorData.error?.message || `ChatGPT API 오류: ${chatGPTResponse.status}`);
+    }
+
+    const chatGPTData = await chatGPTResponse.json();
+    if (window.logApiUsage) window.logApiUsage("openai");
+    return chatGPTData.choices?.[0]?.message?.content || "";
+  }
+};
 
 // Step 4 관련 중복 함수 제거됨 (js/step4.js에서 관리)
 // updateSelectedCount, selectAllImprovements, deselectAllImprovements, applySelectedImprovements 등
@@ -2981,73 +3020,14 @@ ${JSON.stringify(audioAnalysisData).substring(0, 1800)}
 
 **중요**: JSON 형식만 출력하고, 다른 설명이나 텍스트는 포함하지 마세요.`;
 
-    let aiResponse = "";
-    try {
-      // Gemini API 호출
-      const currentGeminiModel = window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash";
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentGeminiModel}:generateContent?key=${geminiKey}`;
-
-      const response = await fetch(geminiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: evaluationPrompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 3000,
-            responseMimeType: "application/json",
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error?.message || `API 오류: ${response.status}`,
-        );
-      }
-
-      const data = await response.json();
-      if (window.logApiUsage) window.logApiUsage("gemini");
-      aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    } catch (geminiError) {
-      if (typeof window.handleGeminiApiFailure === "function") {
-        window.handleGeminiApiFailure(geminiError);
-      }
-      console.warn("⚠️ Gemini 최종 평가 실패, ChatGPT로 전환하여 재시도합니다:", geminiError.message);
-      const openaiKey = window.getOpenAIApiKey ? window.getOpenAIApiKey() : "";
-      if (!openaiKey) {
-        throw new Error(`Gemini 최종 평가 실패 (${geminiError.message}) 후 ChatGPT 폴백을 시도했으나 OpenAI API 키가 없습니다.`);
-      }
-
-      const chatGPTResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${openaiKey}`,
-        },
-        body: JSON.stringify({
-          model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
-          messages: [
-            { role: "system", content: "You are an AI songwriter evaluating lyrics quality." },
-            { role: "user", content: evaluationPrompt },
-          ],
-          temperature: 0.7,
-          response_format: { type: "json_object" },
-        }),
-      });
-
-      if (!chatGPTResponse.ok) {
-        const errorData = await chatGPTResponse.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || `ChatGPT API 오류: ${chatGPTResponse.status}`);
-      }
-
-      const chatGPTData = await chatGPTResponse.json();
-      if (window.logApiUsage) window.logApiUsage("openai");
-      aiResponse = chatGPTData.choices?.[0]?.message?.content || "";
-    }
+    const aiResponse = await window.callAIWithTextFallback({
+      prompt: evaluationPrompt,
+      geminiKey,
+      contextLabel: "최종 평가",
+      temperature: 0.7,
+      maxOutputTokens: 3000,
+      openaiSystemMessage: "You are an AI songwriter evaluating lyrics quality.",
+    });
 
     if (!aiResponse.trim()) {
       throw new Error("Gemini API에서 응답을 받지 못했습니다.");
@@ -4439,72 +4419,16 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
 
 **중요**: JSON 형식만 출력하고, 다른 설명이나 텍스트는 포함하지 마세요.`;
 
-    let aiResponse = "";
-    try {
-      // Gemini API 호출
-      const currentGeminiModel = window.getGeminiModel ? window.getGeminiModel() : "gemini-2.0-flash";
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentGeminiModel}:generateContent?key=${geminiKey}`;
-
-      const response = await fetch(geminiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: marketingPrompt }] }],
-          generationConfig: {
-            temperature: 0.8,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 3000,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error?.message || `API 오류: ${response.status}`,
-        );
-      }
-
-      const data = await response.json();
-      if (window.logApiUsage) window.logApiUsage("gemini");
-      aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    } catch (geminiError) {
-      if (typeof window.handleGeminiApiFailure === "function") {
-        window.handleGeminiApiFailure(geminiError);
-      }
-      console.warn("⚠️ Gemini 마케팅 생성 실패, ChatGPT로 전환하여 재시도합니다:", geminiError.message);
-      const openaiKey = window.getOpenAIApiKey ? window.getOpenAIApiKey() : "";
-      if (!openaiKey) {
-        throw new Error(`Gemini 마케팅 생성 실패 (${geminiError.message}) 후 ChatGPT 폴백을 시도했으나 OpenAI API 키가 없습니다.`);
-      }
-
-      const chatGPTResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${openaiKey}`,
-        },
-        body: JSON.stringify({
-          model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
-          messages: [
-            { role: "system", content: "You are an AI marketer creating promotional texts matching the requested JSON format." },
-            { role: "user", content: marketingPrompt },
-          ],
-          temperature: 0.8,
-          response_format: { type: "json_object" },
-        }),
-      });
-
-      if (!chatGPTResponse.ok) {
-        const errorData = await chatGPTResponse.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || `ChatGPT API 오류: ${chatGPTResponse.status}`);
-      }
-
-      const chatGPTData = await chatGPTResponse.json();
-      if (window.logApiUsage) window.logApiUsage("openai");
-      aiResponse = chatGPTData.choices?.[0]?.message?.content || "";
-    }
+    const aiResponse = await window.callAIWithTextFallback({
+      prompt: marketingPrompt,
+      geminiKey,
+      contextLabel: "마케팅 생성",
+      temperature: 0.8,
+      maxOutputTokens: 3000,
+      geminiJsonMime: false,
+      openaiSystemMessage:
+        "You are an AI marketer creating promotional texts matching the requested JSON format.",
+    });
 
     if (!aiResponse.trim()) {
       throw new Error("Gemini API에서 응답을 받지 못했습니다.");
