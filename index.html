@@ -79,11 +79,11 @@
         </div>
         
         <div class="sidebar-actions">
-            <button class="btn btn-primary btn-small w-full" onclick="if(typeof window.saveCurrentProject === 'function') { const saved = window.saveCurrentProject(); if(saved) { if(typeof window.showCopyIndicator === 'function') { window.showCopyIndicator('✅ 프로젝트가 성공적으로 저장되었습니다!'); } else { alert('✅ 프로젝트가 성공적으로 저장되었습니다!'); } } else { alert('⚠️ 프로젝트 저장에 실패했습니다.\n\n페이지를 새로고침(F5) 후 다시 시도해주세요.'); } } else { alert('⚠️ 저장 기능을 사용할 수 없습니다.\n\n페이지를 새로고침(F5) 후 다시 시도해주세요.'); }"
+            <button class="btn btn-primary btn-small w-full" onclick="if(typeof window.saveCurrentProject === 'function') { const saved = window.saveCurrentProject(); if(saved) { if(typeof window.showCopyIndicator === 'function') { window.showCopyIndicator('✅ 프로젝트가 성공적으로 저장되었습니다!'); } else { window.showToast('✅ 프로젝트가 성공적으로 저장되었습니다!', 'success'); } } else { window.showToast('⚠️ 프로젝트 저장에 실패했습니다.\n\n페이지를 새로고침(F5) 후 다시 시도해주세요.', 'error'); } } else { window.showToast('⚠️ 저장 기능을 사용할 수 없습니다.\n\n페이지를 새로고침(F5) 후 다시 시도해주세요.', 'error'); }"
                     aria-label="현재 프로젝트 저장">
                 <i class="fas fa-save" aria-hidden="true"></i> 현재 프로젝트 저장
             </button>
-            <button class="btn btn-secondary btn-small w-full mt-8" onclick="if(typeof window.saveAndClose === 'function') { window.saveAndClose(); } else { alert('저장 후 닫기 기능을 사용할 수 없습니다.'); }"
+            <button class="btn btn-secondary btn-small w-full mt-8" onclick="if(typeof window.saveAndClose === 'function') { window.saveAndClose(); } else { window.showToast('저장 후 닫기 기능을 사용할 수 없습니다.', 'error'); }"
                     aria-label="저장 후 닫기" title="모든 내용 저장 후 창을 닫습니다">
                 <i class="fas fa-save"></i> 저장 후 닫기
             </button>
@@ -176,7 +176,7 @@
                         </button>
                         <div id="headerMenuContent" class="admin-menu-content d-none">
                             <div class="admin-menu-header">설정 · 복구 · 초기화</div>
-                            <button type="button" class="admin-menu-item" id="apiKeyMenuBtn" onclick="event.preventDefault(); event.stopPropagation(); closeAdminMenu(); if(typeof window.openAPISettings==='function'){ window.openAPISettings(); } else { alert('API 설정을 불러오는 중입니다. 잠시 후 다시 시도해주세요.'); }">
+                            <button type="button" class="admin-menu-item" id="apiKeyMenuBtn" onclick="event.preventDefault(); event.stopPropagation(); closeAdminMenu(); if(typeof window.openAPISettings==='function'){ window.openAPISettings(); } else { window.showToast('API 설정을 불러오는 중입니다. 잠시 후 다시 시도해주세요.', 'info'); }">
                                 <i class="fas fa-key"></i> API 키
                             </button>
                             <button type="button" class="admin-menu-item" onclick="handleHeaderButtonClick('openGuidelinesModal', event); closeAdminMenu();">
@@ -215,7 +215,7 @@
                         <span class="btn-icon" aria-hidden="true"><i class="fas fa-question-circle"></i></span>
                         <span class="btn-text">도움말</span>
                     </button>
-                    <button class="btn btn-header-icon" id="boardPanelBtn" onclick="if(typeof window.openBoardPanel === 'function') { window.openBoardPanel(); } else { alert('게시판 기능을 불러오는 중입니다.'); }" 
+                    <button class="btn btn-header-icon" id="boardPanelBtn" onclick="if(typeof window.openBoardPanel === 'function') { window.openBoardPanel(); } else { window.showToast('게시판 기능을 불러오는 중입니다.', 'info'); }" 
                             title="질문 게시판 (Q&A)" aria-label="게시판 열기">
                         <span class="btn-icon" aria-hidden="true"><i class="fas fa-clipboard-list"></i></span>
                         <span class="btn-text">게시판</span>
@@ -317,8 +317,8 @@
 
                 <!-- Mode Tabs -->
                 <div class="mode-tabs">
-                    <button class="mode-tab active" data-mode="manual" onclick="if(typeof window.switchLyricsMode === 'function') { window.switchLyricsMode('manual'); } else { alert('⚠️ 모드 전환 기능을 사용할 수 없습니다.'); }" title="자신만의 독창적인 가사를 직접 입력하거나 수정합니다">✍️ 직접 작성</button>
-                    <button class="mode-tab" data-mode="ai" onclick="if(typeof window.switchLyricsMode === 'function') { window.switchLyricsMode('ai'); } else { alert('⚠️ 모드 전환 기능을 사용할 수 없습니다.'); }" title="장르와 주제만 입력하면 AI가 멋진 가사를 제안해드립니다">🤖 AI 생성</button>
+                    <button class="mode-tab active" data-mode="manual" onclick="if(typeof window.switchLyricsMode === 'function') { window.switchLyricsMode('manual'); } else { window.showToast('⚠️ 모드 전환 기능을 사용할 수 없습니다.', 'error'); }" title="자신만의 독창적인 가사를 직접 입력하거나 수정합니다">✍️ 직접 작성</button>
+                    <button class="mode-tab" data-mode="ai" onclick="if(typeof window.switchLyricsMode === 'function') { window.switchLyricsMode('ai'); } else { window.showToast('⚠️ 모드 전환 기능을 사용할 수 없습니다.', 'error'); }" title="장르와 주제만 입력하면 AI가 멋진 가사를 제안해드립니다">🤖 AI 생성</button>
                 </div>
 
                 <!-- Manual Mode -->
@@ -1091,7 +1091,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
 
                     <!-- AI 가사 생성 버튼 -->
                     <div class="btn-group m-t-25">
-                        <button class="btn btn-primary w-100 p-12 font-size-1rem" onclick="if(typeof window.generateAILyrics === 'function') { window.generateAILyrics(); } else { alert('⚠️ AI 가사 생성 기능을 사용할 수 없습니다.'); }" title="선택한 옵션을 바탕으로 ChatGPT가 4가지 서로 다른 스타일의 가사를 생성합니다">
+                        <button class="btn btn-primary w-100 p-12 font-size-1rem" onclick="if(typeof window.generateAILyrics === 'function') { window.generateAILyrics(); } else { window.showToast('⚠️ AI 가사 생성 기능을 사용할 수 없습니다.', 'error'); }" title="선택한 옵션을 바탕으로 ChatGPT가 4가지 서로 다른 스타일의 가사를 생성합니다">
                             <i class="fas fa-robot"></i> AI로 4개 가사 생성하기
                         </button>
                     </div>
@@ -1163,7 +1163,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
             </div>
             
             <div class="btn-group justify-center p-t-20 m-t-30 b-t-1">
-                <button class="btn btn-primary min-w-200" onclick="if(typeof window.goToNextStep === 'function') { window.goToNextStep(); } else { alert('⚠️ 다음 단계로 이동 기능을 사용할 수 없습니다.\\n\\n페이지를 새로고침(F5) 후 다시 시도해주세요.'); }">
+                <button class="btn btn-primary min-w-200" onclick="if(typeof window.goToNextStep === 'function') { window.goToNextStep(); } else { window.showToast('⚠️ 다음 단계로 이동 기능을 사용할 수 없습니다.\\n\\n페이지를 새로고침(F5) 후 다시 시도해주세요.', 'error'); }">
                     <i class="fas fa-arrow-right"></i> 다음 단계로
                 </button>
             </div>
@@ -1624,7 +1624,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                         <p>2단계에서 생성된 가사와 스타일 프롬프트의 품질을 다각도로 평가하고 최적의 개선안을 제안합니다.</p>
                     </div>
                     <div class="flex-row gap-10">
-                        <button class="btn btn-primary" id="startAnalysisBtn" onclick="if(typeof window.startGeminiAnalysis === 'function') { window.startGeminiAnalysis(); } else { alert('⚠️ 분석 기능을 사용할 수 없습니다.'); }" title="Gemini와 ChatGPT를 동시에 사용하여 가사의 완성도와 스타일의 적합성을 분석합니다.">
+                        <button class="btn btn-primary" id="startAnalysisBtn" onclick="if(typeof window.startGeminiAnalysis === 'function') { window.startGeminiAnalysis(); } else { window.showToast('⚠️ 분석 기능을 사용할 수 없습니다.', 'error'); }" title="Gemini와 ChatGPT를 동시에 사용하여 가사의 완성도와 스타일의 적합성을 분석합니다.">
                             <i class="fas fa-magic"></i> 분석 시작
                         </button>
                         <button class="btn btn-small btn-save-step" onclick="saveCurrentProject(); showCopyIndicator('✅ 3단계: AI 분석이 저장되었습니다!');" title="이 단계 저장">
@@ -1671,8 +1671,8 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
 
                 <div class="panel-bottom-controls">
                     <div class="btn-group flex-center-all">
-                        <button class="btn btn-secondary" onclick="if(typeof window.goToStep === 'function') { window.goToStep(2); } else { alert('⚠️ 단계 이동 기능을 사용할 수 없습니다.'); }">← 이전</button>
-                        <button class="btn btn-primary" id="nextStepBtn" onclick="if(typeof window.goToStep4AndApplyImprovements === 'function') { window.goToStep4AndApplyImprovements(); } else { alert('⚠️ 개선안 반영 기능을 사용할 수 없습니다.'); }" title="AI가 제안한 모든 개선 사항을 가사와 프롬프트에 즉시 적용하고 다음 단계로 이동합니다">🔧 개선안 반영 →</button>
+                        <button class="btn btn-secondary" onclick="if(typeof window.goToStep === 'function') { window.goToStep(2); } else { window.showToast('⚠️ 단계 이동 기능을 사용할 수 없습니다.', 'error'); }">← 이전</button>
+                        <button class="btn btn-primary" id="nextStepBtn" onclick="if(typeof window.goToStep4AndApplyImprovements === 'function') { window.goToStep4AndApplyImprovements(); } else { window.showToast('⚠️ 개선안 반영 기능을 사용할 수 없습니다.', 'error'); }" title="AI가 제안한 모든 개선 사항을 가사와 프롬프트에 즉시 적용하고 다음 단계로 이동합니다">🔧 개선안 반영 →</button>
                     </div>
                     <div class="step-footer">
                         <p>🎵 Music Creator - AI 가사 & 수노 프롬프트 & 마케팅 자료 생성기</p>
@@ -1711,8 +1711,8 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                             <p class="m-0 text-small text-secondary">3단계에서 분석된 개선 사항 - 적용할 항목을 선택하세요</p>
                         </div>
                         <div class="flex-center gap-8">
-                            <button class="btn btn-small btn-secondary text-tiny" onclick="if(typeof window.selectAllImprovements === 'function') { window.selectAllImprovements(); } else { alert('⚠️ 기능을 사용할 수 없습니다.'); }" title="모든 제안 사항을 선택합니다">전체 선택</button>
-                            <button class="btn btn-small btn-secondary text-tiny" onclick="if(typeof window.deselectAllImprovements === 'function') { window.deselectAllImprovements(); } else { alert('⚠️ 기능을 사용할 수 없습니다.'); }" title="모든 제안 사항 선택을 해제합니다">전체 해제</button>
+                            <button class="btn btn-small btn-secondary text-tiny" onclick="if(typeof window.selectAllImprovements === 'function') { window.selectAllImprovements(); } else { window.showToast('⚠️ 기능을 사용할 수 없습니다.', 'error'); }" title="모든 제안 사항을 선택합니다">전체 선택</button>
+                            <button class="btn btn-small btn-secondary text-tiny" onclick="if(typeof window.deselectAllImprovements === 'function') { window.deselectAllImprovements(); } else { window.showToast('⚠️ 기능을 사용할 수 없습니다.', 'error'); }" title="모든 제안 사항 선택을 해제합니다">전체 해제</button>
                         </div>
                     </div>
                     <div id="geminiSuggestionsSummary" class="p-15 text-small text-secondary overflow-x-hidden max-w-full box-border">
@@ -1724,10 +1724,10 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                 선택된 개선안: <span id="selectedImprovementCount">0</span>개
                             </span>
                             <div class="flex-center gap-8">
-                                <button class="btn btn-primary btn-small" onclick="if(typeof window.applySelectedImprovements === 'function') { window.applySelectedImprovements(); } else { alert('⚠️ 기능을 사용할 수 없습니다.'); }" id="applySelectedBtn" title="선택한 개선 사항만 현재 가사와 스타일 프롬프트에 반영합니다">
+                                <button class="btn btn-primary btn-small" onclick="if(typeof window.applySelectedImprovements === 'function') { window.applySelectedImprovements(); } else { window.showToast('⚠️ 기능을 사용할 수 없습니다.', 'error'); }" id="applySelectedBtn" title="선택한 개선 사항만 현재 가사와 스타일 프롬프트에 반영합니다">
                                     ✅ 선택한 항목만 적용
                                 </button>
-                                <button class="btn btn-success btn-small" onclick="if(typeof window.applyAllImprovements === 'function') { window.applyAllImprovements(); } else { alert('⚠️ 기능을 사용할 수 없습니다.'); }" id="applyAllBtn" title="모든 추천 개선 사항을 한 번에 반영합니다">
+                                <button class="btn btn-success btn-small" onclick="if(typeof window.applyAllImprovements === 'function') { window.applyAllImprovements(); } else { window.showToast('⚠️ 기능을 사용할 수 없습니다.', 'error'); }" id="applyAllBtn" title="모든 추천 개선 사항을 한 번에 반영합니다">
                                     ✅ 전체 적용
                                 </button>
                             </div>
@@ -1899,15 +1899,15 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                     <div class="btn-group flex-col gap-10">
                         <div class="mt-20 border-t pt-20">
                             <label class="block mb-10 font-semibold">Suno에서 다운로드한 음원 업로드 및 분석</label>
-                            <div class="audio-upload-area cursor-pointer p-20 border-dashed rounded-8 text-center bg-input" onclick="const fileInput = document.getElementById('intermediateAudioFileInput'); if(fileInput) { fileInput.click(); } else { alert('⚠️ 파일 입력 요소를 찾을 수 없습니다.'); }" title="Suno에서 생성한 MP3/WAV 파일을 여기에 드래그하거나 클릭하여 업로드하세요">
-                                <input type="file" id="intermediateAudioFileInput" accept="audio/*" class="hidden" title="음원 파일 선택" onchange="if(typeof window.handleIntermediateAudioUpload === 'function') { window.handleIntermediateAudioUpload(event); } else { alert('⚠️ 음원 업로드 기능을 사용할 수 없습니다.'); }">
+                            <div class="audio-upload-area cursor-pointer p-20 border-dashed rounded-8 text-center bg-input" onclick="const fileInput = document.getElementById('intermediateAudioFileInput'); if(fileInput) { fileInput.click(); } else { window.showToast('⚠️ 파일 입력 요소를 찾을 수 없습니다.', 'error'); }" title="Suno에서 생성한 MP3/WAV 파일을 여기에 드래그하거나 클릭하여 업로드하세요">
+                                <input type="file" id="intermediateAudioFileInput" accept="audio/*" class="hidden" title="음원 파일 선택" onchange="if(typeof window.handleIntermediateAudioUpload === 'function') { window.handleIntermediateAudioUpload(event); } else { window.showToast('⚠️ 음원 업로드 기능을 사용할 수 없습니다.', 'error'); }">
                                 <div id="intermediateAudioUploadUI">
                                     <div class="text-large mb-10">🎵</div>
                                     <div class="text-secondary">클릭하여 음원 파일 업로드</div>
                                     <div class="text-tiny text-secondary mt-4">MP3, WAV, M4A 등 지원</div>
                                 </div>
                             </div>
-                            <button class="btn btn-primary w-full mt-10 hidden" id="analyzeIntermediateAudioBtn" onclick="if(typeof window.analyzeIntermediateAudio === 'function') { window.analyzeIntermediateAudio(); } else { alert('⚠️ 음원 분석 기능을 사용할 수 없습니다.'); }" title="업로드된 음원을 Gemini AI로 분석하여 가사와 프롬프트를 자동으로 최적화합니다">
+                            <button class="btn btn-primary w-full mt-10 hidden" id="analyzeIntermediateAudioBtn" onclick="if(typeof window.analyzeIntermediateAudio === 'function') { window.analyzeIntermediateAudio(); } else { window.showToast('⚠️ 음원 분석 기능을 사용할 수 없습니다.', 'error'); }" title="업로드된 음원을 Gemini AI로 분석하여 가사와 프롬프트를 자동으로 최적화합니다">
                                 🔍 음원 분석 및 최종 가사 반영
                             </button>
                             <div id="intermediateVersionProgress" class="hidden mt-15 p-15 border-b panel-box bg-card"></div>
@@ -2602,7 +2602,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                     </div>
                                 </div>
                                 
-                                <button class="btn btn-primary w-full p-12 text-lg" onclick="if(typeof window.generateSRTPreview === 'function') { window.generateSRTPreview(); } else { alert('⚠️ SRT 자막 생성 함수를 찾을 수 없습니다.'); }">
+                                <button class="btn btn-primary w-full p-12 text-lg" onclick="if(typeof window.generateSRTPreview === 'function') { window.generateSRTPreview(); } else { window.showToast('⚠️ SRT 자막 생성 함수를 찾을 수 없습니다.', 'error'); }">
                                     <i class="fas fa-magic"></i> SRT 자막 생성
                                 </button>
                             </div>
@@ -2610,11 +2610,11 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                             <div class="subtitle-preview" id="srtPreview"></div>
                         </div>
                         <div class="btn-group">
-                            <button class="btn btn-primary" onclick="if(typeof window.copySRTContent === 'function') { window.copySRTContent(event); } else { alert('⚠️ SRT 자막 복사 함수를 찾을 수 없습니다.'); }" title="SRT 자막 내용 복사">
+                            <button class="btn btn-primary" onclick="if(typeof window.copySRTContent === 'function') { window.copySRTContent(event); } else { window.showToast('⚠️ SRT 자막 복사 함수를 찾을 수 없습니다.', 'error'); }" title="SRT 자막 내용 복사">
                                 <i class="fas fa-copy"></i> 📋 자막 복사
                             </button>
-                            <button class="btn btn-success" onclick="if(typeof window.downloadSRT === 'function') { window.downloadSRT('mac'); } else { alert('⚠️ SRT 다운로드 함수를 찾을 수 없습니다.'); }">🍎 맥용 SRT 다운로드</button>
-                            <button class="btn btn-success" onclick="if(typeof window.downloadSRT === 'function') { window.downloadSRT('win'); } else { alert('⚠️ SRT 다운로드 함수를 찾을 수 없습니다.'); }">🪟 윈도우용 SRT 다운로드</button>
+                            <button class="btn btn-success" onclick="if(typeof window.downloadSRT === 'function') { window.downloadSRT('mac'); } else { window.showToast('⚠️ SRT 다운로드 함수를 찾을 수 없습니다.', 'error'); }">🍎 맥용 SRT 다운로드</button>
+                            <button class="btn btn-success" onclick="if(typeof window.downloadSRT === 'function') { window.downloadSRT('win'); } else { window.showToast('⚠️ SRT 다운로드 함수를 찾을 수 없습니다.', 'error'); }">🪟 윈도우용 SRT 다운로드</button>
                         </div>
                     </div>
 
@@ -2994,7 +2994,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                 <textarea id="guidelinesText" placeholder="지침서 내용을 입력하세요. 마크다운 형식 사용 가능." title="제작 지침서 내용"></textarea>
             </div>
             <div class="modal-footer">
-                <input type="file" id="importGuidelinesFile" accept=".json" class="d-none" onchange="if(typeof window.handleImportGuidelines === 'function') { window.handleImportGuidelines(event); } else { alert('기능을 초기화 중입니다. 잠시 후 다시 시도해주세요.'); }" title="지침서 파일 가져오기">
+                <input type="file" id="importGuidelinesFile" accept=".json" class="d-none" onchange="if(typeof window.handleImportGuidelines === 'function') { window.handleImportGuidelines(event); } else { window.showToast('기능을 초기화 중입니다. 잠시 후 다시 시도해주세요.', 'info'); }" title="지침서 파일 가져오기">
                 <button type="button" class="btn btn-secondary" onclick="exportGuidelines()">💾 백업</button>
                 <button type="button" class="btn btn-secondary" onclick="triggerImportGuidelines()">📥 복원</button>
                 <div class="flex-1"></div>
@@ -3439,23 +3439,23 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                     if (typeof window.showCopyIndicator === 'function') {
                                         window.showCopyIndicator(savedMessage);
                                     } else {
-                                        alert(savedMessage);
+                                        window.showToast(savedMessage, "info");
                                     }
                                     
                                     console.log('✅ 프로젝트 저장 완료:', projectTitle, '데이터:', dataSummary);
                                     return true;
                                 } else {
-                                    alert('프로젝트 저장에 실패했습니다. 다시 시도해주세요.');
+                                    window.showToast('프로젝트 저장에 실패했습니다. 다시 시도해주세요.', "error");
                                     return false;
                                 }
                             } catch (error) {
                                 console.error('프로젝트 저장 오류:', error);
                                 const errorMessage = `프로젝트 저장 중 오류가 발생했습니다:\n\n${error.message || error}`;
-                                alert(errorMessage);
+                                window.showToast(errorMessage, "info");
                                 return false;
                             }
                         }
-                        alert('saveCurrentProject 함수를 찾을 수 없습니다.');
+                        window.showToast('saveCurrentProject 함수를 찾을 수 없습니다.', "error");
                         return false;
                     },
                     'manualBackup': async () => {
@@ -3507,7 +3507,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                             // 애니메이션을 위해 show 클래스도 추가
                             modal.classList.add('show');
                         } else {
-                            alert('도움말 모달을 찾을 수 없습니다.');
+                            window.showToast('도움말 모달을 찾을 수 없습니다.', "error");
                         }
                     }
                 };
@@ -3521,18 +3521,18 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                         if (result instanceof Promise) {
                             result.catch(err => {
                                 console.error(`❌ ${functionName} 실행 오류:`, err);
-                                alert(`${functionName} 실행 중 오류가 발생했습니다:\n\n${err.message || err}`);
+                                window.showToast(`${functionName} 실행 중 오류가 발생했습니다:\n\n${err.message || err}`, "error");
                             });
                         }
                     } catch (e) {
                         console.error(`❌ ${functionName} 호출 오류:`, e);
-                        alert(`${functionName} 함수 호출 중 오류가 발생했습니다:\n\n${e.message || e}`);
+                        window.showToast(`${functionName} 함수 호출 중 오류가 발생했습니다:\n\n${e.message || e}`, "error");
                     }
                 } else {
                     console.error(`❌ ${functionName} 함수를 찾을 수 없습니다.`);
                     const availableFunctions = Object.keys(functionMap);
                     console.log('사용 가능한 함수들:', availableFunctions);
-                    alert(`${functionName} 기능을 불러오는 중입니다.\n\n페이지를 새로고침하거나 잠시 후 다시 시도해주세요.`);
+                    window.showToast(`${functionName} 기능을 불러오는 중입니다.\n\n페이지를 새로고침하거나 잠시 후 다시 시도해주세요.`, "info");
                     
                     // 1초 후 재시도
                     setTimeout(() => {
@@ -3543,7 +3543,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                 retryFunc();
                             } catch (e) {
                                 console.error(`❌ 재시도 실행 오류:`, e);
-                                alert(`${functionName} 실행 중 오류가 발생했습니다:\n\n${e.message || e}`);
+                                window.showToast(`${functionName} 실행 중 오류가 발생했습니다:\n\n${e.message || e}`, "error");
                             }
                         }
                     }, 1000);
@@ -3564,7 +3564,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                         window.changeAPI(value);
                     } catch (e) {
                         console.error('❌ changeAPI 호출 오류:', e);
-                        alert('API 선택 변경 중 오류가 발생했습니다:\n\n' + e.message);
+                        window.showToast('API 선택 변경 중 오류가 발생했습니다:\n\n' + e.message, "error");
                     }
                 } else {
                     console.warn('⚠️ changeAPI 함수를 찾을 수 없습니다. 기본 동작만 수행합니다.');
@@ -3610,7 +3610,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                             }
                          }).catch(function(err) {
                              console.error('❌ generateSceneOverview 실행 오류:', err);
-                             alert('MV 프롬프트 생성 중 오류가 발생했습니다:\n\n' + (err.message || err));
+                             window.showToast('MV 프롬프트 생성 중 오류가 발생했습니다:\n\n' + (err.message || err), "error");
                              if (btn) {
                                  btn.classList.remove('btn-processing');
                                  btn.innerHTML = originalHTML;
@@ -3619,7 +3619,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                          });
                      } catch (e) {
                          console.error('❌ generateSceneOverview 호출 오류:', e);
-                         alert('MV 프롬프트 생성 함수 호출 중 오류가 발생했습니다:\n\n' + e.message);
+                         window.showToast('MV 프롬프트 생성 함수 호출 중 오류가 발생했습니다:\n\n' + e.message, "error");
                          if (btn) {
                              btn.classList.remove('btn-processing');
                              btn.innerHTML = originalHTML;
@@ -3628,7 +3628,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                      }
                  } else {
                      console.error('❌ generateSceneOverview 함수를 찾을 수 없습니다.');
-                     alert('MV 프롬프트 생성 기능을 불러오는 중입니다.\n\n페이지를 새로고침하거나 잠시 후 다시 시도해주세요.');
+                     window.showToast('MV 프롬프트 생성 기능을 불러오는 중입니다.\n\n페이지를 새로고침하거나 잠시 후 다시 시도해주세요.', "info");
                      
                      if (btn) {
                          btn.classList.remove('btn-processing');
@@ -3642,7 +3642,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                              console.log('✅ 재시도: generateSceneOverview 함수 발견');
                              window.generateSceneOverview().catch(err => {
                                  console.error('❌ 재시도 실행 오류:', err);
-                                 alert('MV 프롬프트 생성 중 오류가 발생했습니다:\n\n' + (err.message || err));
+                                 window.showToast('MV 프롬프트 생성 중 오류가 발생했습니다:\n\n' + (err.message || err), "error");
                              });
                          }
                      }, 1000);
@@ -3655,14 +3655,14 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                 const finalLyrics = document.getElementById('finalLyrics')?.textContent || '';
                 
                 if (!finalizedLyrics && !finalLyrics) {
-                    alert('비교할 가사가 없습니다.');
+                    window.showToast('비교할 가사가 없습니다.', "error");
                     return;
                 }
                 
                 let comparison = '=== 4단계 확정 가사 ===\n\n' + finalizedLyrics + 
                                 '\n\n=== 5단계 최종 가사 ===\n\n' + finalLyrics;
                 
-                alert(comparison);
+                window.showToast(comparison, "info");
             };
         })();
     </script>
