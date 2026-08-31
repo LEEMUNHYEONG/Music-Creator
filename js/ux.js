@@ -163,42 +163,12 @@
       });
   };
 
-  // 5. Generic Copy to Clipboard
-  window.copyToClipboard = function (elementId, labelName, event) {
-    if (event) event.stopPropagation();
-    const el = document.getElementById(elementId);
-    let textToCopy = "";
-
-    if (el) {
-      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") {
-        textToCopy = el.value || "";
-      } else {
-        textToCopy = el.textContent || "";
-      }
-    }
-
-    if (!textToCopy) {
-      window.showToast(`⚠️ 복사할 ${labelName} 내용이 없습니다.`, "error");
-      return;
-    }
-
-    navigator.clipboard
-      .writeText(textToCopy)
-      .then(() => {
-        window.showToast(`✅ ${labelName} 복사되었습니다.`, "success");
-      })
-      .catch((err) => {
-        window.showToast(`❌ ${labelName} 복사 실패: ` + err, "error");
-      });
-  };
-
+  // 5. Generic Copy to Clipboard, 6. Show Copy Indicator
+  // → 둘 다 app.js가 나중에 로드되며 더 많은 호출 규약(elementId=null일 때
+  //   직접 텍스트로 처리하는 경우 등)을 지원하는 자체 버전으로 덮어쓰므로
+  //   여기 정의해도 항상 가려지는 죽은 코드였다. app.js 쪽 정의만 유지한다.
   window.copyTitleToClipboard = function (event) {
     window.copyToClipboard("finalTitleText", "제목", event);
-  };
-
-  // 6. Show Copy Indicator (used extensively in index.html for save/copy feedback)
-  window.showCopyIndicator = function (message) {
-    window.showToast(message, message.includes("❌") ? "error" : "success");
   };
 
   // 7. Custom Confirmation Modal

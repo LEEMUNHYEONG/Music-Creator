@@ -3378,112 +3378,13 @@ window.copyToClipboard = function (elementId, labelOrText, event) {
 // ═══════════════════════════════════════════════════════════════
 // 유틸리티 함수들
 // ═══════════════════════════════════════════════════════════════
+// js/ux.js의 공용 토스트로 위임한다. 이전에는 여기서 별도의 고정 초록색
+// 알림 박스를 직접 그렸는데, 실패 메시지("❌ 복사 실패" 등)도 항상
+// --success(초록) 배경으로 표시되던 버그가 있었다 — showToast는 메시지
+// 내용에 따라 성공/오류 색상을 올바르게 구분한다.
 window.showCopyIndicator = function (message) {
-  console.log(message);
-  if (message) {
-    const indicator = document.createElement("div");
-    indicator.textContent = message;
-    indicator.style.cssText =
-      "position: fixed; top: 20px; right: 20px; background: var(--success); color: white; padding: 15px 20px; border-radius: 8px; z-index: 10000; box-shadow: 0 4px 12px rgba(0,0,0,0.3);";
-    document.body.appendChild(indicator);
-    setTimeout(() => {
-      indicator.remove();
-    }, 3000);
-  }
-};
-
-// ═══════════════════════════════════════════════════════════════
-// 6단계 → 새로 시작 (전체 초기화)
-// ═══════════════════════════════════════════════════════════════
-window.resetAll = async function () {
-  if (await window.showConfirmAsync("모든 내용을 초기화하시겠습니까?")) {
-    try {
-      // 수정 모드 비활성화
-      window.editMode = false;
-      if (typeof window.updateEditModeUI === "function") {
-        window.updateEditModeUI();
-      }
-      if (typeof window.setReadOnlyMode === "function") {
-        window.setReadOnlyMode(false); // 새 프로젝트는 수정 가능
-      }
-
-      // 모든 input과 textarea 초기화
-      const inputs = document.querySelectorAll('input[type="text"], textarea');
-      inputs.forEach((input) => {
-        if (input.id !== "importFile" && input.id !== "backupFileInput") {
-          input.value = "";
-        }
-      });
-
-      // 모든 표시용 div 초기화
-      const displayElements = [
-        "analysisTargetLyrics",
-        "analysisTargetStyle",
-        "finalLyrics",
-        "finalStyle",
-        "finalTitleText",
-        "intermediateLyricsPreview",
-        "intermediateStylePreview",
-        "youtubeDesc",
-        "tiktokDesc",
-        "hashtagsContent",
-      ];
-
-      displayElements.forEach((id) => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.textContent = "";
-        }
-      });
-
-      // 전역 변수 초기화
-      window.currentProject = null;
-      window.currentProjectId = null;
-      window.currentSunoTitle = null;
-      window.currentFinalLyrics = null;
-      window.currentFinalStyle = null;
-      window.marketingData = null;
-      window.selectedLyricsIndex = null;
-      window.generatedLyricsOptions = null;
-      window.vocalPartAssignments = {}; // 파트별 보컬 스타일 지정 초기화
-
-      // 태그 버튼 선택 해제
-      const tagBtns = document.querySelectorAll(".tag-btn.active");
-      tagBtns.forEach((btn) => {
-        // 기본 선택 태그는 유지 (예: Wide Stereo)
-        if (btn.dataset.value !== "Wide Stereo") {
-          btn.classList.remove("active");
-        }
-      });
-
-      // AI 생성 결과 숨기기
-      const aiGeneratedResults = document.getElementById("aiGeneratedResults");
-      if (aiGeneratedResults) {
-        aiGeneratedResults.style.display = "none";
-      }
-
-      // 로컬 스토리지의 마지막 프로젝트 ID 제거 (새로고침 시 자동 로드 방지)
-      localStorage.removeItem("lastProjectId");
-      localStorage.removeItem("lastRestoredProjectId");
-      
-      // 1단계로 이동
-      if (typeof window.goToStep === "function") {
-        window.goToStep(1, false, true);
-      }
-
-      console.log("✅ 전체 초기화 완료 → 1단계로 이동 (임시 저장 데이터 제거)");
-      alert("✅ 모든 내용이 초기화되었습니다. 새로운 프로젝트를 시작하세요!");
-    } catch (error) {
-      console.error("❌ 초기화 오류:", error);
-      alert(
-        "⚠️ 초기화 중 오류가 발생했습니다.\n\n" +
-          "원인: " +
-          error.message +
-          "\n\n" +
-          "해결방법: 페이지를 새로고침(F5) 후 다시 시도해주세요.",
-      );
-    }
-  }
+  if (!message) return;
+  window.showToast(message, message.includes("❌") ? "error" : "success");
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -3534,32 +3435,10 @@ window.initTempoControls = function () {
 };
 
 // 현재 템포 값 가져오기
-window.getCurrentTempo = function () {
-  const tempoSlider = document.getElementById("tempoSlider");
-  return tempoSlider ? parseInt(tempoSlider.value) : 80;
-};
+
 
 // 템포 설정
-window.setTempo = function (bpm) {
-  const tempoSlider = document.getElementById("tempoSlider");
-  const tempoValue = document.getElementById("tempoValue");
-  const tempoPresetBtns = document.querySelectorAll(".tempo-preset-btn");
 
-  if (tempoSlider && tempoValue) {
-    tempoSlider.value = bpm;
-    tempoValue.textContent = bpm;
-
-    // 프리셋 버튼 활성화 상태 업데이트
-    tempoPresetBtns.forEach((btn) => {
-      const btnTempo = parseInt(btn.dataset.tempo);
-      if (btnTempo === parseInt(bpm)) {
-        btn.classList.add("active");
-      } else {
-        btn.classList.remove("active");
-      }
-    });
-  }
-};
 
 // 페이지 로드 시 템포 컨트롤 초기화
 document.addEventListener("DOMContentLoaded", function () {
@@ -5510,12 +5389,7 @@ window.exportAllProjects = function () {
   }
 };
 
-window.importProjects = function () {
-  const fileInput = document.getElementById("importFile");
-  if (fileInput) {
-    fileInput.click();
-  }
-};
+
 
 window.handleImport = function (event) {
   const file = event.target.files[0];
@@ -6418,9 +6292,7 @@ window.closeAPISettings = function () {
 };
 
 // API 키 저장 함수 (모달 내부 버튼에서 호출)
-window.saveAPISettings = function () {
-  window.saveAPIKeys();
-};
+
 
 window.saveAPIKeys = function () {
   try {
@@ -7205,125 +7077,6 @@ if (typeof document !== "undefined") {
   }
 }
 
-// SRT 자막 내용 복사
-// ═══════════════════════════════════════════════════════════════
-// localStorage 용량 관리 함수
-// ═══════════════════════════════════════════════════════════════
-
-// 오래된 프로젝트 정리 (용량 초과 시)
-window.cleanOldProjects = function (key, projects, currentProjectId) {
-  try {
-    if (!Array.isArray(projects) || projects.length === 0) {
-      return projects;
-    }
-
-    // 현재 프로젝트는 제외하고 정렬
-    const otherProjects = projects.filter(
-      (p) => p && p.id !== currentProjectId,
-    );
-    const currentProject = projects.find((p) => p && p.id === currentProjectId);
-
-    // 수정일시 기준으로 정렬 (오래된 것부터)
-    otherProjects.sort((a, b) => {
-      const dateA = new Date(a.updatedAt || a.savedAt || a.createdAt || 0);
-      const dateB = new Date(b.updatedAt || b.savedAt || b.createdAt || 0);
-      return dateA - dateB;
-    });
-
-    // 최신 20개만 유지 (현재 프로젝트 제외)
-    const keepCount = 20;
-    const keptProjects = otherProjects.slice(-keepCount);
-
-    // 현재 프로젝트 추가
-    if (currentProject) {
-      keptProjects.push(currentProject);
-    }
-
-    const removedCount = projects.length - keptProjects.length;
-    if (removedCount > 0) {
-      console.log(
-        `🗑️ ${key}: 오래된 프로젝트 ${removedCount}개 삭제 (최신 ${keepCount}개 유지)`,
-      );
-    }
-
-    return keptProjects;
-  } catch (error) {
-    console.error("❌ 오래된 프로젝트 정리 오류:", error);
-    return projects;
-  }
-};
-
-// localStorage 용량 체크 및 정리
-window.checkAndCleanStorage = function () {
-  try {
-    let totalSize = 0;
-    const keySizes = {};
-
-    // 모든 키의 크기 계산
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key) {
-        const value = localStorage.getItem(key);
-        const size = new Blob([value]).size;
-        keySizes[key] = size;
-        totalSize += size;
-      }
-    }
-
-    // 용량이 4MB 이상이면 경고 (5MB 제한 대비)
-    const maxSize = 4 * 1024 * 1024; // 4MB
-    if (totalSize > maxSize) {
-      console.warn(
-        `⚠️ localStorage 용량 경고: ${(totalSize / 1024 / 1024).toFixed(2)}MB 사용 중`,
-      );
-
-      // 가장 큰 키부터 정리 대상 확인
-      const sortedKeys = Object.keys(keySizes).sort(
-        (a, b) => keySizes[b] - keySizes[a],
-      );
-
-      for (const key of sortedKeys) {
-        if (key.includes("Project") || key.includes("History")) {
-          try {
-            const data = JSON.parse(localStorage.getItem(key) || "[]");
-            if (Array.isArray(data) && data.length > 30) {
-              // 오래된 항목 정리 (최신 30개만 유지)
-              const cleaned = data
-                .filter((p) => p && (p.updatedAt || p.savedAt || p.createdAt))
-                .sort((a, b) => {
-                  const dateA = new Date(
-                    a.updatedAt || a.savedAt || a.createdAt || 0,
-                  );
-                  const dateB = new Date(
-                    b.updatedAt || b.savedAt || b.createdAt || 0,
-                  );
-                  return dateB - dateA; // 최신순
-                })
-                .slice(0, 30);
-
-              localStorage.setItem(key, JSON.stringify(cleaned));
-              console.log(
-                `✅ ${key} 정리 완료: ${data.length}개 → ${cleaned.length}개`,
-              );
-            }
-          } catch (e) {
-            console.warn(`⚠️ ${key} 정리 실패:`, e);
-          }
-        }
-      }
-    }
-
-    return {
-      totalSize,
-      totalSizeMB: (totalSize / 1024 / 1024).toFixed(2),
-      keySizes,
-    };
-  } catch (error) {
-    console.error("❌ localStorage 용량 체크 오류:", error);
-    return null;
-  }
-};
-
 // ═══════════════════════════════════════════════════════════════
 // 다크/라이트 테마 전환
 // ═══════════════════════════════════════════════════════════════
@@ -7376,29 +7129,6 @@ if (document.readyState === "loading") {
 } else {
   applySavedTheme();
 }
-
-// ═══════════════════════════════════════════════════════════════
-// 스타일 프리셋 (1단계 수노 스타일 프롬프트)
-// ═══════════════════════════════════════════════════════════════
-window.applyStylePreset = function (preset) {
-  var el = document.getElementById("manualStylePrompt");
-  if (!el) return;
-  var presets = {
-    ballad:
-      "K-Pop Ballad, emotional, 72 BPM, soft and warm vocals, piano and strings, intimate atmosphere, studio quality, gentle reverb, cinematic, heartfelt, melancholic undertones",
-    poprock:
-      "Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadium atmosphere, dynamic, punchy, anthemic",
-    rnb: "R&B, smooth, 90 BPM, soulful vocals, bass and keys, urban atmosphere, modern, groovy, sensual",
-    kpop: "K-Pop, catchy, 120 BPM, clear vocals, synth and percussion, bright atmosphere, dynamic, polished, trendy",
-    acoustic:
-      "Acoustic, organic, 80 BPM, natural vocals, guitar and piano, warm atmosphere, intimate, stripped-down, heartfelt",
-  };
-  var text = presets[preset] || presets.ballad;
-  el.value = text;
-  if (typeof window.showCopyIndicator === "function") {
-    window.showCopyIndicator("✅ 스타일 프리셋 적용됨");
-  }
-};
 
 // ═══════════════════════════════════════════════════════════════
 // 사용자 편의: 키보드 단축키 (Ctrl+S 저장, Ctrl+1~6 단계 이동, Esc 모달/사이드바 닫기)

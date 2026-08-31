@@ -1,28 +1,6 @@
 // js/storage.js - Music Creator Data Persistence
 
 /**
- * 프로젝트 데이터의 유효성을 검사합니다.
- */
-window.validateProjectData = function (project) {
-  const errors = [];
-  const warnings = [];
-
-  if (!project.title || project.title.trim() === "") {
-    warnings.push("제목이 비어있습니다.");
-  }
-
-  if (project.lastStep && (project.lastStep < 1 || project.lastStep > 6)) {
-    errors.push("잘못된 단계 번호입니다.");
-  }
-
-  return {
-    isValid: errors.length === 0,
-    errors,
-    warnings,
-  };
-};
-
-/**
  * ☁️ 백업 상태 UI 업데이트 함수
  */
 window.updateSaveStatusUI = function(status, message = "") {
@@ -1376,8 +1354,6 @@ window.saveCurrentProject = function () {
     const p = m.mvPrompts;
     
     // 엘리먼트가 존재하는 경우에만 업데이트하여 데이터 유실 방지 (타 단계에서 저장 시 보존용)
-    const canSaveReview = (id) => document.getElementById(id);
-
     // 썸네일
     const tEn = document.getElementById("review_thumbnail_en")?.value || document.getElementById("mvThumbnailPromptEn")?.value || "";
     const tKo = document.getElementById("review_thumbnail_ko")?.value || document.getElementById("mvThumbnailPromptKo")?.value || "";
