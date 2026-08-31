@@ -395,17 +395,17 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                             </div>
                             
                             <div class="form-group mb-15">
-                                <label>참고 노래 제목</label>
+                                <label for="referenceSongTitle">참고 노래 제목</label>
                                 <input type="text" id="referenceSongTitle" placeholder="예: 별이 빛나는 밤" title="참고 노래의 제목을 입력해주세요">
                             </div>
                             
                             <div class="form-group mb-15">
-                                <label>참고 노래 가수/아티스트</label>
+                                <label for="referenceArtist">참고 노래 가수/아티스트</label>
                                 <input type="text" id="referenceArtist" placeholder="예: 아티스트명 (선택사항)" title="참고 노래의 아티스트 이름을 입력해주세요">
                             </div>
                             
                             <div class="form-group m-b-15">
-                                <label>참고 가사 내용</label>
+                                <label for="referenceLyrics">참고 가사 내용</label>
                                 <textarea id="referenceLyrics" placeholder="참고할 가사를 입력하세요...
 
 예시:
@@ -889,7 +889,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                     </div>
 
                     <div class="form-group">
-                        <label>📝 추가 키워드 (선택사항)</label>
+                        <label for="additionalKeywords">📝 추가 키워드 (선택사항)</label>
                         <input type="text" id="additionalKeywords" placeholder="예: 커피향, 창문, 오래된 노래...">
                     </div>
 
@@ -1142,11 +1142,11 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                 </div>
                                 
                                 <div class="form-group">
-                                    <label>제목</label>
+                                    <label for="editedTitle">제목</label>
                                     <input type="text" id="editedTitle" title="편집할 노래 제목">
                                 </div>
                                 <div class="form-group">
-                                    <label>가사 (지시어 포함)</label>
+                                    <label for="editedLyrics">가사 (지시어 포함)</label>
                                     <textarea id="editedLyrics" class="min-h-300 font-mono text-09" title="편집할 가사 모음"></textarea>
                                     <div class="m-t-5 text-08 color-text-secondary">
                                         💡 지시어는 각 줄에 하나씩 입력하세요. 예: <code>[Tempo: 72 BPM]</code>
@@ -1190,7 +1190,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
 
                     <!-- prettier-ignore -->
                     <div class="form-group">
-                        <label class="d-flex justify-between items-center">
+                        <label for="sunoTitle" class="d-flex justify-between items-center">
                             <span>📝 제목</span>
                             <button class="btn btn-small btn-secondary" onclick="copyToClipboard('sunoTitle', '제목', event)" title="제목 복사"><i class="fas fa-copy"></i> 복사</button>
                         </label>
@@ -1199,7 +1199,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
 
 
                     <div class="form-group lyrics-textarea-group">
-                        <label class="d-flex justify-between items-center">
+                        <label for="sunoLyrics" class="d-flex justify-between items-center">
                             <span>수노용 가사 (편집 가능)</span>
                             <div class="d-flex gap-5">
                                 <button class="btn btn-small btn-success" onclick="copyForSuno('sunoLyrics', 'stylePrompt')" title="Suno용 통합 복사"><i class="fas fa-copy"></i> 통합 복사</button>
@@ -2180,7 +2180,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                 <h4>MV 프롬프트 상세 설정</h4>
                                 <div class="mv-detail-grid">
                                     <div class="form-group">
-                                        <label class="block mb-8 text-small text-primary font-semibold">⏰ 시대</label>
+                                        <label for="mvEra" class="block mb-8 text-small text-primary font-semibold">⏰ 시대</label>
                                         <select id="mvEra" class="mv-setting-select" onchange="saveMVSettings()" title="뮤직비디오 배경 시대 선택">
                                             <option value="">선택 안 함</option>
                                             <option value="modern">현대 (2020년대)</option>
@@ -2198,7 +2198,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                     </div>
                                     
                                     <div class="form-group">
-                                        <label class="block mb-8 text-small text-primary font-semibold">🌍 나라/지역</label>
+                                        <label for="mvCountry" class="block mb-8 text-small text-primary font-semibold">🌍 나라/지역</label>
                                         <select id="mvCountry" class="mv-setting-select" onchange="saveMVSettings()" title="뮤직비디오 배경 나라/지역 선택">
                                             <option value="">선택 안 함</option>
                                             <option value="korea">한국</option>
@@ -2220,7 +2220,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                     </div>
                                     
                                     <div class="form-group">
-                                        <label class="block mb-8 text-small text-primary font-semibold">👥 인물 수</label>
+                                        <label for="mvCharacterCount" class="block mb-8 text-small text-primary font-semibold">👥 인물 수</label>
                                         <select id="mvCharacterCount" class="mv-setting-select" onchange="updateCharacterInputs(); saveMVSettings();" title="출연 인물 수 선택">
                                             <option value="1" selected>1인</option>
                                             <option value="2">2인</option>
@@ -2229,7 +2229,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                     </div>
                                     
                                     <div class="form-group">
-                                        <label class="block mb-8 text-small text-primary font-semibold">💡 조명</label>
+                                        <label for="mvLighting" class="block mb-8 text-small text-primary font-semibold">💡 조명</label>
                                         <select id="mvLighting" class="mv-setting-select" onchange="saveMVSettings()" title="조명 스타일 선택">
                                             <option value="">선택 안 함</option>
                                             <option value="natural">자연광</option>
@@ -2246,7 +2246,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                     </div>
                                     
                                     <div class="form-group">
-                                        <label class="block mb-8 text-small text-primary font-semibold">📷 카메라 워크</label>
+                                        <label for="mvCameraWork" class="block mb-8 text-small text-primary font-semibold">📷 카메라 워크</label>
                                         <select id="mvCameraWork" class="mv-setting-select" onchange="saveMVSettings()" title="카메라 워크 스타일 선택">
                                             <option value="">선택 안 함</option>
                                             <option value="close-up">클로즈업</option>
@@ -2263,7 +2263,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                     </div>
                                     
                                     <div class="form-group">
-                                        <label class="block mb-8 text-small text-primary font-semibold">🎭 분위기</label>
+                                        <label for="mvMood" class="block mb-8 text-small text-primary font-semibold">🎭 분위기</label>
                                         <select id="mvMood" class="mv-setting-select" onchange="saveMVSettings()" title="뮤직비디오 전체 분위기 선택">
                                             <option value="">선택 안 함</option>
                                             <option value="romantic">로맨틱</option>
@@ -2341,7 +2341,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                         </div>
                                         <p class="m-8-0 text-tiny text-secondary">💡 선택한 장소 유형이 각 씬 프롬프트 배경에 반영됩니다.</p>
                                         <div class="form-group mt-12">
-                                            <label class="block mb-6 text-small text-secondary font-medium">✏️ 기타 추가 (장소 유형 직접 입력)</label>
+                                            <label for="mvLocationCustom" class="block mb-6 text-small text-secondary font-medium">✏️ 기타 추가 (장소 유형 직접 입력)</label>
                                             <input type="text" id="mvLocationCustom" placeholder="예: 오래된 극장, 수면 풀, 공원 벤치 (쉼표로 구분)" class="w-full p-10-12 border rounded-8 bg-input text-primary text-small" onchange="if(typeof saveMVSettings==='function')saveMVSettings();">
                                         </div>
                                     </div>
@@ -2383,7 +2383,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                         </div>
                                         <p class="m-8-0-0 text-sm text-secondary">💡 선택한 동작이 각 씬의 인물 동작에 반영되며, 가사에 맞게 자동 선택됩니다.</p>
                                         <div class="form-group mt-12">
-                                            <label class="block mb-6 text-sm text-secondary font-medium">✏️ 기타 추가 (인물 동작 직접 입력)</label>
+                                            <label for="mvActionCustom" class="block mb-6 text-sm text-secondary font-medium">✏️ 기타 추가 (인물 동작 직접 입력)</label>
                                             <input type="text" id="mvActionCustom" placeholder="예: 창밖 바라보기, 계단 오르기, 꽃 받기 (쉼표로 구분)" class="w-full p-10-12 border rounded-8 bg-input text-primary text-sm" onchange="if(typeof saveMVSettings==='function')saveMVSettings();">
                                         </div>
                                     </div>
@@ -2396,7 +2396,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                 
                                 <!-- 기타 항목 입력 -->
                                 <div class="mt-20 p-15 bg-card rounded-8 border border-var-border">
-                                    <label class="block mb-10 text-sm text-primary font-semibold">
+                                    <label for="mvCustomSettings" class="block mb-10 text-sm text-primary font-semibold">
                                         ✏️ 기타 항목 (수기 작성)
                                     </label>
                                     <textarea 
@@ -2479,7 +2479,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                             onchange="syncMVPromptTranslation('thumbnail', 'en')"
                                             placeholder="썸네일 이미지 영어 프롬프트..."
                                         ></textarea>
-                                        <label class="block mt-8 mb-5 text-sm text-secondary">통합 프롬프트 한글본</label>
+                                        <label for="mvThumbnailPromptKo" class="block mt-8 mb-5 text-sm text-secondary">통합 프롬프트 한글본</label>
                                         <textarea 
                                             id="mvThumbnailPromptKo" 
                                             class="w-full min-h-80 p-10 bg-card border border-var-border rounded-6 font-inherit text-sm text-primary resize-y"
@@ -2509,7 +2509,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                             onchange="syncMVPromptTranslation('backgroundDetail', 'en')"
                                             placeholder="배경 영어 프롬프트..."
                                         ></textarea>
-                                        <label class="block mt-8 mb-5 text-sm text-secondary">통합 프롬프트 한글본</label>
+                                        <label for="mvBackgroundDetailPromptKo" class="block mt-8 mb-5 text-sm text-secondary">통합 프롬프트 한글본</label>
                                         <textarea 
                                             id="mvBackgroundDetailPromptKo" 
                                             class="w-full min-h-80 p-10 bg-card border border-var-border rounded-6 font-inherit text-sm text-primary resize-y"
@@ -2539,7 +2539,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                             onchange="syncMVPromptTranslation('characterDetail', 'en')"
                                             placeholder="인물 영어 프롬프트..."
                                         ></textarea>
-                                        <label class="block mt-8 mb-5 text-sm text-secondary">통합 프롬프트 한글본</label>
+                                        <label for="mvCharacterDetailPromptKo" class="block mt-8 mb-5 text-sm text-secondary">통합 프롬프트 한글본</label>
                                         <textarea 
                                             id="mvCharacterDetailPromptKo" 
                                             class="w-full min-h-80 p-10 bg-card border border-var-border rounded-6 font-inherit text-sm text-primary resize-y"
@@ -2576,7 +2576,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                 
                                 <div class="grid-1-2 gap-15 mb-15">
                                     <div class="form-group">
-                                        <label class="block mb-8 text-md text-primary font-semibold">
+                                        <label for="srtDisplayDuration" class="block mb-8 text-md text-primary font-semibold">
                                             ⏱️ 자막 표시 시간 (초)
                                         </label>
                                         <input type="number" id="srtDisplayDuration" min="1" max="30" value="16" class="w-full p-10 border rounded-6 bg-card text-primary text-lg" title="자막 당 표시 시간(초) 설정">
@@ -2586,7 +2586,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                                     </div>
                                     
                                     <div class="form-group">
-                                        <label class="block mb-8 text-md text-primary font-semibold">
+                                        <label for="srtLinesPerSubtitle" class="block mb-8 text-md text-primary font-semibold">
                                             📝 자막당 표시할 줄 수
                                         </label>
                                         <select id="srtLinesPerSubtitle" class="w-full p-10 border rounded-6 bg-card text-primary text-lg" title="자막 한 화면당 표시할 줄 수 선택">
@@ -4252,11 +4252,11 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
             <!-- 로그인 패널 -->
             <div id="auth-login" class="auth-panel auth-panel-inner d-block">
                 <div class="form-group m-b-16">
-                    <label class="form-label">이메일</label>
+                    <label for="loginEmail" class="form-label">이메일</label>
                     <input type="email" id="loginEmail" placeholder="example@email.com" class="auth-input" title="이메일 입력">
                 </div>
                 <div class="form-group m-b-20">
-                    <label class="form-label">비밀번호</label>
+                    <label for="loginPassword" class="form-label">비밀번호</label>
                     <input type="password" id="loginPassword" placeholder="비밀번호 입력" class="auth-input" title="비밀번호 입력">
                 </div>
                 <div id="loginMessage" class="auth-message d-none p-10-14 rounded-10 text-0875 m-b-16"></div>
@@ -4269,19 +4269,19 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
             <!-- 회원 가입 패널 -->
             <div id="auth-signup" class="auth-panel auth-panel-inner d-none">
                 <div class="form-group m-b-14">
-                    <label class="form-label">이름</label>
+                    <label for="signupName" class="form-label">이름</label>
                     <input type="text" id="signupName" placeholder="홍길동" class="auth-input" title="이름 입력">
                 </div>
                 <div class="form-group m-b-14">
-                    <label class="form-label">이메일</label>
+                    <label for="signupEmail" class="form-label">이메일</label>
                     <input type="email" id="signupEmail" placeholder="example@email.com" class="auth-input" title="가입 이메일 입력">
                 </div>
                 <div class="form-group m-b-14">
-                    <label class="form-label">비밀번호 (6자 이상)</label>
+                    <label for="signupPassword" class="form-label">비밀번호 (6자 이상)</label>
                     <input type="password" id="signupPassword" placeholder="비밀번호" class="auth-input" title="가입 비밀번호 입력">
                 </div>
                 <div class="form-group m-b-20">
-                    <label class="form-label">비밀번호 확인</label>
+                    <label for="signupPasswordConfirm" class="form-label">비밀번호 확인</label>
                     <input type="password" id="signupPasswordConfirm" placeholder="비밀번호 재입력" class="auth-input" title="비밀번호 재확인 입력">
                 </div>
                 <div id="signupMessage" class="auth-message d-none p-10-14 rounded-10 text-0875 m-b-16"></div>
@@ -4349,12 +4349,12 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                         </p>
                         
                         <div class="m-b-16">
-                            <label class="d-block text-085 font-w-600 m-b-8 color-text-primary">ChatGPT (OpenAI) API Key</label>
+                            <label for="adminOpenAIApiKey" class="d-block text-085 font-w-600 m-b-8 color-text-primary">ChatGPT (OpenAI) API Key</label>
                             <input type="password" id="adminOpenAIApiKey" placeholder="sk-..." class="w-100 p-12-16 rounded-12 border bg-card color-text-primary text-095" title="OpenAI API 키를 입력하세요">
                         </div>
                         
                         <div class="m-b-16">
-                            <label class="d-block text-085 font-w-600 m-b-8 color-text-primary">ChatGPT API 모델</label>
+                            <label for="adminOpenAIModelSelect" class="d-block text-085 font-w-600 m-b-8 color-text-primary">ChatGPT API 모델</label>
                             <select id="adminOpenAIModelSelect" onchange="toggleCustomOpenAIModelInput(this)" class="w-100 p-12-16 rounded-12 border bg-card color-text-primary text-095 m-b-8" title="ChatGPT 모델을 선택하세요">
                                 <option value="gpt-4o-mini">gpt-4o-mini (기본/추천)</option>
                                 <option value="gpt-4o">gpt-4o (고성능)</option>
@@ -4366,12 +4366,12 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                         </div>
                         
                         <div class="m-b-16">
-                            <label class="d-block text-085 font-w-600 m-b-8 color-text-primary">Gemini API Key</label>
+                            <label for="adminGeminiApiKey" class="d-block text-085 font-w-600 m-b-8 color-text-primary">Gemini API Key</label>
                             <input type="password" id="adminGeminiApiKey" placeholder="AIza..." class="w-100 p-12-16 rounded-12 border bg-card color-text-primary text-095" title="Gemini API 키를 입력하세요">
                         </div>
 
                         <div class="m-b-20">
-                            <label class="d-block text-085 font-w-600 m-b-8 color-text-primary">Gemini API 모델</label>
+                            <label for="adminGeminiModelSelect" class="d-block text-085 font-w-600 m-b-8 color-text-primary">Gemini API 모델</label>
                             <select id="adminGeminiModelSelect" onchange="toggleCustomGeminiModelInput(this)" class="w-100 p-12-16 rounded-12 border bg-card color-text-primary text-095 m-b-8" title="Gemini 모델을 선택하세요">
                                 <option value="gemini-2.5-flash">gemini-2.5-flash (기본/추천)</option>
                                 <option value="gemini-2.0-flash">gemini-2.0-flash (안정화)</option>
@@ -4409,14 +4409,14 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                 </p>
 
                 <div class="m-b-16">
-                    <label class="d-block text-085 font-w-600 m-b-8 color-text-primary">
+                    <label for="modalOpenAIApiKey" class="d-block text-085 font-w-600 m-b-8 color-text-primary">
                         <i class="fas fa-comment-dots color-success m-r-6"></i>ChatGPT (OpenAI) API Key
                     </label>
                     <input type="password" id="modalOpenAIApiKey" placeholder="sk-..." class="w-100 p-12-16 rounded-12 border bg-input color-text-primary text-095" title="OpenAI API 키를 입력하세요">
                 </div>
 
                 <div class="m-b-16">
-                    <label class="d-block text-085 font-w-600 m-b-8 color-text-primary">
+                    <label for="modalOpenAIModelSelect" class="d-block text-085 font-w-600 m-b-8 color-text-primary">
                         <i class="fas fa-cogs color-success m-r-6"></i>ChatGPT API 모델
                     </label>
                     <select id="modalOpenAIModelSelect" onchange="toggleCustomOpenAIModelInput(this)" class="w-100 p-12-16 rounded-12 border bg-input color-text-primary text-095 m-b-8" title="ChatGPT 모델을 선택하세요">
@@ -4430,14 +4430,14 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                 </div>
 
                 <div class="m-b-16">
-                    <label class="d-block text-085 font-w-600 m-b-8 color-text-primary">
+                    <label for="modalGeminiApiKey" class="d-block text-085 font-w-600 m-b-8 color-text-primary">
                         <i class="fas fa-robot color-blue m-r-6"></i>Gemini API Key
                     </label>
                     <input type="password" id="modalGeminiApiKey" placeholder="AIza..." class="w-100 p-12-16 rounded-12 border bg-input color-text-primary text-095" title="Gemini API 키를 입력하세요">
                 </div>
 
                 <div class="m-b-24">
-                    <label class="d-block text-085 font-w-600 m-b-8 color-text-primary">
+                    <label for="modalGeminiModelSelect" class="d-block text-085 font-w-600 m-b-8 color-text-primary">
                         <i class="fas fa-cogs color-blue m-r-6"></i>Gemini API 모델
                     </label>
                     <select id="modalGeminiModelSelect" onchange="toggleCustomGeminiModelInput(this)" class="w-100 p-12-16 rounded-12 border bg-input color-text-primary text-095 m-b-8" title="Gemini 모델을 선택하세요">
@@ -4513,7 +4513,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                         <textarea id="boardContent" placeholder="질문 내용을 상세히 입력하세요." class="w-full min-h-180 p-10-12 border rounded-6 bg-input color-text-primary resize-v" title="내용을 입력하세요"></textarea>
                     </div>
                     <div class="form-group m-b-15">
-                        <label class="d-block font-w-600 m-b-8">이미지 첨부 (Option)</label>
+                        <label for="boardImageInput" class="d-block font-w-600 m-b-8">이미지 첨부 (Option)</label>
                         <input type="file" id="boardImageInput" accept="image/*" class="d-none" onchange="handleBoardImageSelect(event)" title="이미지 파일 선택">
                         <div class="d-flex gap-10 flex-align-center">
                             <button type="button" class="btn btn-small bg-secondary border" onclick="document.getElementById('boardImageInput').click()"><i class="fas fa-image"></i> 이미지 선택</button>
@@ -4562,7 +4562,7 @@ Pop Rock, energetic, 128 BPM, powerful vocals, electric guitar and drums, stadiu
                         
                         <!-- 관리자 전용 답변 입력창 -->
                         <div id="adminAnswerInput" class="d-none m-t-24">
-                            <label class="d-block font-w-600 font-s-0-85 m-b-10 color-text-secondary">답변 작성 (관리자 전용)</label>
+                            <label for="boardAnswerText" class="d-block font-w-600 font-s-0-85 m-b-10 color-text-secondary">답변 작성 (관리자 전용)</label>
                             <textarea id="boardAnswerText" placeholder="관리자님, 사용자에게 보여줄 답변 내용을 작성해 주세요." class="w-full min-h-150 p-12 border rounded-10 bg-input color-text-primary resize-v" title="관리자 답변 입력"></textarea>
                             <div class="m-t-15 text-right">
                                 <button class="btn btn-primary rounded-pill bg-accent color-white border-none font-w-600 p-y-10-x-24" onclick="submitBoardAnswer()">답변 등록</button>
