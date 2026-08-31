@@ -34,8 +34,9 @@
             opacity: 0;
             transform: translateX(100%);
             transition: all 0.3s ease;
-            max-width: 300px;
+            max-width: 340px;
             word-wrap: break-word;
+            white-space: pre-line;
         `;
     toast.innerText = message;
 
@@ -47,14 +48,15 @@
       toast.style.transform = "translateX(0)";
     });
 
-    // Remove after 3 seconds
+    // 긴/여러 줄 메시지는 읽을 시간을 더 준다 (3~8초)
+    const displayMs = Math.min(8000, Math.max(3000, String(message).length * 45));
     setTimeout(() => {
       toast.style.opacity = "0";
       toast.style.transform = "translateX(100%)";
       setTimeout(() => {
         if (container.contains(toast)) container.removeChild(toast);
       }, 300);
-    }, 3000);
+    }, displayMs);
   };
 
   // Replace ALL native alert() calls with showToast() for persistent visual feedback.
@@ -65,9 +67,20 @@
     if (!message) return;
     const msg = String(message);
 
-    // Determine toast type based on message content
+    // Determine toast type based on message content.
+    // 오류 신호를 먼저 검사한다 — "저장 완료" 문구와 "오류"가 함께 있으면 오류다.
     let type = "info";
     if (
+      msg.includes("❌") ||
+      msg.includes("⚠️") ||
+      msg.includes("오류") ||
+      msg.includes("실패") ||
+      msg.includes("없습니다") ||
+      msg.includes("찾을 수 없") ||
+      msg.includes("Error")
+    ) {
+      type = "error";
+    } else if (
       msg.includes("✅") ||
       msg.includes("완료") ||
       msg.includes("성공") ||
@@ -78,20 +91,10 @@
       msg.includes("복제되었")
     ) {
       type = "success";
-    } else if (
-      msg.includes("❌") ||
-      msg.includes("⚠️") ||
-      msg.includes("오류") ||
-      msg.includes("실패") ||
-      msg.includes("없습니다") ||
-      msg.includes("찾을 수 없") ||
-      msg.includes("Error")
-    ) {
-      type = "error";
     }
 
-    // Convert newlines to spaces for toast display (toast is single-line friendly)
-    const cleanMsg = msg.replace(/\\n/g, " ").replace(/\n/g, " ").trim();
+    // 이스케이프된 개행만 실제 개행으로 바꾸고 줄바꿈은 보존한다 (토스트가 pre-line 렌더링)
+    const cleanMsg = msg.replace(/\\n/g, "\n").trim();
 
     window.showToast(cleanMsg, type);
   };
