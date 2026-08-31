@@ -532,7 +532,7 @@
       return;
     }
 
-    if (!confirm("정말 이 게시글을 삭제하시겠습니까?")) return;
+    if (!(await window.showConfirmAsync("정말 이 게시글을 삭제하시겠습니까?"))) return;
 
     try {
       await window.firebaseDb.collection(COLLECTION_BOARD).doc(postId).delete();

@@ -71,7 +71,7 @@ window.showCustomTagInput = function (containerId) {
 };
 
 // --- Extracted goToNextStep ---
-window.goToNextStep = function () {
+window.goToNextStep = async function () {
   try {
     // "다음 단계로" 버튼 클릭 시 수정 모드 활성화 (데이터 수정 반영)
     window.editMode = true;
@@ -99,7 +99,7 @@ window.goToNextStep = function () {
 
     // 곡 제목 확인 (선택사항이지만 있으면 좋음)
     if (!songTitle.trim()) {
-      const confirmContinue = confirm(
+      const confirmContinue = await window.showConfirmAsync(
         "곡 제목이 입력되지 않았습니다.\n\n제목 없이 진행하시겠습니까?",
       );
       if (!confirmContinue) {

@@ -202,45 +202,106 @@
   };
 
   // 7. Custom Confirmation Modal
-  // Replaces native window.confirm() to prevent blocking and accidental page reloads.
+  // 네이티브 window.confirm()을 대체 — JS 실행을 막지 않고, showToast처럼
+  // 필요한 DOM을 그때그때 직접 생성한다 (정적 마크업 #customConfirmModal이
+  // index.html에 실제로는 존재하지 않아 지금까지는 항상 네이티브로 폴백되고 있었음).
   window.showConfirm = function (message, onConfirm, onCancel) {
-    const modal = document.getElementById("customConfirmModal");
-    const msgEl = document.getElementById("confirmMessage");
-    const yesBtn = document.getElementById("confirmYesBtn");
-    const noBtn = document.getElementById("confirmNoBtn");
-
-    if (!modal || !msgEl || !yesBtn || !noBtn) {
-      // Fallback if HTML is not yet present
-      if (window.confirm(message)) {
-        if (onConfirm) onConfirm();
-      } else {
-        if (onCancel) onCancel();
-      }
-      return;
+    let overlay = document.getElementById("customConfirmModal");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "customConfirmModal";
+      overlay.style.cssText = `
+        position: fixed; inset: 0; z-index: 100000;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(0,0,0,0.5);
+        opacity: 0; transition: opacity 0.15s ease;
+      `;
+      overlay.innerHTML = `
+        <div style="
+          background: var(--bg-card, #1e1e2e); color: var(--text-primary, #fff);
+          border: 1px solid var(--border, rgba(255,255,255,0.12));
+          border-radius: 12px; padding: 20px 24px; max-width: 400px; width: 90%;
+          box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+          transform: translateY(8px); transition: transform 0.15s ease;
+        ">
+          <div id="confirmMessage" style="white-space: pre-line; line-height: 1.6; margin-bottom: 18px; font-size: 0.95rem;"></div>
+          <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button id="confirmNoBtn" type="button" class="btn btn-secondary" style="padding: 8px 16px; border-radius: 8px; cursor: pointer;">취소</button>
+            <button id="confirmYesBtn" type="button" class="btn btn-primary" style="padding: 8px 16px; border-radius: 8px; cursor: pointer;">확인</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      // 배경 클릭으로 닫기 = 취소
+      overlay.addEventListener("click", function (e) {
+        if (e.target === overlay) overlay.__cancel && overlay.__cancel();
+      });
     }
 
-    msgEl.innerText = message;
-    // 인덱스의 강제 숨김 스크립트가 추가한 인라인 스타일(display: none !important 등) 제거
-    modal.style.cssText = "";
-    modal.classList.add("show");
+    const msgEl = overlay.querySelector("#confirmMessage");
+    const yesBtn = overlay.querySelector("#confirmYesBtn");
+    const noBtn = overlay.querySelector("#confirmNoBtn");
+    const box = overlay.firstElementChild;
 
-    // Clean up previous listeners
+    msgEl.innerText = message;
+    overlay.style.display = "flex";
+    requestAnimationFrame(() => {
+      overlay.style.opacity = "1";
+      box.style.transform = "translateY(0)";
+    });
+
+    let settled = false;
+    function close() {
+      overlay.style.opacity = "0";
+      box.style.transform = "translateY(8px)";
+      setTimeout(() => {
+        overlay.style.display = "none";
+      }, 150);
+    }
+    function handleYes(e) {
+      if (e) e.preventDefault();
+      if (settled) return;
+      settled = true;
+      close();
+      if (onConfirm) onConfirm();
+    }
+    function handleCancel(e) {
+      if (e) e.preventDefault();
+      if (settled) return;
+      settled = true;
+      close();
+      if (onCancel) onCancel();
+    }
+    overlay.__cancel = handleCancel;
+
+    // 이전 리스너 정리를 위해 버튼을 매번 새로 붙인다
     const newYesBtn = yesBtn.cloneNode(true);
     const newNoBtn = noBtn.cloneNode(true);
     yesBtn.parentNode.replaceChild(newYesBtn, yesBtn);
     noBtn.parentNode.replaceChild(newNoBtn, noBtn);
+    newYesBtn.onclick = handleYes;
+    newNoBtn.onclick = handleCancel;
 
-    newYesBtn.onclick = function (e) {
-      if (e) e.preventDefault();
-      modal.classList.remove("show");
-      if (onConfirm) onConfirm();
-    };
+    // Escape 키로 취소
+    function onKeydown(e) {
+      if (e.key === "Escape") {
+        document.removeEventListener("keydown", onKeydown);
+        handleCancel();
+      }
+    }
+    document.addEventListener("keydown", onKeydown);
+  };
 
-    newNoBtn.onclick = function (e) {
-      if (e) e.preventDefault();
-      modal.classList.remove("show");
-      if (onCancel) onCancel();
-    };
+  // Promise 기반 버전 — `if (!(await window.showConfirmAsync(msg))) return;` 형태로
+  // 기존 `if (!confirm(msg)) return;` 패턴을 그대로 치환할 수 있다.
+  window.showConfirmAsync = function (message) {
+    return new Promise((resolve) => {
+      window.showConfirm(
+        message,
+        () => resolve(true),
+        () => resolve(false),
+      );
+    });
   };
 
   // 8. Help Modal System

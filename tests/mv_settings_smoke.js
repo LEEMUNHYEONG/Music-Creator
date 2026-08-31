@@ -207,6 +207,9 @@ global.prompt = function promptStub() {
 global.confirm = function confirmStub() {
   return true;
 };
+window.showConfirmAsync = function showConfirmAsyncStub() {
+  return Promise.resolve(true);
+};
 window.saveCurrentMVSettingsPreset();
 const presets = JSON.parse(localStorage.getItem("mvSettingsPresets"));
 assert.strictEqual(presets.length, 1);
@@ -224,7 +227,10 @@ assert.strictEqual(document.getElementById("mvMood").value, "dreamy");
 assert.strictEqual(document.getElementById("mvMinutes").value, "4");
 assert.ok(toastMessage.includes("적용"));
 
-window.deleteSelectedMVSettingsPreset();
+// deleteSelectedMVSettingsPreset은 비차단 확인 모달(showConfirmAsync)을 기다리는
+// async 함수이므로 이후 나머지 검증도 async IIFE 안에서 await한다.
+(async () => {
+await window.deleteSelectedMVSettingsPreset();
 assert.strictEqual(JSON.parse(localStorage.getItem("mvSettingsPresets")).length, 0);
 
 window.renderMVSettingComboRecommendations();
@@ -299,3 +305,7 @@ assert.strictEqual(actionTagContainer.tags[1].classList.contains("active"), true
 
 originalConsole.log("MV settings smoke test: PASS");
 process.exit(0);
+})().catch((err) => {
+  originalConsole.error(err);
+  process.exit(1);
+});

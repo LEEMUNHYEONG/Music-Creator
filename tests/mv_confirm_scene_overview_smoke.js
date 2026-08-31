@@ -95,6 +95,12 @@ global.confirm = function confirmStub(message) {
   confirms.push(message);
   return false;
 };
+// showAndConfirmMVPrompts 등은 window.confirm() 대신 비차단 커스텀 모달
+// (window.showConfirmAsync)을 사용하므로 동일하게 스텁한다.
+window.showConfirmAsync = function showConfirmAsyncStub(message) {
+  confirms.push(message);
+  return Promise.resolve(false);
+};
 global.requestAnimationFrame = function requestAnimationFrameStub(callback) {
   callback();
 };

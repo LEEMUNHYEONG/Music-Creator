@@ -889,11 +889,7 @@ window.saveAndConfirmMVPrompts = async function () {
     });
 
     const reviewMessage = getMVSceneQualityConfirmMessage(window.currentScenes);
-    if (
-      reviewMessage &&
-      typeof window.confirm === "function" &&
-      !window.confirm(reviewMessage)
-    ) {
+    if (reviewMessage && !(await window.showConfirmAsync(reviewMessage))) {
       if (typeof window.focusMVFirstReviewScene === "function") {
         window.focusMVFirstReviewScene();
       }

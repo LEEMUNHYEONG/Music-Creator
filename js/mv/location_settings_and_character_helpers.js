@@ -480,7 +480,7 @@ window.applySelectedMVSettingsPreset = function () {
   }
 };
 
-window.deleteSelectedMVSettingsPreset = function () {
+window.deleteSelectedMVSettingsPreset = async function () {
   const select = document.getElementById("mvSettingsPresetSelect");
   const presetId = select?.value || "";
   if (!presetId) {
@@ -489,10 +489,7 @@ window.deleteSelectedMVSettingsPreset = function () {
   }
   const preset = window.getMVSettingsPresets().find((item) => item.id === presetId);
   if (!preset) return;
-  if (
-    typeof window.confirm === "function" &&
-    !window.confirm(`'${preset.name}' 프리셋을 삭제할까요?`)
-  ) {
+  if (!(await window.showConfirmAsync(`'${preset.name}' 프리셋을 삭제할까요?`))) {
     return;
   }
   const presets = window.getMVSettingsPresets().filter((item) => item.id !== presetId);
