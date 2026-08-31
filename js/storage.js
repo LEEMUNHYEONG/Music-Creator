@@ -150,7 +150,7 @@ window.saveProjectListToLocalStorage = function (
       const payload = kept.map((project) =>
         project?.id === currentId
           ? compactProjectForLocalStorage(project, mode)
-          : compactProjectForLocalStorage(project, mode === "full" ? "summary" : "summary"),
+          : compactProjectForLocalStorage(project, mode === "full" ? "full" : "summary"),
       );
       try {
         localStorage.setItem(key, JSON.stringify(payload));
@@ -1486,7 +1486,7 @@ window.saveCurrentProject = function () {
       const uid = window.firebaseAuth.currentUser.uid;
       try {
         window.firebaseDb.collection("users").doc(uid).collection("projects").doc(projectId)
-          .set(projectToSave)
+          .set(projectToSave, { merge: true })
           .then(() => {
             console.log(`☁️ 프로젝트 클라우드 백업 완료: ${projectId}`);
             if (typeof window.updateSaveStatusUI === "function") {

@@ -54,6 +54,7 @@ const tests = [
   "tests/mv_scene_model_normalization_smoke.js",
   "tests/mv_marketing_diagnostics_smoke.js",
   "tests/mv_storage_quota_recovery_smoke.js",
+  "tests/mv_storage_full_mode_preservation_smoke.js",
   "tests/mv_step4_ai_fallback_smoke.js",
   "tests/mv_runtime_guard_smoke.js",
   "tests/mv_single_project_json_smoke.js",
