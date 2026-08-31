@@ -39,6 +39,12 @@ global.confirm = function confirmStub(message) {
   confirmMessages.push(message);
   return true;
 };
+// copyAllMVPrompts의 확인 게이트는 네이티브 confirm() 대신 비차단
+// showConfirmAsync를 사용하므로 동일하게 스텁한다.
+window.showConfirmAsync = function showConfirmAsyncStub(message) {
+  confirmMessages.push(message);
+  return Promise.resolve(true);
+};
 
 window.showCopyIndicator = function showCopyIndicator(message) {
   toastMessage = message;
@@ -76,9 +82,15 @@ addElement("scene_0_ko", "씬 0 한글 textarea");
 
 require("../test-results/mv_modules.compat.js");
 
-window.copyAllMVPrompts();
+// copyAllMVPrompts는 확인 게이트를 await하는 async 함수이므로
+// 완료를 직접 기다린 뒤 검증한다.
+(async () => {
 
-setImmediate(() => {
+await window.copyAllMVPrompts();
+// writeText().then() 콜백(toastMessage 설정)이 마이크로태스크 큐에 남아
+// 있을 수 있으므로 매크로태스크 한 틱을 더 기다린다.
+await new Promise((resolve) => setImmediate(resolve));
+
   assert.ok(clipboardText.includes("=== MV 프롬프트 상세 ==="));
   assert.ok(clipboardText.includes("🎬 썸네일 이미지 프롬프트"));
   assert.ok(clipboardText.includes("thumbnail english"));
@@ -103,4 +115,7 @@ setImmediate(() => {
   assert.ok(toastMessage.includes("클립보드"));
   originalConsole.log("MV copy prompts smoke test: PASS");
   process.exit(0);
+})().catch((err) => {
+  originalConsole.error(err);
+  process.exit(1);
 });

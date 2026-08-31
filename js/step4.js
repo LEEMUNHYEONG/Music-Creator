@@ -1016,9 +1016,9 @@ ${guidelines}
 // 다시 생성 (Placeholders for now, linked to applySelectedImprovements logic if needed)
 window.regenerateFinalizedContent = async function () {
   if (
-    !confirm(
+    !(await window.showConfirmAsync(
       "현재 확정된 내용을 바탕으로 다시 생성하시겠습니까?\n(현재 내용은 이력에 저장됩니다.)",
-    )
+    ))
   )
     return;
 
@@ -1095,13 +1095,13 @@ window.showRegenerationHistory = function () {
   }
 };
 
-window.restoreFromHistory = function (index) {
+window.restoreFromHistory = async function (index) {
   const history = window.currentProject?.data?.regenerationHistory || [];
   const item = history[index];
   if (!item) return;
 
   if (
-    !confirm("이 버전으로 복구하시겠습니까? (현재 내용은 이력에 추가됩니다.)")
+    !(await window.showConfirmAsync("이 버전으로 복구하시겠습니까? (현재 내용은 이력에 추가됩니다.)"))
   )
     return;
 

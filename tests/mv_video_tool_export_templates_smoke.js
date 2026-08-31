@@ -137,20 +137,28 @@ assert.ok(pikaText.includes("MV Pika 영상 생성 프롬프트"));
 assert.ok(pikaText.includes("animate as a polished music video shot"));
 assert.ok(pikaText.includes("두 번째 씬 textarea 한글"));
 
-window.copyMVVideoToolPrompts("pika");
+// copyMVVideoToolPrompts/downloadMVVideoToolPrompts는 확인 게이트를
+// await하는 async 함수이므로 완료를 직접 기다린 뒤 검증한다.
+(async () => {
 
-setImmediate(() => {
-  assert.ok(clipboardText.includes("MV Pika 영상 생성 프롬프트"));
-  assert.ok(toastMessage.includes("Pika"));
+await window.copyMVVideoToolPrompts("pika");
+// writeText().then() 콜백은 별도 마이크로태스크이므로 매크로태스크 한 틱을 더 기다린다.
+await new Promise((resolve) => setImmediate(resolve));
 
-  window.downloadMVVideoToolPrompts("kling");
-  assert.strictEqual(clickedDownload, "mv-kling-prompts.txt");
-  assert.strictEqual(appended, true);
-  assert.strictEqual(removed, true);
-  assert.strictEqual(revokedUrl, "blob:mv-video-tool-test");
-  assert.ok(blobText.includes("MV Kling 영상 생성 프롬프트"));
-  assert.ok(blobText.includes("high-detail cinematic video"));
+assert.ok(clipboardText.includes("MV Pika 영상 생성 프롬프트"));
+assert.ok(toastMessage.includes("Pika"));
 
-  originalConsole.log("MV video tool export templates smoke test: PASS");
-  process.exit(0);
+await window.downloadMVVideoToolPrompts("kling");
+assert.strictEqual(clickedDownload, "mv-kling-prompts.txt");
+assert.strictEqual(appended, true);
+assert.strictEqual(removed, true);
+assert.strictEqual(revokedUrl, "blob:mv-video-tool-test");
+assert.ok(blobText.includes("MV Kling 영상 생성 프롬프트"));
+assert.ok(blobText.includes("high-detail cinematic video"));
+
+originalConsole.log("MV video tool export templates smoke test: PASS");
+process.exit(0);
+})().catch((err) => {
+  originalConsole.error(err);
+  process.exit(1);
 });

@@ -69,6 +69,12 @@ global.confirm = function confirmStub(message) {
   confirmMessage = message;
   return allowExport;
 };
+// 미저장 씬 확인 게이트는 네이티브 confirm() 대신 비차단 showConfirmAsync를
+// 사용하므로 동일하게 스텁한다.
+window.showConfirmAsync = function showConfirmAsyncStub(message) {
+  confirmMessage = message;
+  return Promise.resolve(allowExport);
+};
 
 window.showCopyIndicator = function showCopyIndicator(message) {
   toastMessage = message;
@@ -102,26 +108,33 @@ assert.ok(
     .includes("대상 씬: 1"),
 );
 
-window.copyMVImagePromptBundle();
+// copyMVImagePromptBundle은 확인 게이트를 await하는 async 함수이므로
+// 완료를 직접 기다린 뒤 검증한다. writeText().then() 콜백은 별도
+// 마이크로태스크이므로 매크로태스크 한 틱을 더 기다린다.
+(async () => {
 
-setImmediate(() => {
-  assert.ok(confirmMessage.includes("수정 미저장 씬 1개"));
-  assert.ok(confirmMessage.includes("이미지 프롬프트 번들 복사"));
-  assert.strictEqual(clipboardText, "");
-  assert.strictEqual(focusedScene, true);
-  assert.strictEqual(scrolledScene, true);
-  assert.ok(toastMessage.includes("저장되지 않은 씬"));
+await window.copyMVImagePromptBundle();
+await new Promise((resolve) => setImmediate(resolve));
 
-  allowExport = true;
-  confirmMessage = "";
-  toastMessage = "";
-  window.copyMVImagePromptBundle();
+assert.ok(confirmMessage.includes("수정 미저장 씬 1개"));
+assert.ok(confirmMessage.includes("이미지 프롬프트 번들 복사"));
+assert.strictEqual(clipboardText, "");
+assert.strictEqual(focusedScene, true);
+assert.strictEqual(scrolledScene, true);
+assert.ok(toastMessage.includes("저장되지 않은 씬"));
 
-  setImmediate(() => {
-    assert.ok(confirmMessage.includes("수정 미저장 씬 1개"));
-    assert.ok(clipboardText.includes("edited scene prompt from textarea"));
-    assert.ok(toastMessage.includes("이미지 생성 프롬프트"));
-    originalConsole.log("MV unsaved export guard smoke test: PASS");
-    process.exit(0);
-  });
+allowExport = true;
+confirmMessage = "";
+toastMessage = "";
+await window.copyMVImagePromptBundle();
+await new Promise((resolve) => setImmediate(resolve));
+
+assert.ok(confirmMessage.includes("수정 미저장 씬 1개"));
+assert.ok(clipboardText.includes("edited scene prompt from textarea"));
+assert.ok(toastMessage.includes("이미지 생성 프롬프트"));
+originalConsole.log("MV unsaved export guard smoke test: PASS");
+process.exit(0);
+})().catch((err) => {
+  originalConsole.error(err);
+  process.exit(1);
 });

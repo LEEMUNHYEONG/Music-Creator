@@ -136,19 +136,27 @@ assert.ok(bundleText.includes("16:9 aspect ratio"));
 assert.ok(bundleText.includes("textarea rooftop image prompt"));
 assert.ok(bundleText.includes("textarea 옥상 이미지 설명"));
 
-window.copyMVImagePromptBundle();
+// copyMVImagePromptBundle/downloadMVImagePromptBundle은 확인 게이트를
+// await하는 async 함수이므로 완료를 직접 기다린 뒤 검증한다.
+(async () => {
 
-setImmediate(() => {
-  assert.strictEqual(clipboardText, bundleText);
-  assert.ok(toastMessage.includes("이미지 생성 프롬프트"));
+await window.copyMVImagePromptBundle();
+// writeText().then() 콜백은 별도 마이크로태스크이므로 매크로태스크 한 틱을 더 기다린다.
+await new Promise((resolve) => setImmediate(resolve));
 
-  window.downloadMVImagePromptBundle();
-  assert.strictEqual(clickedDownload, "mv-image-prompts.txt");
-  assert.strictEqual(appended, true);
-  assert.strictEqual(removed, true);
-  assert.strictEqual(revokedUrl, "blob:mv-image-bundle-test");
-  assert.strictEqual(blobText, bundleText);
+assert.strictEqual(clipboardText, bundleText);
+assert.ok(toastMessage.includes("이미지 생성 프롬프트"));
 
-  originalConsole.log("MV image prompt bundle smoke test: PASS");
-  process.exit(0);
+await window.downloadMVImagePromptBundle();
+assert.strictEqual(clickedDownload, "mv-image-prompts.txt");
+assert.strictEqual(appended, true);
+assert.strictEqual(removed, true);
+assert.strictEqual(revokedUrl, "blob:mv-image-bundle-test");
+assert.strictEqual(blobText, bundleText);
+
+originalConsole.log("MV image prompt bundle smoke test: PASS");
+process.exit(0);
+})().catch((err) => {
+  originalConsole.error(err);
+  process.exit(1);
 });

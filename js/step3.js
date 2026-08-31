@@ -3,7 +3,7 @@
 // ==========================================
 
 // --- Extracted goToStep4AndApplyImprovements ---
-window.goToStep4AndApplyImprovements = function () {
+window.goToStep4AndApplyImprovements = async function () {
   try {
     // "다음 단계로" 버튼 클릭 시 수정 모드 활성화 (데이터 수정 반영)
     window.editMode = true;
@@ -31,13 +31,13 @@ window.goToStep4AndApplyImprovements = function () {
     if (finalizedLyricsEl) {
       const currentFinalized = finalizedLyricsEl.value.trim();
       // 비어있거나, 사용자가 이전 단계 가사를 최신화하길 원하는 경우
-      if (
-        !currentFinalized ||
-        (currentFinalized !== sunoLyrics &&
-          confirm(
-            "4단계의 기존 확정 가사가 현재 가사와 다릅니다. 현재 가사로 최신화하시겠습니까?",
-          ))
-      ) {
+      let shouldUpdateLyrics = !currentFinalized;
+      if (!shouldUpdateLyrics && currentFinalized !== sunoLyrics) {
+        shouldUpdateLyrics = await window.showConfirmAsync(
+          "4단계의 기존 확정 가사가 현재 가사와 다릅니다. 현재 가사로 최신화하시겠습니까?",
+        );
+      }
+      if (shouldUpdateLyrics) {
         finalizedLyricsEl.value = sunoLyrics;
         console.log("✅ 4단계 확정 가사 최신화 완료");
       }
@@ -47,13 +47,13 @@ window.goToStep4AndApplyImprovements = function () {
     const finalizedStyleEl = document.getElementById("finalizedStyle");
     if (finalizedStyleEl) {
       const currentStyle = finalizedStyleEl.value.trim();
-      if (
-        !currentStyle ||
-        (currentStyle !== stylePrompt &&
-          confirm(
-            "4단계의 기존 확정 스타일이 현재 스타일과 다릅니다. 현재 스타일로 최신화하시겠습니까?",
-          ))
-      ) {
+      let shouldUpdateStyle = !currentStyle;
+      if (!shouldUpdateStyle && currentStyle !== stylePrompt) {
+        shouldUpdateStyle = await window.showConfirmAsync(
+          "4단계의 기존 확정 스타일이 현재 스타일과 다릅니다. 현재 스타일로 최신화하시겠습니까?",
+        );
+      }
+      if (shouldUpdateStyle) {
         finalizedStyleEl.value = stylePrompt;
         console.log("✅ 4단계 확정 스타일 최신화 완료");
       }

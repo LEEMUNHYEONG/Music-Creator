@@ -236,7 +236,7 @@ window.buildMVUnsavedSceneExportMessage = function (actionLabel) {
     .join("\n");
 };
 
-window.confirmMVExportWithUnsavedScenes = function (actionLabel) {
+window.confirmMVExportWithUnsavedScenes = async function (actionLabel) {
   const indexes =
     typeof window.getMVUnsavedSceneIndexes === "function"
       ? window.getMVUnsavedSceneIndexes()
@@ -248,7 +248,9 @@ window.confirmMVExportWithUnsavedScenes = function (actionLabel) {
       ? window.buildMVUnsavedSceneExportMessage(actionLabel)
       : "수정 미저장 씬이 있습니다. 계속 진행할까요?";
   const shouldContinue =
-    typeof window.confirm === "function" ? window.confirm(message) : true;
+    typeof window.showConfirmAsync === "function"
+      ? await window.showConfirmAsync(message)
+      : true;
   if (shouldContinue) return true;
 
   if (typeof window.focusMVFirstDirtyScene === "function") {
@@ -339,14 +341,16 @@ window.buildMVFinalExportConfirmMessage = function (actionLabel, options = {}) {
   ].join("\n");
 };
 
-window.confirmMVFinalPromptExport = function (actionLabel, options = {}) {
+window.confirmMVFinalPromptExport = async function (actionLabel, options = {}) {
   if (options.skipConfirm) return true;
   const message =
     typeof window.buildMVFinalExportConfirmMessage === "function"
       ? window.buildMVFinalExportConfirmMessage(actionLabel, options)
       : "전체 MV 프롬프트를 내보낼까요?";
   const shouldContinue =
-    typeof window.confirm === "function" ? window.confirm(message) : true;
+    typeof window.showConfirmAsync === "function"
+      ? await window.showConfirmAsync(message)
+      : true;
   if (shouldContinue) return true;
 
   const scenes = Array.isArray(window.currentScenes) ? window.currentScenes : [];
@@ -365,13 +369,13 @@ window.confirmMVFinalPromptExport = function (actionLabel, options = {}) {
   return false;
 };
 
-window.copyMVScenePromptTable = function () {
+window.copyMVScenePromptTable = async function () {
   const text = window.buildMVScenePromptTableText();
   if (!text) {
     alert("복사할 씬 프롬프트 표가 없습니다.");
     return;
   }
-  if (!window.confirmMVExportWithUnsavedScenes("씬 프롬프트 표 복사")) {
+  if (!(await window.confirmMVExportWithUnsavedScenes("씬 프롬프트 표 복사"))) {
     return;
   }
 
@@ -459,13 +463,13 @@ window.buildMVImagePromptBundle = function () {
   return `MV 이미지 생성 프롬프트 번들\n\n${window.buildMVExportMetadataHeader()}${window.buildMVExportQualityChecklist(scenes)}${sections.join("\n\n")}\n`;
 };
 
-window.copyMVImagePromptBundle = function () {
+window.copyMVImagePromptBundle = async function () {
   const text = window.buildMVImagePromptBundle();
   if (!text) {
     alert("복사할 이미지 생성 프롬프트가 없습니다.");
     return;
   }
-  if (!window.confirmMVExportWithUnsavedScenes("이미지 프롬프트 번들 복사")) {
+  if (!(await window.confirmMVExportWithUnsavedScenes("이미지 프롬프트 번들 복사"))) {
     return;
   }
 
@@ -486,13 +490,13 @@ window.copyMVImagePromptBundle = function () {
     });
 };
 
-window.downloadMVImagePromptBundle = function () {
+window.downloadMVImagePromptBundle = async function () {
   const text = window.buildMVImagePromptBundle();
   if (!text) {
     alert("다운로드할 이미지 생성 프롬프트가 없습니다.");
     return;
   }
-  if (!window.confirmMVExportWithUnsavedScenes("이미지 프롬프트 TXT 다운로드")) {
+  if (!(await window.confirmMVExportWithUnsavedScenes("이미지 프롬프트 TXT 다운로드"))) {
     return;
   }
 
@@ -581,14 +585,14 @@ window.buildMVVideoToolPrompts = function (tool = "runway") {
   return text;
 };
 
-window.copyMVVideoToolPrompts = function (tool = "runway") {
+window.copyMVVideoToolPrompts = async function (tool = "runway") {
   const config = window.getMVVideoToolConfig(tool);
   const text = window.buildMVVideoToolPrompts(config.key);
   if (!text) {
     alert("복사할 영상 생성 프롬프트가 없습니다.");
     return;
   }
-  if (!window.confirmMVExportWithUnsavedScenes(`${config.label} 영상 프롬프트 복사`)) {
+  if (!(await window.confirmMVExportWithUnsavedScenes(`${config.label} 영상 프롬프트 복사`))) {
     return;
   }
 
@@ -609,7 +613,7 @@ window.copyMVVideoToolPrompts = function (tool = "runway") {
     });
 };
 
-window.downloadMVVideoToolPrompts = function (tool = "runway") {
+window.downloadMVVideoToolPrompts = async function (tool = "runway") {
   const config = window.getMVVideoToolConfig(tool);
   const text = window.buildMVVideoToolPrompts(config.key);
   if (!text) {
@@ -617,9 +621,9 @@ window.downloadMVVideoToolPrompts = function (tool = "runway") {
     return;
   }
   if (
-    !window.confirmMVExportWithUnsavedScenes(
+    !(await window.confirmMVExportWithUnsavedScenes(
       `${config.label} 영상 프롬프트 TXT 다운로드`,
-    )
+    ))
   ) {
     return;
   }
@@ -635,15 +639,15 @@ window.downloadMVVideoToolPrompts = function (tool = "runway") {
   URL.revokeObjectURL(url);
 };
 
-window.downloadMVPrompts = function () {
+window.downloadMVPrompts = async function () {
   if (!window.currentScenes || window.currentScenes.length === 0) {
     alert("다운로드할 프롬프트가 없습니다.");
     return;
   }
-  if (!window.confirmMVExportWithUnsavedScenes("전체 MV 프롬프트 다운로드")) {
+  if (!(await window.confirmMVExportWithUnsavedScenes("전체 MV 프롬프트 다운로드"))) {
     return;
   }
-  if (!window.confirmMVFinalPromptExport("전체 MV 프롬프트 다운로드")) {
+  if (!(await window.confirmMVFinalPromptExport("전체 MV 프롬프트 다운로드"))) {
     return;
   }
 

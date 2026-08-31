@@ -1495,15 +1495,15 @@ ${getMVSceneRegenerationContext(scene, { location, mood, lighting, cameraWork })
 };
 
 // --- Restored Copy and Focus Functions ---
-window.copyAllMVPrompts = function (event) {
+window.copyAllMVPrompts = async function (event) {
   if (!window.currentScenes || window.currentScenes.length === 0) {
     alert("복사할 프롬프트가 없습니다.");
     return;
   }
-  if (!window.confirmMVExportWithUnsavedScenes("전체 MV 프롬프트 복사")) {
+  if (!(await window.confirmMVExportWithUnsavedScenes("전체 MV 프롬프트 복사"))) {
     return;
   }
-  if (!window.confirmMVFinalPromptExport("전체 MV 프롬프트 복사")) {
+  if (!(await window.confirmMVFinalPromptExport("전체 MV 프롬프트 복사"))) {
     return;
   }
 
@@ -1624,7 +1624,7 @@ window.copyAllMVPrompts = function (event) {
 };
 
 // Bulk Copy Aliases (to ensure index.html buttons work)
-window.copyAllMVProductionData = function (event) {
+window.copyAllMVProductionData = async function (event) {
   if (typeof window.copyAllMVPrompts === "function") {
     return window.copyAllMVPrompts(event);
   }

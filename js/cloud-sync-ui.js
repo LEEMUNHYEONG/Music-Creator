@@ -272,7 +272,7 @@ async function loadRestoreCloudList() {
     `).join("");
 }
 async function doRestoreFromCloud(projectId) {
-    if (!confirm("이 프로젝트의 최신 클라우드 버전을 로컬에 복원하시겠습니까?")) return;
+    if (!(await window.showConfirmAsync("이 프로젝트의 최신 클라우드 버전을 로컬에 복원하시겠습니까?"))) return;
     if (typeof window.downloadSelectedCloudProjects === "function") {
         const count = await window.downloadSelectedCloudProjects([projectId]);
         if (count > 0) {
@@ -514,8 +514,8 @@ function closeHistoryModal() {
     document.getElementById("cloudHistoryModal").classList.add("sync-modal-hidden");
 }
 async function doRestoreHistory(historyDocId, timeLabel) {
-    if (!confirm(`"${timeLabel}" 시점의 데이터로 복원하시겠습니까?
-현재 작업 내용은 교체됩니다.`)) return;
+    if (!(await window.showConfirmAsync(`"${timeLabel}" 시점의 데이터로 복원하시겠습니까?
+현재 작업 내용은 교체됩니다.`))) return;
     if (!_historyProjectId) return;
     const ok = await window.restoreFromCloudHistory(_historyProjectId, historyDocId);
     if (ok) {

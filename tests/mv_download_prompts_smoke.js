@@ -53,6 +53,12 @@ global.confirm = function confirmStub(message) {
   confirmMessages.push(message);
   return true;
 };
+// downloadMVPrompts의 확인 게이트는 네이티브 confirm() 대신 비차단
+// showConfirmAsync를 사용하므로 동일하게 스텁한다.
+window.showConfirmAsync = function showConfirmAsyncStub(message) {
+  confirmMessages.push(message);
+  return Promise.resolve(true);
+};
 global.Blob = class BlobStub {
   constructor(parts, options) {
     blobText = parts.join("");
@@ -109,7 +115,11 @@ window.currentScenes = [
   },
 ];
 
-window.downloadMVPrompts();
+// downloadMVPrompts는 확인 게이트를 await하는 async 함수이므로
+// 이후 나머지 검증도 async IIFE 안에서 await한다.
+(async () => {
+
+await window.downloadMVPrompts();
 
 assert.strictEqual(clickedDownload, "mv-prompts.txt");
 assert.strictEqual(appended, true);
@@ -141,8 +151,12 @@ assert.ok(confirmMessages[0].includes("프로젝트: Codex Export Song"));
 assert.ok(confirmMessages[0].includes("포함 항목:"));
 
 window.currentScenes = [];
-window.downloadMVPrompts();
+await window.downloadMVPrompts();
 assert.ok(alerts.some((message) => message.includes("다운로드할 프롬프트")));
 
 console.log("MV download prompts smoke test: PASS");
 process.exit(0);
+})().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
