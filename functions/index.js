@@ -198,10 +198,15 @@ exports.geminiProxy = onRequest(
             contents,
             generationConfig: {
               ...(body.generationConfig || {}),
-              maxOutputTokens:
+              // OpenAI 경로(max_tokens)와 동일하게 상한을 적용한다.
+              // (이전에는 캡 없이 호출자가 요청한 값을 그대로 전달해
+              // 비정상적으로 큰 값을 보내는 비용 남용 벡터가 될 수 있었음)
+              maxOutputTokens: Math.min(
                 body.generationConfig?.maxOutputTokens ||
-                body.maxOutputTokens ||
-                8192,
+                  body.maxOutputTokens ||
+                  8192,
+                MAX_TOKENS_CAP,
+              ),
               temperature:
                 body.generationConfig?.temperature ??
                 body.temperature ??
