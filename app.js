@@ -1505,6 +1505,328 @@ setTimeout(() => {
 // ═══════════════════════════════════════════════════════════════
 // 3단계: Gemini 정밀 분석 함수
 // ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+// startGeminiAnalysis 헬퍼 함수들 (순수 추출 리팩터링, 동작 동일)
+// ═══════════════════════════════════════════════════════════════
+
+// AI에게 보낼 가사/스타일 분석 요청 프롬프트를 만든다.
+function buildGeminiAnalysisPrompt(lyrics, stylePrompt) {
+  return `다음 가사와 스타일 프롬프트를 정밀 분석하고 평가해주세요.
+
+=== 분석 대상 ===
+
+📝 수노 가사 (지시어 포함):
+${lyrics}
+
+🎨 스타일 프롬프트:
+${stylePrompt}
+
+=== 분석 요청 ===
+
+다음 항목을 각각 1-100점으로 평가하고, 구체적인 피드백과 개선 사항을 제안해주세요:
+
+1. **구조 (Structure)**: Verse, Chorus, Bridge 등의 구성이 적절한지
+2. **감정 표현 (Emotion)**: 가사가 전달하는 감정이 명확하고 효과적인지
+3. **운율 및 리듬 (Rhythm)**: 가사의 운율과 리듬감이 좋은지
+4. **창의성 (Creativity)**: 가사의 독창성과 참신함
+5. **전달력 (Impact)**: 메시지가 명확하게 전달되는지
+6. **스타일 프롬프트 적합성 (Style Compatibility)**: 가사와 스타일 프롬프트가 잘 어울리는지
+7. **전체 평가 (Overall Score)**: 종합적인 평가 점수
+
+=== 응답 형식 ===
+
+다음 JSON 형식으로 응답해주세요:
+
+{
+  "scores": {
+    "structure": 85,
+    "emotion": 90,
+    "rhythm": 80,
+    "creativity": 75,
+    "impact": 88,
+    "styleCompatibility": 82,
+    "overall": 83
+  },
+  "feedbacks": [
+    {
+      "category": "구조",
+      "score": 85,
+      "strength": "Verse-Chorus 구조가 명확하고 반복되는 후렴구가 효과적입니다.",
+      "weakness": "Bridge 부분이 부족하여 곡의 변화가 적습니다.",
+      "suggestion": "Bridge를 추가하여 곡의 긴장감을 높이는 것을 권장합니다."
+    },
+    {
+      "category": "감정 표현",
+      "score": 90,
+      "strength": "감정이 매우 명확하고 진정성 있게 전달됩니다.",
+      "weakness": "일부 구절에서 감정 전달이 다소 직설적입니다.",
+      "suggestion": "은유와 비유를 활용하여 감정을 더욱 풍부하게 표현해보세요."
+    }
+  ],
+  "improvements": [
+    "Bridge 섹션 추가를 고려해보세요",
+    "은유적 표현을 더 활용하면 감정 전달이 더욱 효과적일 것입니다",
+    "스타일 프롬프트의 템포와 가사의 리듬을 더욱 조화롭게 맞춰보세요"
+  ],
+  "summary": "전반적으로 우수한 가사입니다. 구조와 감정 표현이 뛰어나며, 스타일 프롬프트와도 잘 어울립니다. Bridge 추가와 은유적 표현 활용을 통해 더욱 완성도 높은 작품이 될 수 있을 것입니다."
+}
+
+**중요**: JSON 형식만 출력하고, 다른 설명이나 텍스트는 포함하지 마세요.`;
+}
+
+// AI 응답을 다단계로 파싱한다: 표준 JSON → 후행 콤마 제거 → 부분(정규식)
+// 추출 → 그래도 실패하면 원본 텍스트를 담은 에러 객체. 기존 로직 그대로.
+function parseGeminiAnalysisResponse(aiResponse) {
+  let analysisData;
+  try {
+    // 1단계: 마크다운 코드 블록 제거
+    let cleanedResponse = aiResponse.trim();
+    cleanedResponse = cleanedResponse
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+
+    // 2단계: JSON 블록 전체 추출
+    const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      // 2-1) 표준 파싱 시도
+      try {
+        analysisData = JSON.parse(jsonMatch[0]);
+      } catch (e1) {
+        // 2-2) 후행 콤마 제거 후 재시도
+        const fixed = jsonMatch[0].replace(/,\s*([}\]])/g, '$1');
+        try {
+          analysisData = JSON.parse(fixed);
+          console.log('✅ 후행 콤마 제거 후 파싱 성공');
+        } catch (e2) {
+          // 2-3) 부분 추출 (feedbacks, improvements, scores 개별 추출)
+          console.warn('⚠️ 전체 JSON 파싱 실패 - 부분 추출 시도:', e2.message);
+          const partialData = {};
+
+          // scores 추출
+          try {
+            const sm = jsonMatch[0].match(/"scores"\s*:\s*(\{[^}]+\})/);
+            if (sm) partialData.scores = JSON.parse(sm[1].replace(/,\s*([}\]])/g, '$1'));
+          } catch (e) {}
+
+          // feedbacks 배열 추출 (각 객체를 개별 파싱)
+          try {
+            const fbBlock = jsonMatch[0].match(/"feedbacks"\s*:\s*\[([\s\S]*?)\]\s*,?\s*"improvements"/);
+            const fbSrc = fbBlock ? fbBlock[1] : jsonMatch[0];
+            const feedbacks = [];
+            const singleFb = /\{([^{}]*)"category"([^{}]*)\}/g;
+            let fm;
+            while ((fm = singleFb.exec(fbSrc)) !== null) {
+              try {
+                const cleaned = fm[0].replace(/,\s*([}\]])/g, '$1');
+                feedbacks.push(JSON.parse(cleaned));
+              } catch (e) {
+                // 개별 객체 파싱 실패 시 suggestion 직접 추출
+                const catM = fm[0].match(/"category"\s*:\s*"([^"]+)"/);
+                const sugM = fm[0].match(/"suggestion"\s*:\s*"([^"]+)"/);
+                if (catM || sugM) {
+                  feedbacks.push({
+                    category: catM ? catM[1] : '제안',
+                    suggestion: sugM ? sugM[1] : ''
+                  });
+                }
+              }
+            }
+            if (feedbacks.length > 0) partialData.feedbacks = feedbacks;
+          } catch (e) {}
+
+          // improvements 배열 추출
+          try {
+            const im = jsonMatch[0].match(/"improvements"\s*:\s*\[([\s\S]*?)\]/);
+            if (im) {
+              const items = im[1].match(/"([^"]+)"/g);
+              if (items) partialData.improvements = items.map(s => s.replace(/^"|"$/g, ''));
+            }
+          } catch (e) {}
+
+          // summary 추출
+          try {
+            const sum = jsonMatch[0].match(/"summary"\s*:\s*"([^"]+)"/);
+            if (sum) partialData.summary = sum[1];
+          } catch (e) {}
+
+          if (partialData.feedbacks || partialData.improvements || partialData.scores) {
+            analysisData = partialData;
+            console.log('✅ 부분 추출 성공 - feedbacks:', (partialData.feedbacks || []).length, '개');
+          } else {
+            throw new Error('부분 추출도 실패: ' + e2.message);
+          }
+        }
+      }
+    } else {
+      throw new Error('JSON 형식을 찾을 수 없습니다.');
+    }
+  } catch (parseError) {
+    console.error('JSON 파싱 최종 실패:', parseError);
+    console.error('AI 응답:', aiResponse);
+    analysisData = {
+      raw: aiResponse,
+      error: 'JSON 파싱 실패',
+    };
+  }
+  return analysisData;
+}
+
+// 분석 결과 데이터를 결과 패널용 HTML 문자열로 렌더링한다.
+function renderGeminiAnalysisResultHtml(analysisData) {
+  let resultHtml = "";
+
+  if (analysisData.error) {
+    // 파싱 실패 시 원본 텍스트 표시
+    resultHtml = `
+                    <div style="padding: 20px; background: var(--bg-input); border-radius: 8px; margin-bottom: 15px;">
+                        <h4 style="margin-bottom: 10px; color: var(--text-primary);">⚠️ 분석 결과 (텍스트 형식)</h4>
+                        <div style="white-space: pre-wrap; color: var(--text-secondary); line-height: 1.8;">${escapeHtml(analysisData.raw)}</div>
+                    </div>
+                `;
+    return resultHtml;
+  }
+
+  // 점수 표시
+  if (analysisData.scores) {
+    const scores = analysisData.scores;
+    const overallScore = scores.overall || scores.overallScore || 0;
+
+    resultHtml += `
+                        <div style="padding: 20px; background: var(--bg-input); border-radius: 8px; margin-bottom: 20px;">
+                            <h4 style="margin-bottom: 15px; color: var(--text-primary);">📊 종합 평가</h4>
+                            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+                                <div style="font-size: 3rem; font-weight: bold; color: var(--accent);">${overallScore}</div>
+                                <div style="flex: 1;">
+                                    <div style="background: var(--bg-card); height: 20px; border-radius: 10px; overflow: hidden; margin-bottom: 5px;">
+                                        <div style="background: linear-gradient(90deg, var(--accent), var(--success)); height: 100%; width: ${overallScore}%; transition: width 0.3s;"></div>
+                                    </div>
+                                    <div style="font-size: 0.85rem; color: var(--text-secondary);">100점 만점</div>
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px;">
+                                <div style="padding: 15px; background: var(--bg-card); border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">구조</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">${scores.structure || 0}</div>
+                                </div>
+                                <div style="padding: 15px; background: var(--bg-card); border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">감정 표현</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">${scores.emotion || 0}</div>
+                                </div>
+                                <div style="padding: 15px; background: var(--bg-card); border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">운율/리듬</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">${scores.rhythm || 0}</div>
+                                </div>
+                                <div style="padding: 15px; background: var(--bg-card); border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">창의성</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">${scores.creativity || 0}</div>
+                                </div>
+                                <div style="padding: 15px; background: var(--bg-card); border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">전달력</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">${scores.impact || 0}</div>
+                                </div>
+                                <div style="padding: 15px; background: var(--bg-card); border-radius: 8px; text-align: center;">
+                                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">스타일 적합성</div>
+                                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">${scores.styleCompatibility || 0}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+  }
+
+  // 피드백 표시
+  if (analysisData.feedbacks && analysisData.feedbacks.length > 0) {
+    resultHtml += `
+                        <div style="padding: 20px; background: var(--bg-input); border-radius: 8px; margin-bottom: 20px;">
+                            <h4 style="margin-bottom: 15px; color: var(--text-primary);">💬 상세 피드백</h4>
+                    `;
+
+    analysisData.feedbacks.forEach((feedback, index) => {
+      resultHtml += `
+                            <div style="padding: 15px; background: var(--bg-card); border-radius: 8px; margin-bottom: 15px; border-left: 4px solid var(--accent);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                    <h5 style="margin: 0; color: var(--text-primary);">${escapeHtml(feedback.category || "분류 없음")}</h5>
+                                    <span style="font-size: 1.2rem; font-weight: bold; color: var(--accent);">${feedback.score || 0}점</span>
+                                </div>
+                                ${feedback.strength ? `<div style="margin-bottom: 10px;"><strong style="color: var(--success);">✅ 강점:</strong> <span style="color: var(--text-secondary);">${escapeHtml(feedback.strength)}</span></div>` : ""}
+                                ${feedback.weakness ? `<div style="margin-bottom: 10px;"><strong style="color: var(--warning);">⚠️ 개선점:</strong> <span style="color: var(--text-secondary);">${escapeHtml(feedback.weakness)}</span></div>` : ""}
+                                ${feedback.suggestion ? `<div><strong style="color: var(--accent);">💡 제안:</strong> <span style="color: var(--text-secondary);">${escapeHtml(feedback.suggestion)}</span></div>` : ""}
+                            </div>
+                        `;
+    });
+
+    resultHtml += `</div>`;
+  }
+
+  // 개선 사항 표시
+  if (analysisData.improvements && analysisData.improvements.length > 0) {
+    resultHtml += `
+                        <div style="padding: 20px; background: var(--bg-input); border-radius: 8px; margin-bottom: 20px;">
+                            <h4 style="margin-bottom: 15px; color: var(--text-primary);">🔧 개선 사항</h4>
+                            <ul style="margin: 0; padding-left: 20px; line-height: 2;">
+                    `;
+
+    analysisData.improvements.forEach((improvement) => {
+      resultHtml += `<li style="color: var(--text-secondary); margin-bottom: 8px;">${escapeHtml(improvement)}</li>`;
+    });
+
+    resultHtml += `</ul></div>`;
+  }
+
+  // 요약 표시
+  if (analysisData.summary) {
+    resultHtml += `
+                        <div style="padding: 20px; background: linear-gradient(135deg, var(--bg-input), var(--bg-card)); border-radius: 8px; border: 2px solid var(--accent);">
+                            <h4 style="margin-bottom: 10px; color: var(--text-primary);">📝 종합 요약</h4>
+                            <p style="color: var(--text-secondary); line-height: 1.8; margin: 0;">${escapeHtml(analysisData.summary)}</p>
+                        </div>
+                    `;
+  }
+
+  return resultHtml;
+}
+
+// 분석 결과를 현재 프로젝트 데이터에 저장한다 (프로젝트가 없으면 DOM
+// 기준으로 새로 생성). 기존 로직 그대로.
+function saveGeminiAnalysisToProject(analysisData) {
+  if (!window.currentProject) {
+    const pid = window.currentProjectId || window.generateProjectId();
+    window.currentProjectId = pid;
+    window.currentProject = {
+      id: pid,
+      title:
+        document.getElementById("songTitle")?.value ||
+        document.getElementById("sunoTitle")?.value ||
+        "제목 없음",
+      lastStep: 3,
+      data: {},
+    };
+  }
+  if (!window.currentProject.data) {
+    window.currentProject.data = {};
+  }
+  window.currentProject.data.analysis = analysisData;
+  window.currentProject.data.feedbacks = analysisData.feedbacks || [];
+  // 전역 백업 저장 (4단계에서 currentProject 참조 실패 시 사용)
+  window.__lastAnalysisData = analysisData;
+  // 2단계 데이터도 있으면 유지 (다음 저장 시 포함되도록)
+  if (
+    !window.currentProject.data.sunoLyrics &&
+    document.getElementById("sunoLyrics")?.value
+  ) {
+    window.currentProject.data.sunoLyrics =
+      document.getElementById("sunoLyrics").value;
+  }
+  if (
+    !window.currentProject.data.stylePrompt &&
+    document.getElementById("stylePrompt")?.value
+  ) {
+    window.currentProject.data.stylePrompt =
+      document.getElementById("stylePrompt").value;
+  }
+}
+
 window.startGeminiAnalysis = async function () {
   try {
     // 분석 대상 데이터 가져오기
@@ -1566,68 +1888,7 @@ window.startGeminiAnalysis = async function () {
         '<div style="text-align: center; padding: 40px;"><div class="spinner" style="margin: 0 auto 20px;"></div><p>🤖 Gemini가 가사와 스타일 프롬프트를 분석 중입니다...</p></div>';
     }
 
-    // 분석 프롬프트 생성
-    const analysisPrompt = `다음 가사와 스타일 프롬프트를 정밀 분석하고 평가해주세요.
-
-=== 분석 대상 ===
-
-📝 수노 가사 (지시어 포함):
-${lyrics}
-
-🎨 스타일 프롬프트:
-${stylePrompt}
-
-=== 분석 요청 ===
-
-다음 항목을 각각 1-100점으로 평가하고, 구체적인 피드백과 개선 사항을 제안해주세요:
-
-1. **구조 (Structure)**: Verse, Chorus, Bridge 등의 구성이 적절한지
-2. **감정 표현 (Emotion)**: 가사가 전달하는 감정이 명확하고 효과적인지
-3. **운율 및 리듬 (Rhythm)**: 가사의 운율과 리듬감이 좋은지
-4. **창의성 (Creativity)**: 가사의 독창성과 참신함
-5. **전달력 (Impact)**: 메시지가 명확하게 전달되는지
-6. **스타일 프롬프트 적합성 (Style Compatibility)**: 가사와 스타일 프롬프트가 잘 어울리는지
-7. **전체 평가 (Overall Score)**: 종합적인 평가 점수
-
-=== 응답 형식 ===
-
-다음 JSON 형식으로 응답해주세요:
-
-{
-  "scores": {
-    "structure": 85,
-    "emotion": 90,
-    "rhythm": 80,
-    "creativity": 75,
-    "impact": 88,
-    "styleCompatibility": 82,
-    "overall": 83
-  },
-  "feedbacks": [
-    {
-      "category": "구조",
-      "score": 85,
-      "strength": "Verse-Chorus 구조가 명확하고 반복되는 후렴구가 효과적입니다.",
-      "weakness": "Bridge 부분이 부족하여 곡의 변화가 적습니다.",
-      "suggestion": "Bridge를 추가하여 곡의 긴장감을 높이는 것을 권장합니다."
-    },
-    {
-      "category": "감정 표현",
-      "score": 90,
-      "strength": "감정이 매우 명확하고 진정성 있게 전달됩니다.",
-      "weakness": "일부 구절에서 감정 전달이 다소 직설적입니다.",
-      "suggestion": "은유와 비유를 활용하여 감정을 더욱 풍부하게 표현해보세요."
-    }
-  ],
-  "improvements": [
-    "Bridge 섹션 추가를 고려해보세요",
-    "은유적 표현을 더 활용하면 감정 전달이 더욱 효과적일 것입니다",
-    "스타일 프롬프트의 템포와 가사의 리듬을 더욱 조화롭게 맞춰보세요"
-  ],
-  "summary": "전반적으로 우수한 가사입니다. 구조와 감정 표현이 뛰어나며, 스타일 프롬프트와도 잘 어울립니다. Bridge 추가와 은유적 표현 활용을 통해 더욱 완성도 높은 작품이 될 수 있을 것입니다."
-}
-
-**중요**: JSON 형식만 출력하고, 다른 설명이나 텍스트는 포함하지 마세요.`;
+    const analysisPrompt = buildGeminiAnalysisPrompt(lyrics, stylePrompt);
 
     const aiResponse = await window.callAIWithTextFallback({
       prompt: analysisPrompt,
@@ -1643,212 +1904,11 @@ ${stylePrompt}
       throw new Error("Gemini API에서 응답을 받지 못했습니다.");
     }
 
-    // JSON 파싱 시도 (강건한 다단계 파싱)
-    let analysisData;
-    try {
-      // 1단계: 마크다운 코드 블록 제거
-      let cleanedResponse = aiResponse.trim();
-      cleanedResponse = cleanedResponse
-        .replace(/^```json\s*/i, '')
-        .replace(/^```\s*/i, '')
-        .replace(/\s*```$/i, '')
-        .trim();
-
-      // 2단계: JSON 블록 전체 추출
-      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        // 2-1) 표준 파싱 시도
-        try {
-          analysisData = JSON.parse(jsonMatch[0]);
-        } catch (e1) {
-          // 2-2) 후행 콤마 제거 후 재시도
-          const fixed = jsonMatch[0].replace(/,\s*([}\]])/g, '$1');
-          try {
-            analysisData = JSON.parse(fixed);
-            console.log('✅ 후행 콤마 제거 후 파싱 성공');
-          } catch (e2) {
-            // 2-3) 부분 추출 (feedbacks, improvements, scores 개별 추출)
-            console.warn('⚠️ 전체 JSON 파싱 실패 - 부분 추출 시도:', e2.message);
-            const partialData = {};
-
-            // scores 추출
-            try {
-              const sm = jsonMatch[0].match(/"scores"\s*:\s*(\{[^}]+\})/);
-              if (sm) partialData.scores = JSON.parse(sm[1].replace(/,\s*([}\]])/g, '$1'));
-            } catch (e) {}
-
-            // feedbacks 배열 추출 (각 객체를 개별 파싱)
-            try {
-              const fbBlock = jsonMatch[0].match(/"feedbacks"\s*:\s*\[([\s\S]*?)\]\s*,?\s*"improvements"/);
-              const fbSrc = fbBlock ? fbBlock[1] : jsonMatch[0];
-              const feedbacks = [];
-              const singleFb = /\{([^{}]*)"category"([^{}]*)\}/g;
-              let fm;
-              while ((fm = singleFb.exec(fbSrc)) !== null) {
-                try {
-                  const cleaned = fm[0].replace(/,\s*([}\]])/g, '$1');
-                  feedbacks.push(JSON.parse(cleaned));
-                } catch (e) {
-                  // 개별 객체 파싱 실패 시 suggestion 직접 추출
-                  const catM = fm[0].match(/"category"\s*:\s*"([^"]+)"/);
-                  const sugM = fm[0].match(/"suggestion"\s*:\s*"([^"]+)"/);
-                  if (catM || sugM) {
-                    feedbacks.push({
-                      category: catM ? catM[1] : '제안',
-                      suggestion: sugM ? sugM[1] : ''
-                    });
-                  }
-                }
-              }
-              if (feedbacks.length > 0) partialData.feedbacks = feedbacks;
-            } catch (e) {}
-
-            // improvements 배열 추출
-            try {
-              const im = jsonMatch[0].match(/"improvements"\s*:\s*\[([\s\S]*?)\]/);
-              if (im) {
-                const items = im[1].match(/"([^"]+)"/g);
-                if (items) partialData.improvements = items.map(s => s.replace(/^"|"$/g, ''));
-              }
-            } catch (e) {}
-
-            // summary 추출
-            try {
-              const sum = jsonMatch[0].match(/"summary"\s*:\s*"([^"]+)"/);
-              if (sum) partialData.summary = sum[1];
-            } catch (e) {}
-
-            if (partialData.feedbacks || partialData.improvements || partialData.scores) {
-              analysisData = partialData;
-              console.log('✅ 부분 추출 성공 - feedbacks:', (partialData.feedbacks || []).length, '개');
-            } else {
-              throw new Error('부분 추출도 실패: ' + e2.message);
-            }
-          }
-        }
-      } else {
-        throw new Error('JSON 형식을 찾을 수 없습니다.');
-      }
-    } catch (parseError) {
-      console.error('JSON 파싱 최종 실패:', parseError);
-      console.error('AI 응답:', aiResponse);
-      analysisData = {
-        raw: aiResponse,
-        error: 'JSON 파싱 실패',
-      };
-    }
+    const analysisData = parseGeminiAnalysisResponse(aiResponse);
 
     // 분석 결과 표시
     if (geminiAnalysisResult) {
-      let resultHtml = "";
-
-      if (analysisData.error) {
-        // 파싱 실패 시 원본 텍스트 표시
-        resultHtml = `
-                    <div style="padding: 20px; background: var(--bg-input); border-radius: 8px; margin-bottom: 15px;">
-                        <h4 style="margin-bottom: 10px; color: var(--text-primary);">⚠️ 분석 결과 (텍스트 형식)</h4>
-                        <div style="white-space: pre-wrap; color: var(--text-secondary); line-height: 1.8;">${escapeHtml(analysisData.raw)}</div>
-                    </div>
-                `;
-      } else {
-        // 점수 표시
-        if (analysisData.scores) {
-          const scores = analysisData.scores;
-          const overallScore = scores.overall || scores.overallScore || 0;
-
-          resultHtml += `
-                        <div style="padding: 20px; background: var(--bg-input); border-radius: 8px; margin-bottom: 20px;">
-                            <h4 style="margin-bottom: 15px; color: var(--text-primary);">📊 종합 평가</h4>
-                            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
-                                <div style="font-size: 3rem; font-weight: bold; color: var(--accent);">${overallScore}</div>
-                                <div style="flex: 1;">
-                                    <div style="background: var(--bg-card); height: 20px; border-radius: 10px; overflow: hidden; margin-bottom: 5px;">
-                                        <div style="background: linear-gradient(90deg, var(--accent), var(--success)); height: 100%; width: ${overallScore}%; transition: width 0.3s;"></div>
-                                    </div>
-                                    <div style="font-size: 0.85rem; color: var(--text-secondary);">100점 만점</div>
-                                </div>
-                            </div>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px;">
-                                <div style="padding: 15px; background: var(--bg-card); border-radius: 8px; text-align: center;">
-                                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">구조</div>
-                                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">${scores.structure || 0}</div>
-                                </div>
-                                <div style="padding: 15px; background: var(--bg-card); border-radius: 8px; text-align: center;">
-                                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">감정 표현</div>
-                                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">${scores.emotion || 0}</div>
-                                </div>
-                                <div style="padding: 15px; background: var(--bg-card); border-radius: 8px; text-align: center;">
-                                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">운율/리듬</div>
-                                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">${scores.rhythm || 0}</div>
-                                </div>
-                                <div style="padding: 15px; background: var(--bg-card); border-radius: 8px; text-align: center;">
-                                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">창의성</div>
-                                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">${scores.creativity || 0}</div>
-                                </div>
-                                <div style="padding: 15px; background: var(--bg-card); border-radius: 8px; text-align: center;">
-                                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">전달력</div>
-                                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">${scores.impact || 0}</div>
-                                </div>
-                                <div style="padding: 15px; background: var(--bg-card); border-radius: 8px; text-align: center;">
-                                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 5px;">스타일 적합성</div>
-                                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent);">${scores.styleCompatibility || 0}</div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-        }
-
-        // 피드백 표시
-        if (analysisData.feedbacks && analysisData.feedbacks.length > 0) {
-          resultHtml += `
-                        <div style="padding: 20px; background: var(--bg-input); border-radius: 8px; margin-bottom: 20px;">
-                            <h4 style="margin-bottom: 15px; color: var(--text-primary);">💬 상세 피드백</h4>
-                    `;
-
-          analysisData.feedbacks.forEach((feedback, index) => {
-            resultHtml += `
-                            <div style="padding: 15px; background: var(--bg-card); border-radius: 8px; margin-bottom: 15px; border-left: 4px solid var(--accent);">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                                    <h5 style="margin: 0; color: var(--text-primary);">${escapeHtml(feedback.category || "분류 없음")}</h5>
-                                    <span style="font-size: 1.2rem; font-weight: bold; color: var(--accent);">${feedback.score || 0}점</span>
-                                </div>
-                                ${feedback.strength ? `<div style="margin-bottom: 10px;"><strong style="color: var(--success);">✅ 강점:</strong> <span style="color: var(--text-secondary);">${escapeHtml(feedback.strength)}</span></div>` : ""}
-                                ${feedback.weakness ? `<div style="margin-bottom: 10px;"><strong style="color: var(--warning);">⚠️ 개선점:</strong> <span style="color: var(--text-secondary);">${escapeHtml(feedback.weakness)}</span></div>` : ""}
-                                ${feedback.suggestion ? `<div><strong style="color: var(--accent);">💡 제안:</strong> <span style="color: var(--text-secondary);">${escapeHtml(feedback.suggestion)}</span></div>` : ""}
-                            </div>
-                        `;
-          });
-
-          resultHtml += `</div>`;
-        }
-
-        // 개선 사항 표시
-        if (analysisData.improvements && analysisData.improvements.length > 0) {
-          resultHtml += `
-                        <div style="padding: 20px; background: var(--bg-input); border-radius: 8px; margin-bottom: 20px;">
-                            <h4 style="margin-bottom: 15px; color: var(--text-primary);">🔧 개선 사항</h4>
-                            <ul style="margin: 0; padding-left: 20px; line-height: 2;">
-                    `;
-
-          analysisData.improvements.forEach((improvement) => {
-            resultHtml += `<li style="color: var(--text-secondary); margin-bottom: 8px;">${escapeHtml(improvement)}</li>`;
-          });
-
-          resultHtml += `</ul></div>`;
-        }
-
-        // 요약 표시
-        if (analysisData.summary) {
-          resultHtml += `
-                        <div style="padding: 20px; background: linear-gradient(135deg, var(--bg-input), var(--bg-card)); border-radius: 8px; border: 2px solid var(--accent);">
-                            <h4 style="margin-bottom: 10px; color: var(--text-primary);">📝 종합 요약</h4>
-                            <p style="color: var(--text-secondary); line-height: 1.8; margin: 0;">${escapeHtml(analysisData.summary)}</p>
-                        </div>
-                    `;
-        }
-      }
-
-      geminiAnalysisResult.innerHTML = resultHtml;
+      geminiAnalysisResult.innerHTML = renderGeminiAnalysisResultHtml(analysisData);
     }
 
     // 상태 업데이트
@@ -1863,43 +1923,7 @@ ${stylePrompt}
     }
 
     // 분석 결과를 프로젝트 데이터에 저장 (currentProject 없으면 DOM 기준으로 생성해 저장)
-    if (!window.currentProject) {
-      const pid =
-        window.currentProjectId ||
-        window.generateProjectId();
-      window.currentProjectId = pid;
-      window.currentProject = {
-        id: pid,
-        title:
-          document.getElementById("songTitle")?.value ||
-          document.getElementById("sunoTitle")?.value ||
-          "제목 없음",
-        lastStep: 3,
-        data: {},
-      };
-    }
-    if (!window.currentProject.data) {
-      window.currentProject.data = {};
-    }
-    window.currentProject.data.analysis = analysisData;
-    window.currentProject.data.feedbacks = analysisData.feedbacks || [];
-    // 전역 백업 저장 (4단계에서 currentProject 참조 실패 시 사용)
-    window.__lastAnalysisData = analysisData;
-    // 2단계 데이터도 있으면 유지 (다음 저장 시 포함되도록)
-    if (
-      !window.currentProject.data.sunoLyrics &&
-      document.getElementById("sunoLyrics")?.value
-    ) {
-      window.currentProject.data.sunoLyrics =
-        document.getElementById("sunoLyrics").value;
-    }
-    if (
-      !window.currentProject.data.stylePrompt &&
-      document.getElementById("stylePrompt")?.value
-    ) {
-      window.currentProject.data.stylePrompt =
-        document.getElementById("stylePrompt").value;
-    }
+    saveGeminiAnalysisToProject(analysisData);
 
     console.log("✅ Gemini 분석 완료:", analysisData);
     console.log("✅ 전역 백업 저장 완료 (window.__lastAnalysisData)");
