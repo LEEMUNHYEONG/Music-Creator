@@ -468,11 +468,12 @@
     }
   };
 
+  // 속성 컨텍스트까지 안전하도록 따옴표 포함 이스케이프
   function escapeHtml(str) {
-    if (!str) return "";
-    const div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
+    if (str === null || str === undefined || str === "") return "";
+    return String(str).replace(/[&<>"']/g, function (m) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m];
+    });
   }
 
   // ─── 붙여넣기 이벤트 바인딩 ───

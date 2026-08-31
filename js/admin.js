@@ -80,7 +80,7 @@
         listEl.appendChild(card);
       });
     } catch (err) {
-      listEl.innerHTML = `<p style="color:var(--error);">❌ 오류: ${err.message}</p>`;
+      listEl.innerHTML = `<p style="color:var(--error);">❌ 오류: ${escapeHtml(err.message)}</p>`;
     }
   }
 
@@ -110,7 +110,7 @@
         listEl.appendChild(card);
       });
     } catch (err) {
-      listEl.innerHTML = `<p style="color:var(--error);">❌ 오류: ${err.message}</p>`;
+      listEl.innerHTML = `<p style="color:var(--error);">❌ 오류: ${escapeHtml(err.message)}</p>`;
     }
   }
 
@@ -490,13 +490,14 @@
     setTimeout(() => (toast.style.opacity = "0"), 3000);
   }
 
-  // ─── XSS 방지 ───────────────────────────────────────────────
+  // ─── XSS 방지 (속성 컨텍스트까지 안전하도록 따옴표 포함 이스케이프) ───
   function escapeHtml(str) {
-    return String(str)
+    return String(str ?? "")
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   // ─── 공용 API 키 관리 전용 모달 ────────────────────────────

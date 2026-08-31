@@ -1568,16 +1568,6 @@ window.saveCurrentProject = function () {
 };
 
 /**
- * 헬퍼: HTML 탈출
- */
-function escapeHtml(text) {
-  if (!text) return "";
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-/**
  * ☁️ 클라우드 데이터 가져오기 및 로컬 스토리지 병합
  */
 window.syncProjectsFromCloud = async function() {

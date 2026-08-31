@@ -49,7 +49,7 @@ function showStep4CompleteBanner(message, type) {
   `;
   banner.innerHTML = `
     <span style="font-size:1.4rem">${isSuccess ? '✅' : '❌'}</span>
-    <span>${message}</span>
+    <span>${escapeHtml(message)}</span>
     <button onclick="this.parentElement.remove()" style="
       background: rgba(255,255,255,0.2);
       border: none;
@@ -1074,11 +1074,11 @@ window.showRegenerationHistory = function () {
     container.innerHTML = history
       .map(
         (item, idx) => `
-            <div class="history-item" style="padding: 15px; border-bottom: 1px solid var(--border); cursor: pointer;" onclick="window.restoreFromHistory(${idx})">
-                <div style="font-weight: 600; margin-bottom: 5px;">#${history.length - idx} [${item.type}]</div>
+            <div class="history-item" style="padding: 15px; border-bottom: 1px solid var(--border); cursor: pointer;" onclick="window.restoreFromHistory(${Number(idx)})">
+                <div style="font-weight: 600; margin-bottom: 5px;">#${history.length - idx} [${escapeHtml(item.type || "")}]</div>
                 <div style="font-size: 0.8rem; color: var(--text-secondary);">${new Date(item.timestamp).toLocaleString()}</div>
                 <div style="font-size: 0.85rem; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                    ${item.lyrics.substring(0, 50)}...
+                    ${escapeHtml(String(item.lyrics || "").substring(0, 50))}...
                 </div>
             </div>
         `,
