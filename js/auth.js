@@ -239,7 +239,7 @@
       showAuthTab("login");
     } catch (err) {
       console.error("로그아웃 오류:", err);
-      alert("로그아웃 중 오류가 발생했습니다: " + err.message);
+      window.showToast("로그아웃 중 오류가 발생했습니다: " + err.message, "error");
     }
   };
 
@@ -253,12 +253,12 @@
     const email = prompt("가입한 이메일 주소를 입력해 주세요:");
     if (!email) return;
     if (!isValidEmail(email))
-      return alert("⚠️ 올바른 이메일 형식을 입력해 주세요.");
+      return window.showToast("⚠️ 올바른 이메일 형식을 입력해 주세요.", "error");
     try {
       await window.firebaseAuth.sendPasswordResetEmail(email);
-      alert(`✅ 비밀번호 재설정 이메일을 ${email}로 전송했습니다.`);
+      window.showToast(`✅ 비밀번호 재설정 이메일을 ${email}로 전송했습니다.`, "success");
     } catch (err) {
-      alert("❌ " + getFirebaseErrorMessage(err.code));
+      window.showToast("❌ " + getFirebaseErrorMessage(err.code), "error");
     }
   };
 

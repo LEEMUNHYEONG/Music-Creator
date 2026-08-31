@@ -272,7 +272,7 @@ window.regenerateMVPrompt = async function (type) {
     }
   } catch (error) {
     console.error("프롬프트 재생성 오류:", error);
-    alert("프롬프트 재생성 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("프롬프트 재생성 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 
@@ -473,7 +473,7 @@ ${taskDescription}
         }
       } catch (aiError) {
         console.warn(`⚠️ ${type} 개별 AI 프롬프트 생성 실패:`, aiError);
-        alert(`프롬프트 재생성 실패: ${aiError.message}`);
+        window.showToast(`프롬프트 재생성 실패: ${aiError.message}`, "error");
         return;
       }
     }
@@ -510,11 +510,11 @@ ${taskDescription}
         window.saveCurrentProject();
       }
     } else {
-      alert("재생성 결과가 비어있습니다.");
+      window.showToast("재생성 결과가 비어있습니다.", "info");
     }
   } catch (error) {
     console.error(`스타일 프롬프트(${type}) 재생성 오류:`, error);
-    alert("재생성 중 오류가 발생했습니다.");
+    window.showToast("재생성 중 오류가 발생했습니다.", "error");
   }
 };
 
@@ -594,11 +594,11 @@ window.regenerateStylePrompts = async function () {
           window.saveCurrentProject();
       }
     } else {
-      alert("재생성 결과가 비어있습니다.");
+      window.showToast("재생성 결과가 비어있습니다.", "info");
     }
   } catch (error) {
     console.error("스타일 프롬프트 재생성 오류:", error);
-    alert("재생성 중 오류가 발생했습니다.");
+    window.showToast("재생성 중 오류가 발생했습니다.", "error");
   }
 };
 
@@ -614,14 +614,14 @@ window.copyReviewPrompt = async function (textareaId) {
   try {
     const el = document.getElementById(textareaId);
     if (!el || !el.value.trim()) {
-      alert("복사할 내용이 없습니다.");
+      window.showToast("복사할 내용이 없습니다.", "error");
       return;
     }
     await navigator.clipboard.writeText(el.value);
     if (typeof window.showCopyIndicator === "function") {
       window.showCopyIndicator("✅ 클립보드에 복사되었습니다!");
     } else {
-      alert("✅ 클립보드에 복사되었습니다!");
+      window.showToast("✅ 클립보드에 복사되었습니다!", "success");
     }
   } catch (err) {
     console.error("복사 오류:", err);
@@ -630,7 +630,7 @@ window.copyReviewPrompt = async function (textareaId) {
 
 window.saveSceneOverview = function () {
   if (!window.currentScenes) {
-    alert("저장할 씬이 없습니다.");
+    window.showToast("저장할 씬이 없습니다.", "error");
     return;
   }
 
@@ -659,7 +659,7 @@ window.saveSceneOverview = function () {
     }
   });
 
-  alert("씬 개요가 저장되었습니다.");
+  window.showToast("씬 개요가 저장되었습니다.", "success");
 };
 
 // 저장 및 확정 통합 함수
@@ -667,7 +667,7 @@ window.saveSceneOverview = function () {
 
 window.confirmSceneOverviewAndGenerate = async function (isSilent = false) {
   if (!window.currentScenes || window.currentScenes.length === 0) {
-    if (!isSilent) alert("생성된 씬이 없습니다.");
+    if (!isSilent) window.showToast("생성된 씬이 없습니다.", "error");
     return;
   }
 
@@ -867,7 +867,7 @@ window.confirmSceneOverviewAndGenerate = async function (isSilent = false) {
 window.saveAndConfirmMVPrompts = async function () {
   try {
     if (!window.currentScenes) {
-      alert("저장할 씬이 없습니다.");
+      window.showToast("저장할 씬이 없습니다.", "error");
       return;
     }
 
@@ -967,7 +967,7 @@ window.saveAndConfirmMVPrompts = async function () {
     if (typeof window.saveCurrentProject === "function") {
       const saved = window.saveCurrentProject();
       if (!saved) {
-        alert("프로젝트 저장에 실패했습니다.");
+        window.showToast("프로젝트 저장에 실패했습니다.", "error");
         return;
       }
     }
@@ -975,7 +975,7 @@ window.saveAndConfirmMVPrompts = async function () {
     if (typeof window.showCopyIndicator === "function") {
       window.showCopyIndicator("✅ 현재 편집 내용이 저장되었습니다.");
     } else {
-      alert("현재 편집 내용이 저장되었습니다.");
+      window.showToast("현재 편집 내용이 저장되었습니다.", "success");
     }
 
     // DOM 업데이트 (수정 영역의 값을 결과 영역의 텍스트 에어리어에 반영)
@@ -1016,7 +1016,7 @@ window.saveAndConfirmMVPrompts = async function () {
     }
   } catch (error) {
     console.error("저장 오류:", error);
-    alert("저장 중 오류가 발생했습니다.");
+    window.showToast("저장 중 오류가 발생했습니다.", "error");
   }
 };
 
@@ -1123,7 +1123,7 @@ window.copySceneOverviewPromptEn = async function (sceneIndex, event) {
 
     const enEl = document.getElementById(`scene_overview_${sceneIndex}_en`);
     if (!enEl || !enEl.value.trim()) {
-      alert("복사할 영어 프롬프트가 없습니다.");
+      window.showToast("복사할 영어 프롬프트가 없습니다.", "error");
       return;
     }
 
@@ -1169,7 +1169,7 @@ window.copySceneOverviewRunwayPrompt = async function (sceneIndex, event) {
   try {
     const enEl = document.getElementById(`scene_overview_${sceneIndex}_runway`);
     if (!enEl || !enEl.value.trim()) {
-      alert("복사할 비디오 프롬프트가 없습니다.");
+      window.showToast("복사할 비디오 프롬프트가 없습니다.", "error");
       return;
     }
 
@@ -1195,7 +1195,7 @@ window.copySceneOverviewRunwayPrompt = async function (sceneIndex, event) {
 window.regenerateSceneOverviewPrompt = async function (sceneIndex) {
   try {
     if (!window.currentScenes || !window.currentScenes[sceneIndex]) {
-      alert("재생성할 씬이 없습니다.");
+      window.showToast("재생성할 씬이 없습니다.", "error");
       return;
     }
 
@@ -1490,14 +1490,14 @@ ${getMVSceneRegenerationContext(scene, { location, mood, lighting, cameraWork })
     }
   } catch (error) {
     console.error("씬 개요 프롬프트 재생성 오류:", error);
-    alert(`씬 개요 프롬프트 재생성 중 오류가 발생했습니다:\n${error.message}`);
+    window.showToast(`씬 개요 프롬프트 재생성 중 오류가 발생했습니다:\n${error.message}`, "error");
   }
 };
 
 // --- Restored Copy and Focus Functions ---
 window.copyAllMVPrompts = async function (event) {
   if (!window.currentScenes || window.currentScenes.length === 0) {
-    alert("복사할 프롬프트가 없습니다.");
+    window.showToast("복사할 프롬프트가 없습니다.", "error");
     return;
   }
   if (!(await window.confirmMVExportWithUnsavedScenes("전체 MV 프롬프트 복사"))) {
@@ -1615,7 +1615,7 @@ window.copyAllMVPrompts = async function (event) {
           "✅ 모든 MV 프롬프트가 클립보드에 복사되었습니다!",
         );
       } else {
-        alert("모든 MV 프롬프트가 클립보드에 복사되었습니다.");
+        window.showToast("모든 MV 프롬프트가 클립보드에 복사되었습니다.", "success");
       }
     })
     .catch((err) => {
@@ -1628,11 +1628,11 @@ window.copyAllMVProductionData = async function (event) {
   if (typeof window.copyAllMVPrompts === "function") {
     return window.copyAllMVPrompts(event);
   }
-  alert("기능을 준비 중입니다.");
+  window.showToast("기능을 준비 중입니다.", "info");
 };
 
 window.copyAllMarketingMaterials = function () {
-  alert("마케팅 자료 전체 복사 기능은 곧 업데이트될 예정입니다.");
+  window.showToast("마케팅 자료 전체 복사 기능은 곧 업데이트될 예정입니다.", "info");
 };
 
 window.copyMVPromptEn = async function (type, event) {
@@ -1657,7 +1657,7 @@ window.copyMVPromptEn = async function (type, event) {
 
     const typeInfo = typeMap[type];
     if (!typeInfo) {
-      alert("알 수 없는 프롬프트 타입입니다.");
+      window.showToast("알 수 없는 프롬프트 타입입니다.", "info");
       return;
     }
 
@@ -1668,7 +1668,7 @@ window.copyMVPromptEn = async function (type, event) {
 
     const enEl = document.getElementById(typeInfo.en);
     if (!enEl || !enEl.value.trim()) {
-      alert(`${typeInfo.name} 영어 프롬프트가 없습니다.`);
+      window.showToast(`${typeInfo.name} 영어 프롬프트가 없습니다.`, "error");
       return;
     }
 
@@ -1692,7 +1692,7 @@ window.copyMVPromptEn = async function (type, event) {
         `✅ ${typeInfo.name} 영어 프롬프트가 클립보드에 복사되었습니다! (Midjourney용)`,
       );
     } else {
-      alert(`✅ ${typeInfo.name} 영어 프롬프트가 클립보드에 복사되었습니다!`);
+      window.showToast(`✅ ${typeInfo.name} 영어 프롬프트가 클립보드에 복사되었습니다!`, "success");
     }
   } catch (error) {
     console.error("영어 프롬프트 복사 오류:", error);
@@ -1747,7 +1747,7 @@ window.copyMVPromptEnOverview = async function (type, event) {
 
     const enEl = document.getElementById(typeInfo.en);
     if (!enEl || !enEl.value.trim()) {
-      alert(typeInfo.name + " 영어 프롬프트가 없습니다.");
+      window.showToast(typeInfo.name + " 영어 프롬프트가 없습니다.", "error");
       return;
     }
     await navigator.clipboard.writeText(enEl.value.trim());
@@ -1778,7 +1778,7 @@ window.copyScenePromptEn = async function (sceneIndex, event) {
   try {
     const enEl = document.getElementById(`scene_${sceneIndex}_en`);
     if (!enEl || !enEl.value.trim()) {
-      alert("복사할 영어 프롬프트가 없습니다.");
+      window.showToast("복사할 영어 프롬프트가 없습니다.", "error");
       return;
     }
 
@@ -1857,7 +1857,7 @@ window.saveScenePrompt = function (sceneIndex) {
     const koEl = document.getElementById(`scene_${sceneIndex}_ko`);
 
     if (!window.currentScenes || !window.currentScenes[sceneIndex]) {
-      alert("저장할 씬 데이터를 찾을 수 없습니다.");
+      window.showToast("저장할 씬 데이터를 찾을 수 없습니다.", "error");
       return;
     }
 
@@ -2086,7 +2086,7 @@ if (
 window.regenerateScenePrompt = async function (sceneIndex) {
   try {
     if (!window.currentScenes || !window.currentScenes[sceneIndex]) {
-      alert("재생성할 씬이 없습니다.");
+      window.showToast("재생성할 씬이 없습니다.", "error");
       return;
     }
 
@@ -2224,7 +2224,7 @@ ${sceneContext.promptLines || "- 없음"}
         "씬 프롬프트 재생성 중 오류가 발생했습니다.",
       );
     }
-    alert(`씬 프롬프트 재생성 중 오류가 발생했습니다: ${error.message}`);
+    window.showToast(`씬 프롬프트 재생성 중 오류가 발생했습니다: ${error.message}`, "error");
   } finally {
     const regenerateBtn = document.getElementById(
       `regenerateScenePromptBtn_${sceneIndex}`,

@@ -85,6 +85,10 @@ global.URL = {
 global.alert = function alertStub(message) {
   alerts.push(message);
 };
+// alert()가 window.showToast(message, level)로 전환되어 동일하게 스텁한다.
+window.showToast = function showToastStub(message, level) {
+  alerts.push(message);
+};
 window.showCopyIndicator = function showCopyIndicatorStub(message) {
   toasts.push(message);
 };

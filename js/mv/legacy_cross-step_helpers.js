@@ -37,7 +37,7 @@ window.switchLyricsMode = function (mode) {
     }
   } catch (error) {
     console.error("❌ 모드 전환 오류:", error);
-    alert("모드 전환 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("모드 전환 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 

@@ -465,12 +465,12 @@ window.applySelectedMVSettingsPreset = function () {
   const select = document.getElementById("mvSettingsPresetSelect");
   const presetId = select?.value || "";
   if (!presetId) {
-    alert("불러올 MV 설정 프리셋을 선택해 주세요.");
+    window.showToast("불러올 MV 설정 프리셋을 선택해 주세요.", "info");
     return;
   }
   const preset = window.getMVSettingsPresets().find((item) => item.id === presetId);
   if (!preset) {
-    alert("선택한 MV 설정 프리셋을 찾을 수 없습니다.");
+    window.showToast("선택한 MV 설정 프리셋을 찾을 수 없습니다.", "error");
     return;
   }
   window.applyMVSettingsToForm(preset.settings);
@@ -484,7 +484,7 @@ window.deleteSelectedMVSettingsPreset = async function () {
   const select = document.getElementById("mvSettingsPresetSelect");
   const presetId = select?.value || "";
   if (!presetId) {
-    alert("삭제할 MV 설정 프리셋을 선택해 주세요.");
+    window.showToast("삭제할 MV 설정 프리셋을 선택해 주세요.", "info");
     return;
   }
   const preset = window.getMVSettingsPresets().find((item) => item.id === presetId);
@@ -524,7 +524,7 @@ window.applyMVSettingCombo = function (comboId) {
     .getMVSettingComboRecommendations()
     .find((item) => item.id === comboId);
   if (!combo) {
-    alert("적용할 MV 추천 조합을 찾을 수 없습니다.");
+    window.showToast("적용할 MV 추천 조합을 찾을 수 없습니다.", "error");
     return;
   }
 
@@ -852,7 +852,7 @@ window.updateCharacterInputs = function () {
 	window.saveCurrentCharacterAppearancePreset = function (charIndex) {
 	  const snapshot = window.getCharacterAppearanceSnapshot(charIndex);
 	  if (!snapshot.appearance.trim()) {
-	    alert("저장할 외모/스타일 키워드를 먼저 입력해 주세요.");
+	    window.showToast("저장할 외모/스타일 키워드를 먼저 입력해 주세요.", "info");
 	    return;
 	  }
 	  const defaultName = `인물 ${charIndex}: ${snapshot.appearance.trim().slice(0, 24)}`;
@@ -886,14 +886,14 @@ window.updateCharacterInputs = function () {
 	  );
 	  const presetId = select?.value || "";
 	  if (!presetId) {
-	    alert("재사용할 외형 키워드를 선택해 주세요.");
+	    window.showToast("재사용할 외형 키워드를 선택해 주세요.", "info");
 	    return;
 	  }
 	  const preset = window
 	    .getCharacterAppearancePresets()
 	    .find((item) => item.id === presetId);
 	  if (!preset) {
-	    alert("선택한 외형 키워드를 찾을 수 없습니다.");
+	    window.showToast("선택한 외형 키워드를 찾을 수 없습니다.", "error");
 	    return;
 	  }
 	  const setValue = (id, value) => {
@@ -935,14 +935,14 @@ window.generateCharacterSheet = async function (charIndex) {
   const artStyle = document.getElementById(`mvCharacter${charIndex}_artStyle`)?.value || "photorealistic";
 
   if (!gender && !age && !race && !appearance) {
-    alert("인물 정보를 최소 1개 이상 입력해주세요.\n(성별, 나이, 인종, 외모/스타일 중 하나)");
+    window.showToast("인물 정보를 최소 1개 이상 입력해주세요.\n(성별, 나이, 인종, 외모/스타일 중 하나)", "info");
     return;
   }
 
   // Gemini API 키 확인
   const geminiKey = window.getGeminiApiKey();
   if (!geminiKey || !geminiKey.startsWith("AIza")) {
-    alert("Gemini API 키가 설정되지 않았습니다.\n설정 > API 키에서 Gemini API 키를 입력해주세요.");
+    window.showToast("Gemini API 키가 설정되지 않았습니다.\n설정 > API 키에서 Gemini API 키를 입력해주세요.", "info");
     return;
   }
 
@@ -1355,7 +1355,7 @@ ${isPhotoRealistic ? `
     }
   } catch (error) {
     console.error(`❌ 캐릭터 시트 생성 실패 (인물 ${charIndex}):`, error);
-    alert(`캐릭터 시트 생성 중 오류가 발생했습니다:\n\n${error.message}`);
+    window.showToast(`캐릭터 시트 생성 중 오류가 발생했습니다:\n\n${error.message}`, "error");
   } finally {
     if (btn) btn.disabled = false;
     if (loadingEl) loadingEl.style.display = "none";
@@ -1374,7 +1374,7 @@ window.toggleCharacterSheet = function (charIndex) {
 window.copyCharacterSheet = function (charIndex, event) {
   const sheetEl = document.getElementById(`mvCharacter${charIndex}_sheet`);
   if (!sheetEl || !sheetEl.value.trim()) {
-    alert("복사할 캐릭터 시트가 없습니다.");
+    window.showToast("복사할 캐릭터 시트가 없습니다.", "error");
     return;
   }
   navigator.clipboard.writeText(sheetEl.value).then(() => {

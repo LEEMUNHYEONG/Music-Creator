@@ -32,6 +32,10 @@ global.document = {
 global.alert = function alertStub(message) {
   alerts.push(message);
 };
+// alert()가 window.showToast(message, level)로 전환되어 동일하게 스텁한다.
+window.showToast = function showToastStub(message, level) {
+  alerts.push(message);
+};
 global.fetch = async function fetchStub(url, options = {}) {
   assert.ok(url.includes("gemini-"));
   lastPrompt = JSON.parse(options.body).contents[0].parts[0].text;

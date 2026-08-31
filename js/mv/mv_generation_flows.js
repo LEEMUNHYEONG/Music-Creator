@@ -593,7 +593,7 @@ window.generateSceneOverview = async function () {
     if (!mvLoading) {
       console.error("❌ mvLoading 요소를 찾을 수 없습니다.");
       setGeneratingUI(false);
-      alert("MV 로딩 영역을 찾을 수 없습니다. 페이지를 새로고침해주세요.");
+      window.showToast("MV 로딩 영역을 찾을 수 없습니다. 페이지를 새로고침해주세요.", "error");
       return;
     }
     if (mvSceneOverviewSection) {
@@ -694,7 +694,7 @@ window.generateSceneOverview = async function () {
 
     if (!finalLyrics.trim()) {
       setGeneratingUI(false);
-      alert("가사를 먼저 입력하거나 생성해주세요.");
+      window.showToast("가사를 먼저 입력하거나 생성해주세요.", "info");
       return;
     }
 
@@ -1814,14 +1814,13 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
           error,
           "MV 프롬프트 생성",
         );
-        alert(
-          `${errorMessage}\n\n${errorInfo.userMessage || ""}\n\n상세: ${errorInfo.error || error.message}`,
-        );
+        window.showToast(
+          `${errorMessage}\n\n${errorInfo.userMessage || ""}\n\n상세: ${errorInfo.error || error.message}`, "info");
       } catch (e) {
-        alert(errorMessage);
+        window.showToast(errorMessage, "info");
       }
     } else {
-      alert(errorMessage);
+      window.showToast(errorMessage, "info");
     }
   }
 };

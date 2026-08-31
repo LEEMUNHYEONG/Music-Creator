@@ -879,7 +879,7 @@ window.showMarketingMVDiagnostics = function () {
   window.copyCurrentMarketingMVDiagnosticsReport();
   const opened = window.openMarketingMVDiagnosticsModal(text);
   if (!opened && typeof alert === "function") {
-    alert(text);
+    window.showToast(text, "info");
   }
   return diagnostics;
 };
@@ -985,12 +985,12 @@ window.exportCurrentProjectJSON = function () {
   if (typeof window.saveCurrentProject === "function") {
     const saved = window.saveCurrentProject();
     if (saved === false) {
-      alert("프로젝트 저장 후 내보내기를 다시 시도해주세요.");
+      window.showToast("프로젝트 저장 후 내보내기를 다시 시도해주세요.", "info");
       return null;
     }
   }
   if (!window.currentProject) {
-    alert("내보낼 현재 프로젝트가 없습니다.");
+    window.showToast("내보낼 현재 프로젝트가 없습니다.", "error");
     return null;
   }
 
@@ -1059,7 +1059,7 @@ window.importSingleProjectJSON = function () {
         window.importSingleProjectJSONFromText(loadEvent.target.result);
       } catch (error) {
         console.error("단일 프로젝트 가져오기 오류:", error);
-        alert(`단일 프로젝트 가져오기 중 오류가 발생했습니다:\n\n${error.message}`);
+        window.showToast(`단일 프로젝트 가져오기 중 오류가 발생했습니다:\n\n${error.message}`, "error");
       }
     };
     reader.readAsText(file);
@@ -1148,7 +1148,7 @@ window.loadProject = function (projectId) {
     }
 
     if (!foundProject) {
-      alert("프로젝트를 찾을 수 없습니다. (ID: " + projectId + ")");
+      window.showToast("프로젝트를 찾을 수 없습니다. (ID: " + projectId + ")", "error");
       window.isInitialLoading = false;
       return;
     }
@@ -1196,7 +1196,7 @@ window.loadProject = function (projectId) {
 
   } catch (error) {
     console.error("❌ 프로젝트 로드 중 오류 발생:", error);
-    alert("프로젝트 로드 중 오류가 발생했습니다.");
+    window.showToast("프로젝트 로드 중 오류가 발생했습니다.", "error");
     window.isInitialLoading = false;
     window.__isLoadingProject = false;
   }
@@ -2013,7 +2013,7 @@ window.restoreFromCloudHistory = async function(projectId, historyDocId) {
       .collection("history").doc(historyDocId)
       .get();
     if (!doc.exists) {
-      alert("해당 히스토리 스냅샷을 찾을 수 없습니다.");
+      window.showToast("해당 히스토리 스냅샷을 찾을 수 없습니다.", "error");
       return false;
     }
     const snapshot = doc.data();

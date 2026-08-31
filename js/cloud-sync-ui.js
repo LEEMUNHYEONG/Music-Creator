@@ -147,7 +147,7 @@ async function doCsUpload() {
     if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 업로드 중...'; }
 
     if (!window.firebaseAuth?.currentUser || !window.firebaseDb) {
-        alert('로그인 후 이용 가능합니다.');
+        window.showToast('로그인 후 이용 가능합니다.', "info");
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> &nbsp;선택 업로드'; }
         return;
     }
@@ -161,7 +161,7 @@ async function doCsUpload() {
         } catch(e) { console.error('업로드 실패:', p.id, e); }
     }
     closeCloudSyncModal();
-    alert(`☁️ 클라우드 업로드 완료: ${uploaded}개 프로젝트가 동기화되었습니다.`);
+    window.showToast(`☁️ 클라우드 업로드 완료: ${uploaded}개 프로젝트가 동기화되었습니다.`, "success");
 }
 
 // ── 다운로드 탭 렌더링 ────────────────────────────────────
@@ -211,7 +211,7 @@ async function doCsDownload() {
     if (typeof window.downloadSelectedCloudProjects === 'function') {
         const count = await window.downloadSelectedCloudProjects(ids);
         closeCloudSyncModal();
-        alert(`✅ ${count}개의 프로젝트가 이 기기에 다운로드되었습니다.`);
+        window.showToast(`✅ ${count}개의 프로젝트가 이 기기에 다운로드되었습니다.`, "success");
     }
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-download-alt"></i> &nbsp;선택 다운로드'; }
 }
@@ -277,7 +277,7 @@ async function doRestoreFromCloud(projectId) {
         const count = await window.downloadSelectedCloudProjects([projectId]);
         if (count > 0) {
             closeRestoreModal();
-            alert("✅ 클라우드 최신 버전으로 복원 완료!");
+            window.showToast("✅ 클라우드 최신 버전으로 복원 완료!", "success");
         }
     }
 }
@@ -340,7 +340,7 @@ function handleRestoreLocalFile(event) {
                     <i class="fas fa-file-import"></i> &nbsp;선택 가져오기
                 </button>`;
         } catch(err) {
-            alert("파일을 읽는 중 오류가 발생했습니다: " + err.message);
+            window.showToast("파일을 읽는 중 오류가 발생했습니다: " + err.message, "error");
         }
     };
     reader.readAsText(file, "utf-8");
@@ -365,7 +365,7 @@ function doLocalRestoreImport() {
         ? window.smartMergeToLocal(toImport)
         : { newCount: toImport.length, updateCount: 0 };
     closeRestoreModal();
-    alert(`✅ 가져오기 완료!\n🔵 신규 추가: ${result.newCount}건\n🟢 업데이트: ${result.updateCount}건`);
+    window.showToast(`✅ 가져오기 완료!\n🔵 신규 추가: ${result.newCount}건\n🟢 업데이트: ${result.updateCount}건`, "success");
 }
 
 // ─── 타계정 클라우드 불러오기 ────────────────────────────────
@@ -476,7 +476,7 @@ async function doCrossImport() {
         }
     }
     closeRestoreModal();
-    alert(`✅ 타계정 프로젝트 가져오기 완료!\n🔵 신규 추가: ${result.newCount}건\n🟢 업데이트: ${result.updateCount}건`);
+    window.showToast(`✅ 타계정 프로젝트 가져오기 완료!\n🔵 신규 추가: ${result.newCount}건\n🟢 업데이트: ${result.updateCount}건`, "success");
 }
 
 // ─── 히스토리 복원 모달 ──────────────────────────────────────
@@ -521,9 +521,9 @@ async function doRestoreHistory(historyDocId, timeLabel) {
     if (ok) {
         closeHistoryModal();
         closeRestoreModal();
-        alert(`✅ "${timeLabel}" 시점으로 복원 완료!`);
+        window.showToast(`✅ "${timeLabel}" 시점으로 복원 완료!`, "success");
     } else {
-        alert("❌ 복원에 실패했습니다. 다시 시도해 주세요.");
+        window.showToast("❌ 복원에 실패했습니다. 다시 시도해 주세요.", "error");
     }
 }
 

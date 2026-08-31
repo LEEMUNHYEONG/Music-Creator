@@ -144,9 +144,8 @@ window.generateAILyrics = async function () {
     const apiKey = (typeof window.getOpenAIApiKey === "function" ? window.getOpenAIApiKey() : localStorage.getItem("openai_api_key")) || "";
 
     if (!apiKey || !apiKey.startsWith("sk-")) {
-      alert(
-        "ChatGPT API 키를 먼저 설정해주세요.\n\n설정 > API 설정에서 OpenAI API 키를 입력해주세요.",
-      );
+      window.showToast(
+        "ChatGPT API 키를 먼저 설정해주세요.\n\n설정 > API 설정에서 OpenAI API 키를 입력해주세요.", "info");
       if (aiGeneratedResults) aiGeneratedResults.style.display = "none";
       return;
     }
@@ -345,7 +344,7 @@ ${guidelinesSection}
     console.log("✅ 가사 생성 완료:", result.lyrics.length, "개 옵션");
   } catch (error) {
     console.error("❌ 가사 생성 오류:", error);
-    alert("가사 생성 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("가사 생성 중 오류가 발생했습니다:\n\n" + error.message, "error");
     const aiLyricsLoading = document.getElementById("aiLyricsLoading");
     if (aiLyricsLoading) aiLyricsLoading.style.display = "none";
   }
@@ -529,7 +528,7 @@ window.confirmSelectedLyrics = async function () {
     const editedLyrics = document.getElementById("editedLyrics")?.value || "";
 
     if (!editedLyrics.trim()) {
-      alert("가사를 입력해주세요.");
+      window.showToast("가사를 입력해주세요.", "info");
       return;
     }
 
@@ -709,15 +708,14 @@ JSON 구조:
         "✅ 가사가 확정되었습니다! 수기로 내용을 수정한 후 '다음 단계로'를 클릭하세요.",
       );
     } else {
-      alert(
-        "✅ 가사가 확정되었습니다! 수기로 내용을 수정한 후 '다음 단계로'를 클릭하세요.",
-      );
+      window.showToast(
+        "✅ 가사가 확정되었습니다! 수기로 내용을 수정한 후 '다음 단계로'를 클릭하세요.", "success");
     }
 
     console.log("✅ 가사 확정 완료");
   } catch (error) {
     console.error("❌ 가사 확정 오류:", error);
-    alert("가사 확정 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("가사 확정 중 오류가 발생했습니다:\n\n" + error.message, "error");
     const confirmBtn = document.querySelector(
       'button[onclick="confirmSelectedLyrics()"]',
     );
@@ -798,7 +796,7 @@ window.selectLyricsOption = function (index) {
       !window.generatedLyricsOptions ||
       !window.generatedLyricsOptions[index]
     ) {
-      alert("선택할 가사를 찾을 수 없습니다.");
+      window.showToast("선택할 가사를 찾을 수 없습니다.", "error");
       return;
     }
 
@@ -851,7 +849,7 @@ window.selectLyricsOption = function (index) {
     console.log("✅ 가사 옵션 선택:", index);
   } catch (error) {
     console.error("❌ 가사 옵션 선택 오류:", error);
-    alert("가사 선택 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("가사 선택 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 

@@ -206,7 +206,7 @@ window.callAPIWithRetry = async function (apiCall, context, maxRetries = 3) {
       const errorInfo = await window.handleAPIError(error, context, maxRetries);
 
       if (!errorInfo.shouldRetry || attempt === maxRetries) {
-        alert(`${errorInfo.userMessage}\n\n상세: ${errorInfo.error}`);
+        window.showToast(`${errorInfo.userMessage}\n\n상세: ${errorInfo.error}`, "info");
         throw error;
       }
 
@@ -539,7 +539,7 @@ window.changeAPI = function (value) {
     console.log("✅ API 선택 변경 완료:", value);
   } catch (error) {
     console.error("API 선택 변경 오류:", error);
-    alert("API 선택 변경 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("API 선택 변경 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 

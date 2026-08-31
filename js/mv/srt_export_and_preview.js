@@ -8,9 +8,8 @@ window.copySRTContent = function (event) {
     }
 
     if (!window.currentSRTContent) {
-      alert(
-        '⚠️ 복사할 SRT 자막이 없습니다.\n\n먼저 "SRT 자막 생성" 버튼을 클릭하여 자막을 생성해주세요.',
-      );
+      window.showToast(
+        '⚠️ 복사할 SRT 자막이 없습니다.\n\n먼저 "SRT 자막 생성" 버튼을 클릭하여 자막을 생성해주세요.', "error");
       return;
     }
 
@@ -20,7 +19,7 @@ window.copySRTContent = function (event) {
         if (typeof window.showCopyIndicator === "function") {
           window.showCopyIndicator("✅ SRT 자막이 클립보드에 복사되었습니다!");
         } else {
-          alert("✅ SRT 자막이 클립보드에 복사되었습니다!");
+          window.showToast("✅ SRT 자막이 클립보드에 복사되었습니다!", "success");
         }
       })
       .catch(() => {
@@ -36,12 +35,12 @@ window.copySRTContent = function (event) {
         if (typeof window.showCopyIndicator === "function") {
           window.showCopyIndicator("✅ SRT 자막이 클립보드에 복사되었습니다!");
         } else {
-          alert("✅ SRT 자막이 클립보드에 복사되었습니다!");
+          window.showToast("✅ SRT 자막이 클립보드에 복사되었습니다!", "success");
         }
       });
   } catch (error) {
     console.error("❌ SRT 자막 복사 오류:", error);
-    alert("SRT 자막 복사 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("SRT 자막 복사 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 
@@ -49,9 +48,8 @@ window.copySRTContent = function (event) {
 window.downloadSRT = function (platform) {
   try {
     if (!window.currentSRTContent) {
-      alert(
-        '⚠️ 다운로드할 SRT 자막이 없습니다.\n\n먼저 "SRT 자막 생성" 버튼을 클릭하여 자막을 생성해주세요.',
-      );
+      window.showToast(
+        '⚠️ 다운로드할 SRT 자막이 없습니다.\n\n먼저 "SRT 자막 생성" 버튼을 클릭하여 자막을 생성해주세요.', "error");
       return;
     }
 
@@ -96,15 +94,14 @@ window.downloadSRT = function (platform) {
         `✅ ${platformName} SRT 파일이 다운로드되었습니다!\n\n파일명: ${filename}`,
       );
     } else {
-      alert(
-        `✅ ${platformName} SRT 파일이 다운로드되었습니다!\n\n파일명: ${filename}`,
-      );
+      window.showToast(
+        `✅ ${platformName} SRT 파일이 다운로드되었습니다!\n\n파일명: ${filename}`, "success");
     }
 
     console.log("✅ SRT 파일 다운로드 완료:", filename);
   } catch (error) {
     console.error("❌ SRT 파일 다운로드 오류:", error);
-    alert("SRT 파일 다운로드 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("SRT 파일 다운로드 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 
@@ -114,9 +111,8 @@ window.generateSRTPreview = function () {
     // 최종 가사 가져오기
     const finalLyricsEl = document.getElementById("finalLyrics");
     if (!finalLyricsEl || !finalLyricsEl.textContent.trim()) {
-      alert(
-        "⚠️ 최종 가사가 없습니다.\n\n5단계에서 최종 가사를 먼저 확인해주세요.",
-      );
+      window.showToast(
+        "⚠️ 최종 가사가 없습니다.\n\n5단계에서 최종 가사를 먼저 확인해주세요.", "error");
       return;
     }
 
@@ -150,9 +146,8 @@ window.generateSRTPreview = function () {
       });
 
     if (lyricsLines.length === 0) {
-      alert(
-        "⚠️ 추출할 가사가 없습니다.\n\n가사에 지시어만 있고 실제 가사 내용이 없는 것 같습니다.",
-      );
+      window.showToast(
+        "⚠️ 추출할 가사가 없습니다.\n\n가사에 지시어만 있고 실제 가사 내용이 없는 것 같습니다.", "error");
       return;
     }
 
@@ -232,7 +227,7 @@ window.generateSRTPreview = function () {
           `✅ SRT 자막이 생성되었습니다! (${sceneSubtitles.length}개 자막)`,
         );
       } else {
-        alert(`✅ SRT 자막이 생성되었습니다! (${sceneSubtitles.length}개 자막)`);
+        window.showToast(`✅ SRT 자막이 생성되었습니다! (${sceneSubtitles.length}개 자막)`, "success");
       }
 
       console.log("✅ SRT 자막 생성 완료:", sceneSubtitles.length, "개 자막");
@@ -290,13 +285,13 @@ window.generateSRTPreview = function () {
         `✅ SRT 자막이 생성되었습니다! (${subtitleIndex - 1}개 자막)`,
       );
     } else {
-      alert(`✅ SRT 자막이 생성되었습니다! (${subtitleIndex - 1}개 자막)`);
+      window.showToast(`✅ SRT 자막이 생성되었습니다! (${subtitleIndex - 1}개 자막)`, "success");
     }
 
     console.log("✅ SRT 자막 생성 완료:", subtitleIndex - 1, "개 자막");
   } catch (error) {
     console.error("❌ SRT 자막 생성 오류:", error);
-    alert("SRT 자막 생성 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("SRT 자막 생성 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 

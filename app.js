@@ -902,7 +902,7 @@ window.restoreStepData = function (step) {
 window.saveAndClose = function () {
   try {
     if (typeof window.saveCurrentProject !== "function") {
-      alert("저장 기능을 사용할 수 없습니다.");
+      window.showToast("저장 기능을 사용할 수 없습니다.", "error");
       return;
     }
     if (!window.currentProjectId) {
@@ -914,7 +914,7 @@ window.saveAndClose = function () {
         if (typeof window.showCopyIndicator === "function") {
           window.showCopyIndicator("저장할 내용이 없습니다. 창을 닫아 주세요.");
         } else {
-          alert("저장할 내용이 없습니다.\n\n창을 닫아 주세요.");
+          window.showToast("저장할 내용이 없습니다.\n\n창을 닫아 주세요.", "error");
         }
         window.close();
         return;
@@ -929,17 +929,16 @@ window.saveAndClose = function () {
           "✅ 모든 내용이 저장되었습니다. 이제 브라우저 창을 닫아도 됩니다.",
         );
       } else {
-        alert(
-          "✅ 모든 내용이 저장되었습니다.\n\n이제 브라우저 창을 닫아도 됩니다.",
-        );
+        window.showToast(
+          "✅ 모든 내용이 저장되었습니다.\n\n이제 브라우저 창을 닫아도 됩니다.", "success");
       }
       window.close();
     } else {
-      alert("저장에 실패했습니다. 다시 시도해 주세요.");
+      window.showToast("저장에 실패했습니다. 다시 시도해 주세요.", "error");
     }
   } catch (e) {
     console.error("저장 후 닫기 오류:", e);
-    alert("저장 후 닫기 중 오류가 발생했습니다.");
+    window.showToast("저장 후 닫기 중 오류가 발생했습니다.", "error");
   }
 };
 
@@ -1501,9 +1500,8 @@ window.startGeminiAnalysis = async function () {
     const startAnalysisBtn = document.getElementById("startAnalysisBtn");
 
     if (!analysisTargetLyrics || !analysisTargetStyle) {
-      alert(
-        "⚠️ 분석할 가사와 스타일 프롬프트가 없습니다.\n\n2단계에서 가사와 스타일 프롬프트를 생성한 후 다시 시도해주세요.",
-      );
+      window.showToast(
+        "⚠️ 분석할 가사와 스타일 프롬프트가 없습니다.\n\n2단계에서 가사와 스타일 프롬프트를 생성한 후 다시 시도해주세요.", "error");
       return;
     }
 
@@ -1511,18 +1509,16 @@ window.startGeminiAnalysis = async function () {
     const stylePrompt = analysisTargetStyle.textContent.trim();
 
     if (!lyrics || !stylePrompt) {
-      alert(
-        "⚠️ 분석할 가사와 스타일 프롬프트가 비어있습니다.\n\n2단계에서 가사와 스타일 프롬프트를 생성한 후 다시 시도해주세요.",
-      );
+      window.showToast(
+        "⚠️ 분석할 가사와 스타일 프롬프트가 비어있습니다.\n\n2단계에서 가사와 스타일 프롬프트를 생성한 후 다시 시도해주세요.", "error");
       return;
     }
 
     // Gemini API 키 확인
     const geminiKey = (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || "";
     if (!geminiKey || !geminiKey.startsWith("AIza")) {
-      alert(
-        '⚠️ Gemini API 키가 설정되지 않았습니다.\n\n"API 키" 버튼을 클릭하여 Gemini API 키를 설정해주세요.',
-      );
+      window.showToast(
+        '⚠️ Gemini API 키가 설정되지 않았습니다.\n\n"API 키" 버튼을 클릭하여 Gemini API 키를 설정해주세요.', "error");
       if (typeof window.openAPISettings === "function") {
         window.openAPISettings();
       }
@@ -1931,7 +1927,7 @@ ${stylePrompt}
     const analysisLoading = document.getElementById("analysisLoading");
     if (analysisLoading) analysisLoading.style.display = "none";
 
-    alert(
+    window.showToast(
       "⚠️ Gemini 분석 중 오류가 발생했습니다.\n\n" +
         "원인: " +
         errorMessage +
@@ -1939,8 +1935,7 @@ ${stylePrompt}
         "해결방법:\n" +
         "1. API 키가 올바른지 확인하세요\n" +
         "2. 네트워크 연결을 확인하세요\n" +
-        "3. 잠시 후 다시 시도해주세요",
-    );
+        "3. 잠시 후 다시 시도해주세요", "error");
   }
 };
 
@@ -2101,9 +2096,8 @@ window.handleIntermediateAudioUpload = function (event) {
       fileName.endsWith(".webm");
 
     if (!isValidType) {
-      alert(
-        "⚠️ 지원하지 않는 파일 형식입니다.\n\n지원 형식: MP3, WAV, M4A, OGG, WEBM",
-      );
+      window.showToast(
+        "⚠️ 지원하지 않는 파일 형식입니다.\n\n지원 형식: MP3, WAV, M4A, OGG, WEBM", "error");
       fileInput.value = ""; // 파일 선택 초기화
       return;
     }
@@ -2113,11 +2107,10 @@ window.handleIntermediateAudioUpload = function (event) {
     // 업로드 단계에서 15MB로 제한해 대용량 메모리 낭비와 확정 실패를 막는다.
     const maxSize = 15 * 1024 * 1024; // 15MB
     if (file.size > maxSize) {
-      alert(
+      window.showToast(
         "⚠️ 파일 크기가 너무 큽니다.\n\n최대 크기: 15MB (AI 오디오 분석 한도)\n현재 크기: " +
           (file.size / 1024 / 1024).toFixed(2) +
-          "MB\n\n💡 MP3(128kbps 내외)로 변환하면 대부분의 곡이 15MB 이하가 됩니다.",
-      );
+          "MB\n\n💡 MP3(128kbps 내외)로 변환하면 대부분의 곡이 15MB 이하가 됩니다.", "error");
       fileInput.value = "";
       return;
     }
@@ -2160,7 +2153,7 @@ window.handleIntermediateAudioUpload = function (event) {
     }
   } catch (error) {
     console.error("❌ 음원 업로드 오류:", error);
-    alert("⚠️ 음원 파일 업로드 중 오류가 발생했습니다.\n\n" + error.message);
+    window.showToast("⚠️ 음원 파일 업로드 중 오류가 발생했습니다.\n\n" + error.message, "error");
   }
 };
 
@@ -2206,7 +2199,7 @@ window.resetIntermediateAudioUpload = function () {
 window.analyzeIntermediateAudio = async function () {
   try {
     if (!window.intermediateAudioFile) {
-      alert("⚠️ 음원 파일을 먼저 업로드해주세요.");
+      window.showToast("⚠️ 음원 파일을 먼저 업로드해주세요.", "error");
       return;
     }
 
@@ -2214,7 +2207,7 @@ window.analyzeIntermediateAudio = async function () {
     const progressDiv = document.getElementById("intermediateVersionProgress");
 
     if (!analyzeBtn || !progressDiv) {
-      alert("⚠️ 분석 UI 요소를 찾을 수 없습니다.");
+      window.showToast("⚠️ 분석 UI 요소를 찾을 수 없습니다.", "error");
       return;
     }
 
@@ -2229,9 +2222,8 @@ window.analyzeIntermediateAudio = async function () {
     // Gemini API 키 확인
     const geminiKey = (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || "";
     if (!geminiKey || !geminiKey.startsWith("AIza")) {
-      alert(
-        '⚠️ Gemini API 키가 설정되지 않았습니다.\n\n"API 키" 버튼을 클릭하여 Gemini API 키를 설정해주세요.',
-      );
+      window.showToast(
+        '⚠️ Gemini API 키가 설정되지 않았습니다.\n\n"API 키" 버튼을 클릭하여 Gemini API 키를 설정해주세요.', "error");
       analyzeBtn.disabled = false;
       analyzeBtn.innerHTML = "🔍 음원 분석 및 최종 가사 반영";
       progressDiv.classList.add("hidden");
@@ -2578,7 +2570,7 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
 
           resultHtml += `
                         <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
-                            <button class="btn btn-success" onclick="if(typeof window.applyExtractedLyrics === 'function') { window.applyExtractedLyrics(this); } else { alert('⚠️ 기능을 사용할 수 없습니다.'); }" style="width: 100%;">
+                            <button class="btn btn-success" onclick="if(typeof window.applyExtractedLyrics === 'function') { window.applyExtractedLyrics(this); } else { window.showToast('⚠️ 기능을 사용할 수 없습니다.', "error"); }" style="width: 100%;">
                                 ✅ 추출된 가사를 최종 가사에 반영
                             </button>
                         </div>
@@ -2633,7 +2625,7 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
         analyzeBtn.disabled = false;
         analyzeBtn.innerHTML = "🔍 음원 분석 및 최종 가사 반영";
 
-        alert(
+        window.showToast(
           "⚠️ 음원 분석 중 오류가 발생했습니다.\n\n" +
             "원인: " +
             error.message +
@@ -2642,14 +2634,13 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
             "1. API 키가 올바른지 확인하세요\n" +
             "2. 파일 형식이 지원되는지 확인하세요\n" +
             "3. 네트워크 연결을 확인하세요\n" +
-            "4. 잠시 후 다시 시도해주세요",
-        );
+            "4. 잠시 후 다시 시도해주세요", "error");
       }
     };
 
     reader.onerror = function (error) {
       console.error("❌ 파일 읽기 오류:", error);
-      alert("⚠️ 파일을 읽는 중 오류가 발생했습니다.");
+      window.showToast("⚠️ 파일을 읽는 중 오류가 발생했습니다.", "error");
       analyzeBtn.disabled = false;
       analyzeBtn.innerHTML = "🔍 음원 분석 및 최종 가사 반영";
       progressDiv.classList.add("hidden");
@@ -2660,7 +2651,7 @@ ${guidelines.substring(0, 2000)}${guidelines.length > 2000 ? "..." : ""}
     reader.readAsDataURL(file);
   } catch (error) {
     console.error("❌ 음원 분석 오류:", error);
-    alert("⚠️ 음원 분석 중 오류가 발생했습니다.\n\n" + error.message);
+    window.showToast("⚠️ 음원 분석 중 오류가 발생했습니다.\n\n" + error.message, "error");
 
     const analyzeBtn = document.getElementById("analyzeIntermediateAudioBtn");
     if (analyzeBtn) {
@@ -3272,13 +3263,12 @@ window.goToMarketingStep = function () {
     }
   } catch (error) {
     console.error("❌ 5→6단계 이동 오류:", error);
-    alert(
+    window.showToast(
       "⚠️ 5단계 → 6단계 이동 중 오류가 발생했습니다.\n\n" +
         "원인: " +
         error.message +
         "\n\n" +
-        "해결방법: 페이지를 새로고침(F5) 후 다시 시도해주세요.",
-    );
+        "해결방법: 페이지를 새로고침(F5) 후 다시 시도해주세요.", "error");
   }
 };
 
@@ -3328,7 +3318,7 @@ window.copyToClipboard = function (elementId, labelOrText, event) {
     }
 
     if (!text.trim()) {
-      alert("복사할 내용이 없습니다.");
+      window.showToast("복사할 내용이 없습니다.", "error");
       return;
     }
 
@@ -3347,7 +3337,7 @@ window.copyToClipboard = function (elementId, labelOrText, event) {
             `✅ ${label || "내용"}이 클립보드에 복사되었습니다!`,
           );
         } else {
-          alert(`${label || "내용"}이 클립보드에 복사되었습니다.`);
+          window.showToast(`${label || "내용"}이 클립보드에 복사되었습니다.`, "success");
         }
       })
       .catch(() => {
@@ -3366,12 +3356,12 @@ window.copyToClipboard = function (elementId, labelOrText, event) {
             `✅ ${label || "내용"}이 클립보드에 복사되었습니다!`,
           );
         } else {
-          alert(`${label || "내용"}이 클립보드에 복사되었습니다.`);
+          window.showToast(`${label || "내용"}이 클립보드에 복사되었습니다.`, "success");
         }
       });
   } catch (error) {
     console.error("복사 오류:", error);
-    alert("복사 중 오류가 발생했습니다.");
+    window.showToast("복사 중 오류가 발생했습니다.", "error");
   }
 };
 
@@ -3458,7 +3448,7 @@ window.generateStylePromptAI = async function () {
     // 로딩 표시
     const stylePromptEl = document.getElementById("stylePrompt");
     if (!stylePromptEl) {
-      alert("스타일 프롬프트 입력란을 찾을 수 없습니다.");
+      window.showToast("스타일 프롬프트 입력란을 찾을 수 없습니다.", "error");
       return;
     }
 
@@ -3472,9 +3462,8 @@ window.generateStylePromptAI = async function () {
     if (!apiKey) {
       stylePromptEl.value = previousValue;
       stylePromptEl.disabled = false;
-      alert(
-        "OpenAI API 키가 설정되지 않았습니다.\n\n설정 → API 키 설정에서 키를 입력해주세요.",
-      );
+      window.showToast(
+        "OpenAI API 키가 설정되지 않았습니다.\n\n설정 → API 키 설정에서 키를 입력해주세요.", "info");
       return;
     }
 
@@ -3650,13 +3639,12 @@ K-Pop Ballad, emotional, melancholic, 75 BPM, soft female vocals, breathy tone, 
       }
     }
 
-    alert(
+    window.showToast(
       "⚠️ 스타일 프롬프트 생성 중 오류가 발생했습니다.\n\n" +
         "원인: " +
         error.message +
         "\n\n" +
-        "해결방법: API 키를 확인하고 다시 시도해주세요.",
-    );
+        "해결방법: API 키를 확인하고 다시 시도해주세요.", "error");
   }
 };
 
@@ -3677,7 +3665,7 @@ window.assignVocalToPart = function () {
     );
 
     if (!partSelect || !styleSelect || !assignmentsContainer) {
-      alert("파트별 보컬 스타일 지정 요소를 찾을 수 없습니다.");
+      window.showToast("파트별 보컬 스타일 지정 요소를 찾을 수 없습니다.", "error");
       return;
     }
 
@@ -3686,14 +3674,14 @@ window.assignVocalToPart = function () {
 
     // 파트 선택 확인
     if (!selectedPart) {
-      alert("파트를 선택해주세요.");
+      window.showToast("파트를 선택해주세요.", "info");
       partSelect.focus();
       return;
     }
 
     // 보컬 스타일 선택 확인
     if (!selectedStyle) {
-      alert("보컬 스타일을 선택해주세요.");
+      window.showToast("보컬 스타일을 선택해주세요.", "info");
       styleSelect.focus();
       return;
     }
@@ -3704,7 +3692,7 @@ window.assignVocalToPart = function () {
       if (customInput && customInput.value.trim()) {
         selectedStyle = customInput.value.trim();
       } else {
-        alert("커스텀 보컬 스타일을 입력해주세요.");
+        window.showToast("커스텀 보컬 스타일을 입력해주세요.", "info");
         const customInputDiv = document.getElementById("customVocalStyleInput");
         if (customInputDiv) {
           customInputDiv.style.display = "block";
@@ -3748,9 +3736,8 @@ window.assignVocalToPart = function () {
     }
   } catch (error) {
     console.error("❌ 파트별 보컬 스타일 지정 오류:", error);
-    alert(
-      "파트별 보컬 스타일 지정 중 오류가 발생했습니다:\n\n" + error.message,
-    );
+    window.showToast(
+      "파트별 보컬 스타일 지정 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 
@@ -3823,7 +3810,7 @@ window.addCustomVocalStyle = function () {
 
   const customStyle = customInput.value.trim();
   if (!customStyle) {
-    alert("보컬 스타일을 입력해주세요.");
+    window.showToast("보컬 스타일을 입력해주세요.", "info");
     customInput.focus();
     return;
   }
@@ -4208,9 +4195,8 @@ window.generateMarketingMaterials = async function () {
       "";
 
     if (!lyrics.trim()) {
-      alert(
-        "⚠️ 마케팅 자료를 생성할 가사가 없습니다.\n\n5단계에서 최종 가사를 확인한 후 다시 시도해주세요.",
-      );
+      window.showToast(
+        "⚠️ 마케팅 자료를 생성할 가사가 없습니다.\n\n5단계에서 최종 가사를 확인한 후 다시 시도해주세요.", "error");
       return;
     }
 
@@ -4453,7 +4439,7 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
             `;
     }
 
-    alert(
+    window.showToast(
       "⚠️ 마케팅 자료 생성 중 오류가 발생했습니다.\n\n" +
         "원인: " +
         error.message +
@@ -4461,8 +4447,7 @@ ${guidelines.substring(0, 1000)}${guidelines.length > 1000 ? "..." : ""}
         "해결방법:\n" +
         "1. API 키가 올바른지 확인하세요\n" +
         "2. 네트워크 연결을 확인하세요\n" +
-        "3. 잠시 후 다시 시도해주세요",
-    );
+        "3. 잠시 후 다시 시도해주세요", "error");
   }
 };
 
@@ -5147,7 +5132,7 @@ window.restoreProjectOrder = function (projects) {
 // 프로젝트 삭제 함수
 window.deleteProject = function (projectId) {
   if (!projectId) {
-    alert("프로젝트 ID가 없습니다.");
+    window.showToast("프로젝트 ID가 없습니다.", "error");
     return;
   }
 
@@ -5294,7 +5279,7 @@ window.deleteProject = function (projectId) {
     }
 
     if (deleted) {
-      alert("✅ 프로젝트가 삭제되었습니다.");
+      window.showToast("✅ 프로젝트가 삭제되었습니다.", "success");
 
       // 프로젝트 목록 새로고침
       if (typeof window.loadProjectList === "function") {
@@ -5307,11 +5292,11 @@ window.deleteProject = function (projectId) {
         window.currentProject = null;
       }
     } else {
-      alert("⚠️ 삭제할 프로젝트를 찾을 수 없습니다.");
+      window.showToast("⚠️ 삭제할 프로젝트를 찾을 수 없습니다.", "error");
     }
   } catch (error) {
     console.error("프로젝트 삭제 오류:", error);
-    alert("프로젝트 삭제 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("프로젝트 삭제 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
   }, 0); // setTimeout 종료 — 크롬 draggable+confirm 버그 우회
 };
@@ -5366,7 +5351,7 @@ window.exportAllProjects = function () {
     const uniqueProjects = Array.from(projectMap.values());
 
     if (uniqueProjects.length === 0) {
-      alert("내보낼 프로젝트가 없습니다.");
+      window.showToast("내보낼 프로젝트가 없습니다.", "error");
       return;
     }
 
@@ -5382,10 +5367,10 @@ window.exportAllProjects = function () {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    alert(`✅ ${uniqueProjects.length}개 프로젝트가 내보내기되었습니다.`);
+    window.showToast(`✅ ${uniqueProjects.length}개 프로젝트가 내보내기되었습니다.`, "success");
   } catch (error) {
     console.error("프로젝트 내보내기 오류:", error);
-    alert("프로젝트 내보내기 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("프로젝트 내보내기 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 
@@ -5446,12 +5431,12 @@ window.handleImport = function (event) {
       ) {
         projects = importData.musicCreatorProjects;
       } else {
-        alert("유효하지 않은 가져오기 파일 형식입니다.");
+        window.showToast("유효하지 않은 가져오기 파일 형식입니다.", "info");
         return;
       }
 
       if (projects.length === 0) {
-        alert("가져올 프로젝트가 없습니다.");
+        window.showToast("가져올 프로젝트가 없습니다.", "error");
         return;
       }
 
@@ -5553,7 +5538,7 @@ window.handleImport = function (event) {
       }
       resultMessage += `\n페이지를 새로고침하여 프로젝트 목록을 확인하세요.`;
 
-      alert(resultMessage);
+      window.showToast(resultMessage, "info");
 
       // 프로젝트 목록 새로고침
       if (typeof window.loadProjectList === "function") {
@@ -5564,16 +5549,15 @@ window.handleImport = function (event) {
       event.target.value = "";
     } catch (error) {
       console.error("가져오기 오류:", error);
-      alert(
+      window.showToast(
         "프로젝트 가져오기 중 오류가 발생했습니다:\n\n" +
           error.message +
-          "\n\n파일 형식을 확인해주세요.",
-      );
+          "\n\n파일 형식을 확인해주세요.", "error");
     }
   };
 
   reader.onerror = function () {
-    alert("파일을 읽는 중 오류가 발생했습니다.");
+    window.showToast("파일을 읽는 중 오류가 발생했습니다.", "error");
   };
 
   reader.readAsText(file);
@@ -5689,13 +5673,12 @@ window.backupFullProgram = function () {
         `✅ 전체 프로그램 백업 완료!\n\n파일명: ${filename}`,
       );
     } else {
-      alert(
-        `✅ 전체 프로그램 백업이 완료되었습니다!\n\n파일명: ${filename}\n\n이 파일에는 모든 프로젝트 데이터와 설정이 포함되어 있습니다.`,
-      );
+      window.showToast(
+        `✅ 전체 프로그램 백업이 완료되었습니다!\n\n파일명: ${filename}\n\n이 파일에는 모든 프로젝트 데이터와 설정이 포함되어 있습니다.`, "success");
     }
   } catch (error) {
     console.error("❌ 전체 프로그램 백업 오류:", error);
-    alert("전체 프로그램 백업 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("전체 프로그램 백업 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 
@@ -5841,23 +5824,22 @@ window.restoreFromBackupFile = function () {
         }
         resultMessage += `\n페이지를 새로고침하여 프로젝트 목록을 확인하세요.`;
 
-        alert(resultMessage);
+        window.showToast(resultMessage, "info");
 
         if (typeof window.loadProjectList === "function") {
           window.loadProjectList();
         }
       } catch (error) {
         console.error("백업 파일 복구 오류:", error);
-        alert(
+        window.showToast(
           "백업 파일 복구 중 오류가 발생했습니다:\n\n" +
             error.message +
-            "\n\n파일 형식을 확인해주세요.",
-        );
+            "\n\n파일 형식을 확인해주세요.", "error");
       }
     };
 
     reader.onerror = function () {
-      alert("파일을 읽는 중 오류가 발생했습니다.");
+      window.showToast("파일을 읽는 중 오류가 발생했습니다.", "error");
     };
 
     reader.readAsText(file);
@@ -5947,10 +5929,10 @@ window.resetCurrentStep = async function () {
       window.saveCurrentProject();
     }
 
-    alert("✅ 현재 단계가 초기화되었습니다.");
+    window.showToast("✅ 현재 단계가 초기화되었습니다.", "success");
   } catch (error) {
     console.error("단계 초기화 오류:", error);
-    alert("단계 초기화 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("단계 초기화 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 
@@ -6047,11 +6029,11 @@ window.resetAllSteps = async function (skipConfirm = false) {
     if (typeof window.setReadOnlyMode === "function") window.setReadOnlyMode(false);
 
     console.log("✅ 앱 전체 초기화 완료!");
-    if (!skipConfirm) alert("✅ 모든 내용이 초기화되었습니다. 새로 시작합니다!");
+    if (!skipConfirm) window.showToast("✅ 모든 내용이 초기화되었습니다. 새로 시작합니다!", "success");
 
   } catch (error) {
     console.error("전체 초기화 중 오류 발생:", error);
-    alert("초기화 중 일부 오류가 발생했습니다. 페이지를 새로고침하는 것을 권장합니다.");
+    window.showToast("초기화 중 일부 오류가 발생했습니다. 페이지를 새로고침하는 것을 권장합니다.", "error");
   }
 };
 
@@ -6073,9 +6055,8 @@ window.testAPIConnection = async function () {
       inputGeminiVal || (typeof window.getGeminiApiKey === "function" ? window.getGeminiApiKey() : localStorage.getItem("gemini_api_key")) || gc.gemini_api_key || "";
 
     if (!openaiKey && !geminiKey) {
-      alert(
-        '⚠️ API 키가 설정되지 않았습니다.\n\n설정 > "API 관리" 에서 키를 입력해주세요.',
-      );
+      window.showToast(
+        '⚠️ API 키가 설정되지 않았습니다.\n\n설정 > "API 관리" 에서 키를 입력해주세요.', "error");
       if (typeof window.openAPISettings === "function") {
         window.openAPISettings();
       }
@@ -6132,10 +6113,10 @@ window.testAPIConnection = async function () {
 
     // 결과 알림 팝업
     const message = `🔌 API 연결 테스트 결과\n\n${results.join("\n")}\n\n${allSuccess ? "✅ 모든 API가 정상적으로 연결되었습니다." : "⚠️ 일부 API 연결에 문제가 있습니다."}`;
-    alert(message);
+    window.showToast(message, "info");
   } catch (error) {
     console.error("API 테스트 오류:", error);
-    alert("API 테스트 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("API 테스트 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 
@@ -6150,7 +6131,7 @@ window.openAPISettings = function () {
         ? window.getCurrentUserData()
         : null;
     if (!userData || !userData.approved) {
-      alert("⚠️ 승인된 사용자만 API 설정에 접근할 수 있습니다.");
+      window.showToast("⚠️ 승인된 사용자만 API 설정에 접근할 수 있습니다.", "error");
       return;
     }
 
@@ -6158,7 +6139,7 @@ window.openAPISettings = function () {
     const modal = document.getElementById("apiSettingsModal");
     if (!modal) {
       console.error("❌ apiSettingsModal 요소를 찾을 수 없습니다.");
-      alert("API 설정 모달을 찾을 수 없습니다.");
+      window.showToast("API 설정 모달을 찾을 수 없습니다.", "error");
       return;
     }
 
@@ -6270,7 +6251,7 @@ window.openAPISettings = function () {
     console.log("모달 computed style:", window.getComputedStyle(modal).display);
   } catch (error) {
     console.error("❌ API 설정 모달 열기 오류:", error);
-    alert("API 설정 모달을 열 수 없습니다:\n\n" + error.message);
+    window.showToast("API 설정 모달을 열 수 없습니다:\n\n" + error.message, "error");
   }
 };
 
@@ -6298,7 +6279,7 @@ window.saveAPIKeys = function () {
   try {
     const userData = typeof window.getCurrentUserData === "function" ? window.getCurrentUserData() : null;
     if (userData && userData.role !== "admin") {
-      alert("⚠️ 일반 사용자는 API 키를 직접 수정하거나 저장할 수 없습니다.");
+      window.showToast("⚠️ 일반 사용자는 API 키를 직접 수정하거나 저장할 수 없습니다.", "error");
       window.closeAPISettings();
       return;
     }
@@ -6308,7 +6289,7 @@ window.saveAPIKeys = function () {
     const geminiInput = document.getElementById("geminiKeyInput");
 
     if (!openaiInput && !geminiInput) {
-      alert("API 키 입력 필드를 찾을 수 없습니다.");
+      window.showToast("API 키 입력 필드를 찾을 수 없습니다.", "error");
       return;
     }
 
@@ -6348,18 +6329,18 @@ window.saveAPIKeys = function () {
       }
     }
 
-    alert("✅ API 키가 저장되었습니다.");
+    window.showToast("✅ API 키가 저장되었습니다.", "success");
     window.closeAPISettings();
   } catch (error) {
     console.error("API 키 저장 오류:", error);
-    alert("API 키 저장 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("API 키 저장 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 
 window.resetAPIKeys = async function () {
   const userData = typeof window.getCurrentUserData === "function" ? window.getCurrentUserData() : null;
   if (userData && userData.role !== "admin") {
-    alert("⚠️ 일반 사용자는 API 키를 초기화할 수 없습니다.");
+    window.showToast("⚠️ 일반 사용자는 API 키를 초기화할 수 없습니다.", "error");
     return;
   }
 
@@ -6393,10 +6374,10 @@ window.resetAPIKeys = async function () {
       }
     }
 
-    alert("✅ API 키가 초기화되었습니다.");
+    window.showToast("✅ API 키가 초기화되었습니다.", "success");
   } catch (error) {
     console.error("API 키 초기화 오류:", error);
-    alert("API 키 초기화 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("API 키 초기화 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 
@@ -6459,7 +6440,7 @@ window.openGuidelinesModal = function () {
     const modal = document.getElementById("guidelinesModal");
     if (!modal) {
       console.error("❌ guidelinesModal 요소를 찾을 수 없습니다.");
-      alert("지침서 모달을 찾을 수 없습니다.");
+      window.showToast("지침서 모달을 찾을 수 없습니다.", "error");
       return;
     }
 
@@ -6518,7 +6499,7 @@ window.openGuidelinesModal = function () {
     console.log("모달 computed style:", window.getComputedStyle(modal).display);
   } catch (error) {
     console.error("❌ 지침서 모달 열기 오류:", error);
-    alert("지침서 모달을 열 수 없습니다:\n\n" + error.message);
+    window.showToast("지침서 모달을 열 수 없습니다:\n\n" + error.message, "error");
   }
 };
 
@@ -6543,7 +6524,7 @@ window.saveGuidelines = async function () {
   try {
     const guidelinesText = document.getElementById("guidelinesText");
     if (!guidelinesText) {
-      alert("지침서 입력 필드를 찾을 수 없습니다.");
+      window.showToast("지침서 입력 필드를 찾을 수 없습니다.", "error");
       return;
     }
 
@@ -6577,7 +6558,7 @@ window.saveGuidelines = async function () {
         }
       } catch (err) {
         console.error("서버 지침서 저장 실패:", err);
-        alert("⚠️ 로컬에는 저장되었으나, 서버 동기화에 실패했습니다: " + err.message);
+        window.showToast("⚠️ 로컬에는 저장되었으나, 서버 동기화에 실패했습니다: " + err.message, "error");
       } finally {
         if (saveBtn) {
           saveBtn.disabled = false;
@@ -6586,13 +6567,13 @@ window.saveGuidelines = async function () {
       }
     }
 
-    alert("✅ 지침서가 저장되었습니다.");
+    window.showToast("✅ 지침서가 저장되었습니다.", "success");
     if (typeof window.closeGuidelinesModal === "function") {
       window.closeGuidelinesModal();
     }
   } catch (error) {
     console.error("지침서 저장 오류:", error);
-    alert("지침서 저장 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("지침서 저장 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 
@@ -6658,7 +6639,7 @@ window.exportGuidelines = async function () {
   try {
     const payload = window.getGuidelinesBackupPayload();
     if (!payload.content.trim()) {
-      alert("백업할 지침서 내용이 없습니다.");
+      window.showToast("백업할 지침서 내용이 없습니다.", "error");
       return;
     }
 
@@ -6679,13 +6660,13 @@ window.exportGuidelines = async function () {
 
     const serverResult = await window.saveGuidelinesBackupToServer(payload);
     if (serverResult.ok) {
-      alert("✅ 지침서를 로컬 파일과 서버에 백업했습니다.");
+      window.showToast("✅ 지침서를 로컬 파일과 서버에 백업했습니다.", "success");
     } else {
-      alert(`✅ 지침서를 로컬 파일로 백업했습니다.\n\n⚠️ 서버 백업: ${serverResult.reason}`);
+      window.showToast(`✅ 지침서를 로컬 파일로 백업했습니다.\n\n⚠️ 서버 백업: ${serverResult.reason}`, "error");
     }
   } catch (error) {
     console.error("지침서 백업 오류:", error);
-    alert("지침서 백업 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("지침서 백업 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 
@@ -6702,7 +6683,7 @@ window.triggerImportGuidelines = function () {
 
   const input = document.getElementById("importGuidelinesFile");
   if (!input) {
-    alert("지침서 백업 파일 입력 요소를 찾을 수 없습니다.");
+    window.showToast("지침서 백업 파일 입력 요소를 찾을 수 없습니다.", "error");
     return;
   }
   input.value = "";
@@ -6719,10 +6700,10 @@ window.handleImportGuidelines = function (event) {
       const text = String(loadEvent.target?.result || "");
       const payload = JSON.parse(text);
       window.applyGuidelinesBackupPayload(payload);
-      alert("✅ 로컬 백업 파일에서 지침서를 복원했습니다.");
+      window.showToast("✅ 로컬 백업 파일에서 지침서를 복원했습니다.", "success");
     } catch (error) {
       console.error("지침서 로컬 복원 오류:", error);
-      alert("지침서 복원 중 오류가 발생했습니다:\n\n" + error.message);
+      window.showToast("지침서 복원 중 오류가 발생했습니다:\n\n" + error.message, "error");
     }
   };
   reader.readAsText(file, "utf-8");
@@ -6732,7 +6713,7 @@ window.restoreGuidelinesFromServer = async function () {
   try {
     const user = window.firebaseAuth?.currentUser;
     if (!user || !window.firebaseDb) {
-      alert("서버 백업을 복원하려면 먼저 로그인해야 합니다.");
+      window.showToast("서버 백업을 복원하려면 먼저 로그인해야 합니다.", "info");
       return;
     }
 
@@ -6743,15 +6724,15 @@ window.restoreGuidelinesFromServer = async function () {
     const backup = doc.data()?.guidelinesBackupLatest;
 
     if (!backup?.content) {
-      alert("서버에 저장된 지침서 백업이 없습니다.");
+      window.showToast("서버에 저장된 지침서 백업이 없습니다.", "error");
       return;
     }
 
     window.applyGuidelinesBackupPayload(backup);
-    alert(`✅ 서버 백업에서 지침서를 복원했습니다.\n\n백업 시각: ${backup.savedAt || "알 수 없음"}`);
+    window.showToast(`✅ 서버 백업에서 지침서를 복원했습니다.\n\n백업 시각: ${backup.savedAt || "알 수 없음"}`, "success");
   } catch (error) {
     console.error("지침서 서버 복원 오류:", error);
-    alert("서버 지침서 복원 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("서버 지침서 복원 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 
@@ -6793,7 +6774,7 @@ window.resetGuidelines = async function () {
     }
   } catch (error) {
     console.error("지침서 초기화 오류:", error);
-    alert("지침서 초기화 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("지침서 초기화 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 
@@ -7045,7 +7026,7 @@ window.resetStepOrder = async function () {
     window.initStepDragAndDrop();
   }
 
-  alert("✅ 단계 순서가 기본값으로 초기화되었습니다.");
+  window.showToast("✅ 단계 순서가 기본값으로 초기화되었습니다.", "success");
 };
 
 // 페이지 로드 시 드래그 앤 드롭 초기화 및 수정 모드 초기화
@@ -7198,7 +7179,7 @@ window.copySunoLyricsAndStyle = async function () {
     if (typeof window.showCopyIndicator === "function") {
       window.showCopyIndicator("❌ 복사할 가사/스타일이 없습니다");
     } else {
-      alert("복사할 가사 또는 스타일이 없습니다.");
+      window.showToast("복사할 가사 또는 스타일이 없습니다.", "error");
     }
     return;
   }

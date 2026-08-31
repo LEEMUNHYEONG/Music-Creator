@@ -36,11 +36,11 @@ window.saveMVPrompt = function (type) {
     if (typeof window.showCopyIndicator === "function") {
       window.showCopyIndicator(`✅ ${type} 프롬프트가 저장되었습니다!`);
     } else {
-      alert(`${type} 프롬프트가 저장되었습니다.`);
+      window.showToast(`${type} 프롬프트가 저장되었습니다.`, "success");
     }
   } catch (error) {
     console.error("프롬프트 저장 오류:", error);
-    alert("프롬프트 저장 중 오류가 발생했습니다.");
+    window.showToast("프롬프트 저장 중 오류가 발생했습니다.", "error");
   }
 };
 
@@ -76,11 +76,11 @@ window.copyMVPromptSection = function (type) {
           `✅ ${typeNames[type]}가 클립보드에 복사되었습니다!`,
         );
       } else {
-        alert(`${typeNames[type]}가 클립보드에 복사되었습니다.`);
+        window.showToast(`${typeNames[type]}가 클립보드에 복사되었습니다.`, "success");
       }
     })
     .catch(() => {
-      alert("복사 중 오류가 발생했습니다.");
+      window.showToast("복사 중 오류가 발생했습니다.", "error");
     });
 };
 
@@ -372,7 +372,7 @@ window.confirmMVFinalPromptExport = async function (actionLabel, options = {}) {
 window.copyMVScenePromptTable = async function () {
   const text = window.buildMVScenePromptTableText();
   if (!text) {
-    alert("복사할 씬 프롬프트 표가 없습니다.");
+    window.showToast("복사할 씬 프롬프트 표가 없습니다.", "error");
     return;
   }
   if (!(await window.confirmMVExportWithUnsavedScenes("씬 프롬프트 표 복사"))) {
@@ -387,12 +387,12 @@ window.copyMVScenePromptTable = async function () {
           "✅ 씬 프롬프트 표가 클립보드에 복사되었습니다!",
         );
       } else {
-        alert("씬 프롬프트 표가 클립보드에 복사되었습니다.");
+        window.showToast("씬 프롬프트 표가 클립보드에 복사되었습니다.", "success");
       }
     })
     .catch((err) => {
       console.error("씬 프롬프트 표 복사 오류:", err);
-      alert("씬 프롬프트 표 복사 중 오류가 발생했습니다.");
+      window.showToast("씬 프롬프트 표 복사 중 오류가 발생했습니다.", "error");
     });
 };
 
@@ -466,7 +466,7 @@ window.buildMVImagePromptBundle = function () {
 window.copyMVImagePromptBundle = async function () {
   const text = window.buildMVImagePromptBundle();
   if (!text) {
-    alert("복사할 이미지 생성 프롬프트가 없습니다.");
+    window.showToast("복사할 이미지 생성 프롬프트가 없습니다.", "error");
     return;
   }
   if (!(await window.confirmMVExportWithUnsavedScenes("이미지 프롬프트 번들 복사"))) {
@@ -481,19 +481,19 @@ window.copyMVImagePromptBundle = async function () {
           "✅ 이미지 생성 프롬프트 번들이 클립보드에 복사되었습니다!",
         );
       } else {
-        alert("이미지 생성 프롬프트 번들이 클립보드에 복사되었습니다.");
+        window.showToast("이미지 생성 프롬프트 번들이 클립보드에 복사되었습니다.", "success");
       }
     })
     .catch((err) => {
       console.error("이미지 생성 프롬프트 번들 복사 오류:", err);
-      alert("이미지 생성 프롬프트 번들 복사 중 오류가 발생했습니다.");
+      window.showToast("이미지 생성 프롬프트 번들 복사 중 오류가 발생했습니다.", "error");
     });
 };
 
 window.downloadMVImagePromptBundle = async function () {
   const text = window.buildMVImagePromptBundle();
   if (!text) {
-    alert("다운로드할 이미지 생성 프롬프트가 없습니다.");
+    window.showToast("다운로드할 이미지 생성 프롬프트가 없습니다.", "error");
     return;
   }
   if (!(await window.confirmMVExportWithUnsavedScenes("이미지 프롬프트 TXT 다운로드"))) {
@@ -589,7 +589,7 @@ window.copyMVVideoToolPrompts = async function (tool = "runway") {
   const config = window.getMVVideoToolConfig(tool);
   const text = window.buildMVVideoToolPrompts(config.key);
   if (!text) {
-    alert("복사할 영상 생성 프롬프트가 없습니다.");
+    window.showToast("복사할 영상 생성 프롬프트가 없습니다.", "error");
     return;
   }
   if (!(await window.confirmMVExportWithUnsavedScenes(`${config.label} 영상 프롬프트 복사`))) {
@@ -604,12 +604,12 @@ window.copyMVVideoToolPrompts = async function (tool = "runway") {
           `✅ ${config.label} 영상 생성 프롬프트가 클립보드에 복사되었습니다!`,
         );
       } else {
-        alert(`${config.label} 영상 생성 프롬프트가 클립보드에 복사되었습니다.`);
+        window.showToast(`${config.label} 영상 생성 프롬프트가 클립보드에 복사되었습니다.`, "success");
       }
     })
     .catch((err) => {
       console.error("영상 생성 프롬프트 복사 오류:", err);
-      alert("영상 생성 프롬프트 복사 중 오류가 발생했습니다.");
+      window.showToast("영상 생성 프롬프트 복사 중 오류가 발생했습니다.", "error");
     });
 };
 
@@ -617,7 +617,7 @@ window.downloadMVVideoToolPrompts = async function (tool = "runway") {
   const config = window.getMVVideoToolConfig(tool);
   const text = window.buildMVVideoToolPrompts(config.key);
   if (!text) {
-    alert("다운로드할 영상 생성 프롬프트가 없습니다.");
+    window.showToast("다운로드할 영상 생성 프롬프트가 없습니다.", "error");
     return;
   }
   if (
@@ -641,7 +641,7 @@ window.downloadMVVideoToolPrompts = async function (tool = "runway") {
 
 window.downloadMVPrompts = async function () {
   if (!window.currentScenes || window.currentScenes.length === 0) {
-    alert("다운로드할 프롬프트가 없습니다.");
+    window.showToast("다운로드할 프롬프트가 없습니다.", "error");
     return;
   }
   if (!(await window.confirmMVExportWithUnsavedScenes("전체 MV 프롬프트 다운로드"))) {

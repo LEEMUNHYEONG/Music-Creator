@@ -22,7 +22,7 @@
 
   window.showBoardWriteForm = function (isEdit = false) {
     if (!window.firebaseAuth?.currentUser) {
-      alert("게시판 글 작성은 로그인 후 이용할 수 있습니다.");
+      window.showToast("게시판 글 작성은 로그인 후 이용할 수 있습니다.", "info");
       if (typeof window.showAuthOverlay === "function") {
         window.showAuthOverlay();
         window.showAuthTab?.("login");
@@ -62,11 +62,11 @@
   function setBoardImage(file) {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      alert("이미지 파일만 첨부할 수 있습니다.");
+      window.showToast("이미지 파일만 첨부할 수 있습니다.", "info");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      alert("파일 크기는 5MB 이하여야 합니다.");
+      window.showToast("파일 크기는 5MB 이하여야 합니다.", "info");
       return;
     }
     selectedFile = file;
@@ -94,7 +94,7 @@
     const isAuthor =
       window.firebaseAuth?.currentUser?.uid === data.userId;
     if (!isAdmin && !isAuthor) {
-      alert("작성자 또는 관리자만 게시글을 수정할 수 있습니다.");
+      window.showToast("작성자 또는 관리자만 게시글을 수정할 수 있습니다.", "info");
       return;
     }
 
@@ -417,7 +417,7 @@
     const isPrivate = document.getElementById("boardIsPrivate").checked;
 
     if (!title || !content) {
-      alert("제목과 내용을 입력해 주세요.");
+      window.showToast("제목과 내용을 입력해 주세요.", "info");
       return;
     }
 
@@ -502,14 +502,13 @@
       }
 
       console.log("✅ 게시글 처리 완료");
-      alert(isEditMode ? "수정되었습니다." : "등록되었습니다.");
+      window.showToast(isEditMode ? "수정되었습니다." : "등록되었습니다.", "info");
       showBoardList();
     } catch (err) {
       console.error("❌ 게시글 등록 실패:", err);
       // alert는 브라우저를 블로킹하므로 showToast 등이 있으면 더 좋으나, 현재 alert 사용 중
-      alert(
-        "❌ 오류 발생: " + (err.message || "알 수 없는 오류가 발생했습니다."),
-      );
+      window.showToast(
+        "❌ 오류 발생: " + (err.message || "알 수 없는 오류가 발생했습니다."), "error");
     } finally {
       console.log("🔚 버튼 상태 복원");
       if (submitBtn) {
@@ -528,7 +527,7 @@
     const isAuthor =
       window.firebaseAuth?.currentUser?.uid === postData.userId;
     if (!isAdmin && !isAuthor) {
-      alert("작성자 또는 관리자만 게시글을 삭제할 수 있습니다.");
+      window.showToast("작성자 또는 관리자만 게시글을 삭제할 수 있습니다.", "info");
       return;
     }
 
@@ -541,10 +540,10 @@
           await window.firebaseStorage.refFromURL(postData.imageUrl).delete();
         } catch (e) {}
       }
-      alert("삭제되었습니다.");
+      window.showToast("삭제되었습니다.", "success");
       showBoardList();
     } catch (err) {
-      alert("❌ 삭제 오류: " + err.message);
+      window.showToast("❌ 삭제 오류: " + err.message, "error");
     }
   };
 
@@ -558,14 +557,14 @@
         answered: true,
         answeredAt: firebase.firestore.FieldValue.serverTimestamp(),
       });
-      alert("답변이 등록되었습니다.");
+      window.showToast("답변이 등록되었습니다.", "info");
       viewPostDetail(postId, {
         ...window.currentBoardPostData,
         answer,
         answered: true,
       });
     } catch (err) {
-      alert("❌ 답변 등록 오류: " + err.message);
+      window.showToast("❌ 답변 등록 오류: " + err.message, "error");
     }
   };
 

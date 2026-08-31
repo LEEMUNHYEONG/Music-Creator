@@ -47,6 +47,10 @@ Object.defineProperty(globalThis, "navigator", {
 global.alert = function alertStub(message) {
   alerts.push(message);
 };
+// alert()가 window.showToast(message, level)로 전환되어 동일하게 스텁한다.
+window.showToast = function showToastStub(message, level) {
+  alerts.push(message);
+};
 global.translateKoreanToEnglishForScene = async function translateStub(fieldName, koreanText) {
   // fieldName은 "prompt", "location" 등 필드 식별자이고 koreanText가 실제 번역 대상
   const textToTranslate = koreanText !== undefined ? koreanText : fieldName;

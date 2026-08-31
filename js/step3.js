@@ -102,12 +102,11 @@ window.goToStep4AndApplyImprovements = async function () {
     }
   } catch (error) {
     console.error("❌ 3→4단계 이동 오류:", error);
-    alert(
+    window.showToast(
       "⚠️ 3단계 → 4단계 이동 중 오류가 발생했습니다.\n\n" +
         "원인: " +
         error.message +
         "\n\n" +
-        "해결방법: 페이지를 새로고침(F5) 후 다시 시도해주세요.",
-    );
+        "해결방법: 페이지를 새로고침(F5) 후 다시 시도해주세요.", "error");
   }
 };

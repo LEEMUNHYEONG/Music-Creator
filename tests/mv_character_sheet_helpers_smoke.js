@@ -44,6 +44,10 @@ global.document = {
 global.alert = function alertStub(message) {
   alertMessage = message;
 };
+// alert()가 window.showToast(message, level)로 전환되어 동일하게 스텁한다.
+window.showToast = function showToastStub(message, level) {
+  alertMessage = message;
+};
 Object.defineProperty(globalThis, "navigator", {
   configurable: true,
   value: {

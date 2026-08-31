@@ -8,7 +8,7 @@ window.convertToSuno = function () {
   const stylePrompt = document.getElementById("manualStylePrompt")?.value || "";
 
   if (!originalLyrics.trim()) {
-    alert("가사를 먼저 입력해주세요.");
+    window.showToast("가사를 먼저 입력해주세요.", "info");
     return;
   }
 
@@ -28,7 +28,7 @@ window.convertToSuno = function () {
     styleEl.value = stylePrompt;
   }
 
-  alert("수노 변환 기능은 구현 중입니다.");
+  window.showToast("수노 변환 기능은 구현 중입니다.", "info");
 };
 
 // --- Extracted showCustomTagInput ---
@@ -36,7 +36,7 @@ window.showCustomTagInput = function (containerId) {
   try {
     const container = document.getElementById(containerId);
     if (!container) {
-      alert("태그 컨테이너를 찾을 수 없습니다.");
+      window.showToast("태그 컨테이너를 찾을 수 없습니다.", "error");
       return;
     }
 
@@ -66,7 +66,7 @@ window.showCustomTagInput = function (containerId) {
     }
   } catch (error) {
     console.error("❌ 커스텀 태그 추가 오류:", error);
-    alert("태그 추가 중 오류가 발생했습니다:\n\n" + error.message);
+    window.showToast("태그 추가 중 오류가 발생했습니다:\n\n" + error.message, "error");
   }
 };
 
@@ -91,9 +91,8 @@ window.goToNextStep = async function () {
 
     // 가사가 없으면 경고
     if (!originalLyrics.trim()) {
-      alert(
-        '가사를 먼저 입력하거나 생성해주세요.\n\n- "직접 작성" 모드: 가사란에 직접 입력\n- "AI 생성" 모드: "AI로 4개 가사 생성하기" 버튼으로 가사 생성 후 선택',
-      );
+      window.showToast(
+        '가사를 먼저 입력하거나 생성해주세요.\n\n- "직접 작성" 모드: 가사란에 직접 입력\n- "AI 생성" 모드: "AI로 4개 가사 생성하기" 버튼으로 가사 생성 후 선택', "info");
       return;
     }
 
@@ -173,17 +172,16 @@ window.goToNextStep = async function () {
       }
     } else {
       console.error("❌ goToStep 함수를 찾을 수 없습니다.");
-      alert("단계 이동 기능을 사용할 수 없습니다. 페이지를 새로고침해주세요.");
+      window.showToast("단계 이동 기능을 사용할 수 없습니다. 페이지를 새로고침해주세요.", "error");
     }
   } catch (error) {
     console.error("❌ 1→2단계 이동 오류:", error);
-    alert(
+    window.showToast(
       "⚠️ 1단계 → 2단계 이동 중 오류가 발생했습니다.\n\n" +
         "원인: " +
         error.message +
         "\n\n" +
-        "해결방법: 페이지를 새로고침(F5) 후 다시 시도해주세요.",
-    );
+        "해결방법: 페이지를 새로고침(F5) 후 다시 시도해주세요.", "error");
   }
 };
 
@@ -205,7 +203,7 @@ window.goToStep2To3 = function () {
     const stylePrompt = document.getElementById("stylePrompt")?.value || "";
 
     if (!sunoLyrics.trim()) {
-      alert("수노 가사를 먼저 생성해주세요.");
+      window.showToast("수노 가사를 먼저 생성해주세요.", "info");
       return;
     }
 
@@ -242,12 +240,11 @@ window.goToStep2To3 = function () {
     }
   } catch (error) {
     console.error("❌ 2→3단계 이동 오류:", error);
-    alert(
+    window.showToast(
       "⚠️ 2단계 → 3단계 이동 중 오류가 발생했습니다.\n\n" +
         "원인: " +
         error.message +
         "\n\n" +
-        "해결방법: 페이지를 새로고침(F5) 후 다시 시도해주세요.",
-    );
+        "해결방법: 페이지를 새로고침(F5) 후 다시 시도해주세요.", "error");
   }
 };

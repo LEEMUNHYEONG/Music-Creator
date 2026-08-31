@@ -14,7 +14,7 @@
   window.openAdminPanel = function (showConfig) {
     const userData = window.currentUserData;
     if (!userData || userData.role !== "admin") {
-      alert("⚠️ 관리자 권한이 필요합니다.");
+      window.showToast("⚠️ 관리자 권한이 필요합니다.", "error");
       return;
     }
     const panel = document.getElementById("adminPanel");
@@ -196,7 +196,7 @@
       loadPendingUsers();
       loadAllUsers();
     } catch (err) {
-      alert("❌ 오류: " + err.message);
+      window.showToast("❌ 오류: " + err.message, "error");
     }
   };
 
@@ -231,7 +231,7 @@
       loadPendingUsers();
       loadAllUsers();
     } catch (err) {
-      alert("❌ 오류: " + err.message);
+      window.showToast("❌ 오류: " + err.message, "error");
     }
   };
 
@@ -246,7 +246,7 @@
       showAdminToast("🚫 승인을 취소했습니다.");
       loadAllUsers();
     } catch (err) {
-      alert("❌ 오류: " + err.message);
+      window.showToast("❌ 오류: " + err.message, "error");
     }
   };
 
@@ -261,7 +261,7 @@
       showAdminToast("👑 관리자로 지정했습니다.");
       loadAllUsers();
     } catch (err) {
-      alert("❌ 오류: " + err.message);
+      window.showToast("❌ 오류: " + err.message, "error");
     }
   };
 
@@ -276,7 +276,7 @@
       showAdminToast("👤 일반 회원으로 변경했습니다.");
       loadAllUsers();
     } catch (err) {
-      alert("❌ 오류: " + err.message);
+      window.showToast("❌ 오류: " + err.message, "error");
     }
   };
 
@@ -477,7 +477,7 @@
         openai_model: openaiModel,
       };
     } catch (err) {
-      alert("❌ 저장 오류: " + err.message);
+      window.showToast("❌ 저장 오류: " + err.message, "error");
     }
   };
 
@@ -505,7 +505,7 @@
   window.openGlobalApiKeyModal = async function () {
     const userData = window.currentUserData;
     if (!userData || userData.role !== "admin") {
-      alert("⚠️ 관리자 권한이 필요합니다.");
+      window.showToast("⚠️ 관리자 권한이 필요합니다.", "error");
       return;
     }
     const modal = document.getElementById("globalApiKeyModal");
@@ -592,10 +592,10 @@
         toast.style.opacity = "1";
         setTimeout(() => (toast.style.opacity = "0"), 3000);
       } else {
-        alert("✅ 공용 API 키가 저장되었습니다.");
+        window.showToast("✅ 공용 API 키가 저장되었습니다.", "success");
       }
     } catch (err) {
-      alert("❌ 저장 오류: " + err.message);
+      window.showToast("❌ 저장 오류: " + err.message, "error");
     }
   };
 

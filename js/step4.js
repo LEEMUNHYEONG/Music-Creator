@@ -460,7 +460,7 @@ window.confirmFinalizedContent = function () {
       "제목 없음";
 
     if (!finalizedLyrics.trim()) {
-      alert("확정된 가사를 먼저 입력해주세요.");
+      window.showToast("확정된 가사를 먼저 입력해주세요.", "info");
       return;
     }
 
@@ -528,13 +528,12 @@ window.confirmFinalizedContent = function () {
     }
   } catch (error) {
     console.error("❌ 4→5단계 이동 오류:", error);
-    alert(
+    window.showToast(
       "⚠️ 4단계 → 5단계 이동 중 오류가 발생했습니다.\n\n" +
         "원인: " +
         error.message +
         "\n\n" +
-        "해결방법: 페이지를 새로고침(F5) 후 다시 시도해주세요.",
-    );
+        "해결방법: 페이지를 새로고침(F5) 후 다시 시도해주세요.", "error");
   }
 };
 
@@ -544,9 +543,8 @@ window.applyAllImprovements = async function () {
     // 모든 체크박스 선택
     const checkboxes = document.querySelectorAll(".improvement-checkbox");
     if (checkboxes.length === 0) {
-      alert(
-        "⚠️ 적용할 개선안이 없습니다.\n\n3단계에서 분석을 먼저 실행해주세요.",
-      );
+      window.showToast(
+        "⚠️ 적용할 개선안이 없습니다.\n\n3단계에서 분석을 먼저 실행해주세요.", "error");
       return;
     }
 
@@ -574,7 +572,7 @@ window.applyExtractedLyrics = async function (btnElement) {
     const extractedLyrics = window.extractedLyricsForApply;
 
     if (!extractedLyrics) {
-      alert("⚠️ 반영할 가사가 없습니다.\n\n음원 분석을 먼저 실행해주세요.");
+      window.showToast("⚠️ 반영할 가사가 없습니다.\n\n음원 분석을 먼저 실행해주세요.", "error");
       return;
     }
 
@@ -711,10 +709,9 @@ ${extractedLyrics}
       console.error("❌ AI 지시어 생성 실패:", aiError);
       // 실패 시 폴백
       applyPlainText(extractedLyrics);
-      alert(
+      window.showToast(
         "⚠️ AI 지시어 생성에 실패하여 원본 텍스트만 반영되었습니다.\\n" +
-          aiError.message,
-      );
+          aiError.message, "error");
     } finally {
       // 버튼 상태 복구
       if (btnElement) {
@@ -724,7 +721,7 @@ ${extractedLyrics}
     }
   } catch (error) {
     console.error("❌ 가사 반영 오류:", error);
-    alert("⚠️ 가사 반영 중 오류가 발생했습니다.\\n\\n" + error.message);
+    window.showToast("⚠️ 가사 반영 중 오류가 발생했습니다.\\n\\n" + error.message, "error");
   }
 };
 
@@ -831,7 +828,7 @@ window.applySelectedImprovements = async function () {
     ".improvement-checkbox:checked",
   );
   if (checkedBoxes.length === 0) {
-    alert("적용할 개선안을 선택해주세요.");
+    window.showToast("적용할 개선안을 선택해주세요.", "info");
     return;
   }
 
@@ -862,7 +859,7 @@ window.applySelectedImprovements = async function () {
   });
 
   if (selectedImprovements.length === 0) {
-    alert("선택된 개선안의 내용을 가져올 수 없습니다.");
+    window.showToast("선택된 개선안의 내용을 가져올 수 없습니다.", "error");
     return;
   }
 
@@ -1003,7 +1000,7 @@ ${guidelines}
     }
   } catch (error) {
     console.error("개선안 적용 오류:", error);
-    alert("개선안 적용 중 오류가 발생했습니다: " + error.message);
+    window.showToast("개선안 적용 중 오류가 발생했습니다: " + error.message, "error");
     return false;
   } finally {
     if (applyBtn) {
@@ -1056,7 +1053,7 @@ window.saveToRegenerationHistory = function (lyrics, style, type) {
 window.showRegenerationHistory = function () {
   const history = window.currentProject?.data?.regenerationHistory || [];
   if (history.length === 0) {
-    alert("이전 생성 이력이 없습니다.");
+    window.showToast("이전 생성 이력이 없습니다.", "error");
     return;
   }
 
@@ -1065,7 +1062,7 @@ window.showRegenerationHistory = function () {
     // 모달이 없으면 간단히 얼럿으로 표시하거나 모달 동적 생성 필요
     // 여기서는 index.html에 모달이 있다고 가정하고 구현
     console.warn("historyModal 요소를 찾을 수 없습니다.");
-    alert("이력 기능을 위한 모달 UI가 준비되지 않았습니다. (개발 중)");
+    window.showToast("이력 기능을 위한 모달 UI가 준비되지 않았습니다. (개발 중)", "info");
     return;
   }
 
