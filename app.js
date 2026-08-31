@@ -671,10 +671,208 @@ function restoreMarketingMVStepData(projectData) {
   restoreMVResultSections(mvData, prompts);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// restoreStepData 헬퍼 함수들 (순수 추출 리팩터링, 동작 동일)
+// switch의 각 case를 그대로 이름 붙은 함수로 옮겼다.
+// ═══════════════════════════════════════════════════════════════
+
+// 1단계: 가사 작성 + 선택 태그
+function restoreStep1Data(projectData) {
+  const title1 = window.currentProject?.title || projectData.title || "";
+  if (title1) {
+    const titleEl = document.getElementById("songTitle");
+    if (titleEl) titleEl.value = title1;
+  }
+  if (projectData.originalLyrics) {
+    const lyricsEl = document.getElementById("originalLyrics");
+    if (lyricsEl) lyricsEl.value = projectData.originalLyrics;
+  }
+  if (projectData.manualStylePrompt) {
+    const styleEl = document.getElementById("manualStylePrompt");
+    if (styleEl) styleEl.value = projectData.manualStylePrompt;
+  }
+  if (projectData.step1Tags && typeof projectData.step1Tags === "object" && typeof window.setTagSelections === "function") {
+    const step1Map = {
+      genre: "genreTags",
+      mood: "moodTags",
+      era: "eraTags",
+      theme: "themeTags",
+      perspective: "perspectiveTags",
+      time: "timeTags",
+      special: "specialTags",
+      region: "regionTags",
+    };
+    Object.keys(step1Map).forEach((key) => {
+      if (projectData.step1Tags[key] && Array.isArray(projectData.step1Tags[key])) {
+        window.setTagSelections(step1Map[key], projectData.step1Tags[key]);
+      }
+    });
+  }
+}
+
+// 2단계: 수노 변환 + 선택 태그·템포
+function restoreStep2Data(projectData) {
+  const title2 = window.currentProject?.title || projectData.title || "";
+  if (title2) {
+    const sunoTitleEl = document.getElementById("sunoTitle");
+    if (sunoTitleEl) sunoTitleEl.value = title2;
+  }
+  if (projectData.sunoLyrics) {
+    const sunoEl = document.getElementById("sunoLyrics");
+    if (sunoEl) {
+      sunoEl.value = projectData.sunoLyrics;
+      if (typeof window.autoResizeTextarea === "function") {
+        requestAnimationFrame(() => window.autoResizeTextarea(sunoEl));
+      }
+    }
+  }
+  if (projectData.stylePrompt) {
+    const stylePromptEl = document.getElementById("stylePrompt");
+    if (stylePromptEl) stylePromptEl.value = projectData.stylePrompt;
+  }
+  if (projectData.step2Tags && typeof projectData.step2Tags === "object" && typeof window.setTagSelections === "function") {
+    const step2Map = {
+      audioFormat: "audioFormatTags",
+      venue: "sunoVenueTags",
+      vocalStyle: "vocalStyle",
+      instruments: "instrumentTags",
+    };
+    Object.keys(step2Map).forEach((key) => {
+      if (projectData.step2Tags[key] && Array.isArray(projectData.step2Tags[key])) {
+        window.setTagSelections(step2Map[key], projectData.step2Tags[key]);
+      }
+    });
+  }
+  if (projectData.tempo) {
+    const tempoSlider = document.getElementById("tempoSlider");
+    const tempoValue = document.getElementById("tempoValue");
+    if (tempoSlider) tempoSlider.value = projectData.tempo;
+    if (tempoValue) tempoValue.textContent = projectData.tempo;
+  }
+  if (projectData.vocalPartAssignments && typeof projectData.vocalPartAssignments === "object") {
+    window.vocalPartAssignments = projectData.vocalPartAssignments;
+    if (typeof window.renderVocalPartAssignments === "function") {
+      window.renderVocalPartAssignments();
+    }
+  }
+}
+
+// 3단계: AI 분석
+function restoreStep3Data(projectData) {
+  if (projectData.sunoLyrics) {
+    const targetLyrics = document.getElementById("analysisTargetLyrics");
+    if (targetLyrics) targetLyrics.textContent = projectData.sunoLyrics;
+  }
+  if (projectData.stylePrompt) {
+    const targetStyle = document.getElementById("analysisTargetStyle");
+    if (targetStyle) targetStyle.textContent = projectData.stylePrompt;
+  }
+
+  const analysisData = projectData.analysis || {};
+  if (analysisData.scores || analysisData.feedbacks || analysisData.raw) {
+    const analysisResult = document.getElementById("analysisResult");
+    const analysisLoading = document.getElementById("analysisLoading");
+    if (analysisResult && analysisLoading) {
+      analysisLoading.style.display = "none";
+      analysisResult.style.display = "block";
+
+      if (analysisData.scores) {
+        const s = analysisData.scores;
+        const setScore = (id, val) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = val || 0;
+        };
+        setScore("overallScore", s.overall || s.overallScore);
+        setScore("lyricsScore", s.lyrics);
+        setScore("styleScore", s.style);
+        setScore("structureScore", s.structure);
+      }
+
+      const feedbacks = analysisData.feedbacks || [];
+      const geminiResult = document.getElementById("geminiAnalysisResult");
+      const geminiCard = document.getElementById("geminiAnalysisCard");
+      if (geminiResult && geminiCard && (feedbacks.length > 0 || analysisData.raw)) {
+        geminiCard.style.display = "block";
+        if (feedbacks.length > 0) {
+          let html = "";
+          feedbacks.forEach(f => {
+            html += `<div style="margin-bottom:15px;padding:15px;background:var(--bg-input);border-radius:8px;border-left:4px solid var(--accent);">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                      <span>${f.icon || "💡"}</span>
+                      <h4 style="margin:0;color:var(--text-primary);font-size:1rem;">${f.title || f.category || "피드백"}</h4>
+                    </div>
+                    <p style="margin:0;color:var(--text-secondary);line-height:1.6;font-size:0.9rem;">${escapeHtml(f.suggestion || f.desc || f.text || "")}</p>
+                  </div>`;
+          });
+          geminiResult.innerHTML = html;
+        } else if (analysisData.raw) {
+          geminiResult.innerHTML = `<div style="white-space:pre-wrap;color:var(--text-secondary);line-height:1.8;">${escapeHtml(analysisData.raw)}</div>`;
+        }
+      }
+    }
+  }
+}
+
+// 4단계: 최종 확정
+function restoreStep4Data(projectData) {
+  const fl4 = projectData.finalizedLyrics || projectData.finalLyrics || "";
+  const fs4 = projectData.finalizedStyle || projectData.finalStyle || "";
+  if (fl4) {
+    const el = document.getElementById("finalizedLyrics");
+    if (el) el.value = fl4;
+  }
+  if (fs4) {
+    const el = document.getElementById("finalizedStyle");
+    if (el) el.value = fs4;
+  }
+}
+
+// 5단계: 최종 출력 & 평가
+function restoreStep5Data(projectData) {
+  const evalData = projectData.evaluation || {};
+  const title5 = evalData.finalTitle || projectData.finalTitle || projectData.title || "";
+  const lyrics5 = evalData.finalLyrics || projectData.finalLyrics || projectData.finalizedLyrics || "";
+  const style5 = evalData.finalStyle || projectData.finalStyle || projectData.finalizedStyle || "";
+
+  if (title5) {
+    const el = document.getElementById("finalTitleText");
+    if (el) el.textContent = title5;
+  }
+  if (lyrics5) {
+    const el = document.getElementById("finalLyrics");
+    // 저장된 프로젝트/가져온 백업의 내용이므로 HTML로 해석하지 않는다
+    if (el) el.textContent = lyrics5;
+  }
+  if (style5) {
+    const el = document.getElementById("finalStyle");
+    if (el) el.textContent = style5;
+  }
+
+  const bScore = evalData.beforeScore || projectData.beforeScore || "0";
+  const aScore = evalData.afterScore || projectData.afterScore || "0";
+  const comment = evalData.aiComment || projectData.aiComment || "";
+  const grade = evalData.finalGrade || projectData.finalGrade || "-";
+
+  if (typeof window.updateFinalEvaluationUI === "function") {
+    window.updateFinalEvaluationUI(bScore, aScore, comment);
+    const gEl = document.getElementById("finalGrade");
+    if (gEl && grade !== "-") gEl.textContent = grade;
+  } else {
+    const bEl = document.getElementById("beforeScore");
+    const aEl = document.getElementById("afterScore");
+    const cEl = document.getElementById("aiComment");
+    const gEl = document.getElementById("finalGrade");
+    if (bEl) bEl.textContent = bScore;
+    if (aEl) aEl.textContent = aScore;
+    if (cEl) cEl.textContent = comment;
+    if (gEl) gEl.textContent = grade;
+  }
+}
+
 window.restoreStepData = function (step) {
   try {
     window.isRestoringStepData = true;
-    
+
     // 수정 모드일 때는 복원하지 않음 (사용자가 수정 중인 데이터를 보존)
     if (window.editMode && !window.isInitialLoading) {
       console.log(`⏭️ 수정 모드 활성화 중 - ${step}단계 데이터 복원 건너뜀`);
@@ -691,204 +889,26 @@ window.restoreStepData = function (step) {
 
     switch (step) {
       case 1:
-        // 1단계: 가사 작성 + 선택 태그
-        const title1 = window.currentProject?.title || projectData.title || "";
-        if (title1) {
-          const titleEl = document.getElementById("songTitle");
-          if (titleEl) titleEl.value = title1;
-        }
-        if (projectData.originalLyrics) {
-          const lyricsEl = document.getElementById("originalLyrics");
-          if (lyricsEl) lyricsEl.value = projectData.originalLyrics;
-        }
-        if (projectData.manualStylePrompt) {
-          const styleEl = document.getElementById("manualStylePrompt");
-          if (styleEl) styleEl.value = projectData.manualStylePrompt;
-        }
-        if (projectData.step1Tags && typeof projectData.step1Tags === "object" && typeof window.setTagSelections === "function") {
-          const step1Map = {
-            genre: "genreTags",
-            mood: "moodTags",
-            era: "eraTags",
-            theme: "themeTags",
-            perspective: "perspectiveTags",
-            time: "timeTags",
-            special: "specialTags",
-            region: "regionTags",
-          };
-          Object.keys(step1Map).forEach((key) => {
-            if (projectData.step1Tags[key] && Array.isArray(projectData.step1Tags[key])) {
-              window.setTagSelections(step1Map[key], projectData.step1Tags[key]);
-            }
-          });
-        }
+        restoreStep1Data(projectData);
         break;
-
       case 2:
-        // 2단계: 수노 변환 + 선택 태그·템포
-        const title2 = window.currentProject?.title || projectData.title || "";
-        if (title2) {
-          const sunoTitleEl = document.getElementById("sunoTitle");
-          if (sunoTitleEl) sunoTitleEl.value = title2;
-        }
-        if (projectData.sunoLyrics) {
-          const sunoEl = document.getElementById("sunoLyrics");
-          if (sunoEl) {
-            sunoEl.value = projectData.sunoLyrics;
-            if (typeof window.autoResizeTextarea === "function") {
-              requestAnimationFrame(() => window.autoResizeTextarea(sunoEl));
-            }
-          }
-        }
-        if (projectData.stylePrompt) {
-          const stylePromptEl = document.getElementById("stylePrompt");
-          if (stylePromptEl) stylePromptEl.value = projectData.stylePrompt;
-        }
-        if (projectData.step2Tags && typeof projectData.step2Tags === "object" && typeof window.setTagSelections === "function") {
-          const step2Map = {
-            audioFormat: "audioFormatTags",
-            venue: "sunoVenueTags",
-            vocalStyle: "vocalStyle",
-            instruments: "instrumentTags",
-          };
-          Object.keys(step2Map).forEach((key) => {
-            if (projectData.step2Tags[key] && Array.isArray(projectData.step2Tags[key])) {
-              window.setTagSelections(step2Map[key], projectData.step2Tags[key]);
-            }
-          });
-        }
-        if (projectData.tempo) {
-          const tempoSlider = document.getElementById("tempoSlider");
-          const tempoValue = document.getElementById("tempoValue");
-          if (tempoSlider) tempoSlider.value = projectData.tempo;
-          if (tempoValue) tempoValue.textContent = projectData.tempo;
-        }
-        if (projectData.vocalPartAssignments && typeof projectData.vocalPartAssignments === "object") {
-          window.vocalPartAssignments = projectData.vocalPartAssignments;
-          if (typeof window.renderVocalPartAssignments === "function") {
-            window.renderVocalPartAssignments();
-          }
-        }
+        restoreStep2Data(projectData);
         break;
-
       case 3:
-        // 3단계: AI 분석
-        if (projectData.sunoLyrics) {
-          const targetLyrics = document.getElementById("analysisTargetLyrics");
-          if (targetLyrics) targetLyrics.textContent = projectData.sunoLyrics;
-        }
-        if (projectData.stylePrompt) {
-          const targetStyle = document.getElementById("analysisTargetStyle");
-          if (targetStyle) targetStyle.textContent = projectData.stylePrompt;
-        }
-        
-        const analysisData = projectData.analysis || {};
-        if (analysisData.scores || analysisData.feedbacks || analysisData.raw) {
-          const analysisResult = document.getElementById("analysisResult");
-          const analysisLoading = document.getElementById("analysisLoading");
-          if (analysisResult && analysisLoading) {
-            analysisLoading.style.display = "none";
-            analysisResult.style.display = "block";
-
-            if (analysisData.scores) {
-              const s = analysisData.scores;
-              const setScore = (id, val) => {
-                const el = document.getElementById(id);
-                if (el) el.textContent = val || 0;
-              };
-              setScore("overallScore", s.overall || s.overallScore);
-              setScore("lyricsScore", s.lyrics);
-              setScore("styleScore", s.style);
-              setScore("structureScore", s.structure);
-            }
-
-            const feedbacks = analysisData.feedbacks || [];
-            const geminiResult = document.getElementById("geminiAnalysisResult");
-            const geminiCard = document.getElementById("geminiAnalysisCard");
-            if (geminiResult && geminiCard && (feedbacks.length > 0 || analysisData.raw)) {
-              geminiCard.style.display = "block";
-              if (feedbacks.length > 0) {
-                let html = "";
-                feedbacks.forEach(f => {
-                  html += `<div style="margin-bottom:15px;padding:15px;background:var(--bg-input);border-radius:8px;border-left:4px solid var(--accent);">
-                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-                      <span>${f.icon || "💡"}</span>
-                      <h4 style="margin:0;color:var(--text-primary);font-size:1rem;">${f.title || f.category || "피드백"}</h4>
-                    </div>
-                    <p style="margin:0;color:var(--text-secondary);line-height:1.6;font-size:0.9rem;">${escapeHtml(f.suggestion || f.desc || f.text || "")}</p>
-                  </div>`;
-                });
-                geminiResult.innerHTML = html;
-              } else if (analysisData.raw) {
-                geminiResult.innerHTML = `<div style="white-space:pre-wrap;color:var(--text-secondary);line-height:1.8;">${escapeHtml(analysisData.raw)}</div>`;
-              }
-            }
-          }
-        }
+        restoreStep3Data(projectData);
         break;
-
       case 4:
-        // 4단계: 최종 확정
-        const fl4 = projectData.finalizedLyrics || projectData.finalLyrics || "";
-        const fs4 = projectData.finalizedStyle || projectData.finalStyle || "";
-        if (fl4) {
-          const el = document.getElementById("finalizedLyrics");
-          if (el) el.value = fl4;
-        }
-        if (fs4) {
-          const el = document.getElementById("finalizedStyle");
-          if (el) el.value = fs4;
-        }
+        restoreStep4Data(projectData);
         break;
-
       case 5:
-        // 5단계: 최종 출력 & 평가
-        const evalData = projectData.evaluation || {};
-        const title5 = evalData.finalTitle || projectData.finalTitle || projectData.title || "";
-        const lyrics5 = evalData.finalLyrics || projectData.finalLyrics || projectData.finalizedLyrics || "";
-        const style5 = evalData.finalStyle || projectData.finalStyle || projectData.finalizedStyle || "";
-
-        if (title5) {
-          const el = document.getElementById("finalTitleText");
-          if (el) el.textContent = title5;
-        }
-        if (lyrics5) {
-          const el = document.getElementById("finalLyrics");
-          // 저장된 프로젝트/가져온 백업의 내용이므로 HTML로 해석하지 않는다
-          if (el) el.textContent = lyrics5;
-        }
-        if (style5) {
-          const el = document.getElementById("finalStyle");
-          if (el) el.textContent = style5;
-        }
-
-        const bScore = evalData.beforeScore || projectData.beforeScore || "0";
-        const aScore = evalData.afterScore || projectData.afterScore || "0";
-        const comment = evalData.aiComment || projectData.aiComment || "";
-        const grade = evalData.finalGrade || projectData.finalGrade || "-";
-
-        if (typeof window.updateFinalEvaluationUI === "function") {
-          window.updateFinalEvaluationUI(bScore, aScore, comment);
-          const gEl = document.getElementById("finalGrade");
-          if (gEl && grade !== "-") gEl.textContent = grade;
-        } else {
-          const bEl = document.getElementById("beforeScore");
-          const aEl = document.getElementById("afterScore");
-          const cEl = document.getElementById("aiComment");
-          const gEl = document.getElementById("finalGrade");
-          if (bEl) bEl.textContent = bScore;
-          if (aEl) aEl.textContent = aScore;
-          if (cEl) cEl.textContent = comment;
-          if (gEl) gEl.textContent = grade;
-        }
+        restoreStep5Data(projectData);
         break;
-
       case 6:
         // 6단계: 마케팅 & MV
         restoreMarketingMVStepData(projectData);
         break;
     }
-    
+
     // 데이터 복원 완료 후 플래그 해제
     window.isRestoringStepData = false;
     console.log(`✅ ${step}단계 데이터 복원 완료`);
