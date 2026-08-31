@@ -258,10 +258,15 @@
         overlay.style.display = "none";
       }, 150);
     }
+    // Yes/No 버튼 클릭, 배경 클릭, Escape 중 어느 경로로 닫히든
+    // keydown 리스너가 반드시 해제되도록 정리 함수를 한 곳에 모은다.
+    // (이전에는 Escape 경로에서만 해제되어, 버튼으로 닫을 때마다
+    //  document에 keydown 리스너가 영구히 누적되는 누수가 있었음)
     function handleYes(e) {
       if (e) e.preventDefault();
       if (settled) return;
       settled = true;
+      document.removeEventListener("keydown", onKeydown);
       close();
       if (onConfirm) onConfirm();
     }
@@ -269,6 +274,7 @@
       if (e) e.preventDefault();
       if (settled) return;
       settled = true;
+      document.removeEventListener("keydown", onKeydown);
       close();
       if (onCancel) onCancel();
     }
@@ -284,10 +290,7 @@
 
     // Escape 키로 취소
     function onKeydown(e) {
-      if (e.key === "Escape") {
-        document.removeEventListener("keydown", onKeydown);
-        handleCancel();
-      }
+      if (e.key === "Escape") handleCancel();
     }
     document.addEventListener("keydown", onKeydown);
   };
