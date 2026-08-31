@@ -559,7 +559,7 @@ small,
 }
 .theme-dark .tag-btn.active {
   background: var(--accent) !important;
-  color: #ffffff !important;
+  /* 글씨색은 아래 "4-1. 강조 배경 버튼(다크)" 블록에서 일괄 지정 */
   border-color: var(--accent) !important;
 }
 
@@ -2964,6 +2964,28 @@ body:not(.theme-dark) .header-user-role {
 }
 body:not(.theme-dark) #headerUserInfo {
   color: #0f172a !important;
+}
+
+/* ── 4-1. 강조 배경 버튼(다크) → 진한 글씨 ──
+   다크 테마의 --accent(css/main.css의 "Google AI Studio 스타일" 팔레트,
+   #a8c7fa 파스텔 블루)는 밝은 톤이라 흰 글씨와 대비가 거의 나지 않는다.
+   위 라이트 전용 블록만 있고 다크 대응 블록이 빠져 있던 것이 원인 —
+   기존 --bg-primary(다크 배경 톤, 매우 진함) 토큰을 재사용해 보정한다. */
+body.theme-dark .btn-primary,
+body.theme-dark .btn-save,
+body.theme-dark .btn-save-step,
+body.theme-dark .btn-header-icon.active,
+body.theme-dark .btn-edit.active,
+body.theme-dark .custom-tag-btn,
+body.theme-dark .custom-tag-btn-dashed,
+body.theme-dark .auth-tab-btn.active,
+body.theme-dark .admin-tab-btn.active,
+body.theme-dark .tag-btn.active,
+body.theme-dark .step.active,
+body.theme-dark .mode-tab.active,
+body.theme-dark .marketing-tab.active,
+body.theme-dark .btn-save-action:hover {
+  color: var(--bg-primary, #131314) !important;
 }
 
 /* ── 4. 강조 배경 버튼 → 흰 글씨 ── */
