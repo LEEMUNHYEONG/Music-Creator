@@ -99,7 +99,16 @@ async function verifyApprovedUser(req) {
       .get();
     if (!userDoc.exists || !userDoc.data().approved) return null;
     return decoded;
-  } catch {
+  } catch (err) {
+    // 만료/위조된 토큰(err.code가 "auth/"로 시작하는 정상적인 인증 실패)은
+    // 흔히 발생하므로 조용히 무시한다. 그 외(코드에 버그가 있어 발생하는
+    // TypeError 등, err.code가 없는 경우)는 반드시 로그를 남겨야 한다 —
+    // 바로 이 catch가 아무 로그도 남기지 않아 firebase-admin v14 마이그레이션
+    // 누락으로 인증 로직 전체가 하루 가까이 조용히 죽어있던 것을
+    // 아무도 알아채지 못했던 사고가 있었다.
+    if (!err || !String(err.code || "").startsWith("auth/")) {
+      console.error("verifyApprovedUser unexpected error:", err);
+    }
     return null;
   }
 }
