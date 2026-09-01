@@ -108,10 +108,11 @@ addElement("finalStyle", "current style");
 
 require("../js/storage.js");
 
-const storageSource = fs.readFileSync(path.resolve(__dirname, "../js/storage.js"), "utf8");
-// 클라우드 동기화 UI는 index.html 인라인에서 js/cloud-sync-ui.js로 이관됨
+// 클라우드 동기화 UI는 index.html 인라인에서 js/cloud-sync-ui.js로 이관됨.
+// (js/storage.js의 uploadAllLocalToCloud는 이 함수와 완전히 중복이면서
+// 어디서도 호출되지 않던 죽은 코드였기에 정밀 재분석 때 제거했다 -
+// 클라우드 업로드는 아래 doCsUpload 경로가 유일한 실사용 구현이다.)
 const cloudSyncSource = fs.readFileSync(path.resolve(__dirname, "../js/cloud-sync-ui.js"), "utf8");
-assert.ok(storageSource.includes(".collection(\"projects\").doc(docId)"));
 assert.ok(cloudSyncSource.includes(".collection('projects').doc(String(p.id))"));
 
 const saved = window.saveCurrentProject();

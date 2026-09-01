@@ -1169,33 +1169,6 @@ window.copySceneOverviewPromptEn = async function (sceneIndex, event) {
   }
 };
 
-window.copySceneOverviewRunwayPrompt = async function (sceneIndex, event) {
-  try {
-    const enEl = document.getElementById(`scene_overview_${sceneIndex}_runway`);
-    if (!enEl || !enEl.value.trim()) {
-      window.showToast("복사할 비디오 프롬프트가 없습니다.", "error");
-      return;
-    }
-
-    await navigator.clipboard.writeText(enEl.value.trim());
-
-    const btn = event
-      ? event.currentTarget
-      : document.getElementById(`copySceneOverviewRunwayBtn_${sceneIndex}`);
-    if (btn) {
-      const originalHTML = btn.innerHTML;
-      btn.innerHTML = "✅ 복사됨";
-      btn.classList.add("copied");
-      setTimeout(() => {
-        btn.innerHTML = originalHTML;
-        btn.classList.remove("copied");
-      }, 2000);
-    }
-  } catch (error) {
-    console.error("비디오 프롬프트 복사 오류:", error);
-  }
-};
-
 window.regenerateSceneOverviewPrompt = async function (sceneIndex) {
   try {
     if (!window.currentScenes || !window.currentScenes[sceneIndex]) {
@@ -1722,64 +1695,6 @@ window.focusMVPromptTextarea = function (type) {
   }
 };
 
-window.focusMVPromptOverviewTextarea = function (type) {
-  const typeMap = {
-    thumbnail: "mv_thumbnail_en_overview",
-    background: "mv_background_en_overview",
-    character: "mv_character_en_overview",
-  };
-  const id = typeMap[type];
-  if (!id) return;
-  const el = document.getElementById(id);
-  if (el) {
-    el.focus();
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-  }
-};
-
-window.copyMVPromptEnOverview = async function (type, event) {
-  try {
-    const typeMap = {
-      thumbnail: { en: "mv_thumbnail_en_overview", name: "썸네일" },
-      background: { en: "mv_background_en_overview", name: "배경" },
-      character: { en: "mv_character_en_overview", name: "인물" },
-    };
-    const typeInfo = typeMap[type];
-    if (!typeInfo) return;
-    var copyButton =
-      event
-        ? (event.currentTarget || event.target.closest("button"))
-        : document.querySelector(
-            '.copy-mv-overview-btn[data-type="' + type + '"]',
-          );
-
-    const enEl = document.getElementById(typeInfo.en);
-    if (!enEl || !enEl.value.trim()) {
-      window.showToast(typeInfo.name + " 영어 프롬프트가 없습니다.", "error");
-      return;
-    }
-    await navigator.clipboard.writeText(enEl.value.trim());
-    
-    if (copyButton) {
-      if (!copyButton.dataset.originalHTML) {
-        copyButton.dataset.originalHTML = copyButton.innerHTML;
-      }
-      copyButton.innerHTML = '<i class="fas fa-check"></i> 복사됨';
-      copyButton.classList.add("copied");
-      setTimeout(() => {
-        copyButton.innerHTML = copyButton.dataset.originalHTML;
-        copyButton.classList.remove("copied");
-      }, 2000);
-    }
-    if (typeof window.showCopyIndicator === "function") {
-      window.showCopyIndicator(
-        "✅ " + typeInfo.name + " 영어 프롬프트가 클립보드에 복사되었습니다!",
-      );
-    }
-  } catch (err) {
-    console.error("영어 프롬프트 복사 오류:", err);
-  }
-};
 
 // 씬별 개별 프롬프트 섹션의 영어 프롬프트만 복사 (Midjourney용)
 window.copyScenePromptEn = async function (sceneIndex, event) {

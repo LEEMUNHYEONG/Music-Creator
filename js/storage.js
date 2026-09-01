@@ -1053,30 +1053,6 @@ window.importSingleProjectJSONFromText = function (jsonText, options = {}) {
   return project;
 };
 
-window.importSingleProjectJSON = function () {
-  const fileInput = document.createElement("input");
-  fileInput.type = "file";
-  fileInput.accept = ".json,application/json";
-  fileInput.style.display = "none";
-  fileInput.onchange = function (event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function (loadEvent) {
-      try {
-        window.importSingleProjectJSONFromText(loadEvent.target.result);
-      } catch (error) {
-        console.error("단일 프로젝트 가져오기 오류:", error);
-        window.showToast(`단일 프로젝트 가져오기 중 오류가 발생했습니다:\n\n${error.message}`, "error");
-      }
-    };
-    reader.readAsText(file);
-  };
-  document.body.appendChild(fileInput);
-  fileInput.click();
-  document.body.removeChild(fileInput);
-};
-
 /**
  * 프로젝트 정보를 비교하여 더 최신이거나 데이터가 많은 프로젝트를 반환하기 위한 유틸리티
  */
@@ -1928,43 +1904,6 @@ window.downloadSelectedCloudProjects = async function(projectIds) {
 /**
  * 클라우드에 저장된 모든 프로젝트 목록을 가져옵니다. (복원 모달용)
  */
-/**
- * ☁️ 로컬 전체 프로젝트를 클라우드에 일괄 업로드합니다.
- * 다른 기기/계정에서 불러올 수 있도록 사전에 동기화할 때 사용.
- */
-window.uploadAllLocalToCloud = async function() {
-  if (!window.firebaseAuth?.currentUser || !window.firebaseDb) return { ok: false, count: 0 };
-  const uid = window.firebaseAuth.currentUser.uid;
-  const localKey = "musicCreatorProjects";
-  let localProjects = [];
-  try {
-    const stored = localStorage.getItem(localKey);
-    if (stored) {
-      localProjects = JSON.parse(stored);
-      if (!Array.isArray(localProjects)) localProjects = [];
-    }
-  } catch(e) { return { ok: false, count: 0 }; }
-
-  if (localProjects.length === 0) return { ok: true, count: 0 };
-
-  let uploaded = 0;
-  for (const p of localProjects) {
-    if (!p || !p.id) continue;
-    const docId = String(p.id);
-    try {
-      await window.firebaseDb
-        .collection("users").doc(uid)
-        .collection("projects").doc(docId)
-        .set(p, { merge: true });
-      uploaded++;
-    } catch(e) {
-      console.error("☁️ 개별 업로드 실패:", p.id, e);
-    }
-  }
-  console.log(`☁️ 클라우드 일괄 업로드 완료: ${uploaded}/${localProjects.length}개`);
-  return { ok: true, count: uploaded };
-};
-
 window.getAllCloudProjects = async function() {
   if (!window.firebaseAuth?.currentUser || !window.firebaseDb) return [];
   const uid = window.firebaseAuth.currentUser.uid;
@@ -2063,12 +2002,6 @@ window.restoreFromCloudHistory = async function(projectId, historyDocId) {
   }
 };
 
-/**
- * 클라우드 프로젝트를 로컬에 직접 병합하고 즉시 열기 (단일 프로젝트).
- */
-window.openCloudProject = async function(projectId) {
-  const count = await window.downloadSelectedCloudProjects([projectId]);
-  if (count > 0 && typeof window.loadProject === "function") {
-    window.loadProject(projectId);
-  }
-};
+// (openCloudProject 제거됨: js/cloud-sync-ui.js가 클라우드 프로젝트를
+// 열람/복원하는 UI 흐름을 전담하며, 이 함수는 어디서도 호출되지
+// 않던 죽은 코드였다.)
