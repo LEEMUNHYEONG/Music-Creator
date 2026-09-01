@@ -75,6 +75,7 @@ const tests = [
   "tests/mv_auth_flow_smoke.js",
   "tests/mv_admin_panel_smoke.js",
   "tests/mv_cloud_sync_ui_smoke.js",
+  "tests/mv_backup_restore_smoke.js",
 ];
 
 for (const testFile of tests) {
