@@ -1028,6 +1028,23 @@ function scheduleMVSceneHeavyRefresh() {
   }, 400);
 }
 
+// 썸네일/배경/인물 리뷰 textarea 6곳(review_thumbnail_en/ko,
+// review_background_en/ko, review_character_en/ko)이 oninput마다 직접
+// window.saveCurrentProject()를 호출하고 있었다. 이 함수는 앱 전체
+// 상태(모든 씬·프롬프트 포함)를 DOM에서 다시 긁어모아 JSON.stringify한
+// 뒤 localStorage에 쓰는 무거운 작업이라, 텍스트를 한 글자씩 입력할
+// 때마다 실행되면 불필요한 반복 작업이 된다. 인라인 onclick/oninput
+// 속성에서 호출해야 하므로 window에 노출한다.
+let _mvReviewFieldSaveTimer = null;
+window.scheduleMVReviewFieldSave = function () {
+  clearTimeout(_mvReviewFieldSaveTimer);
+  _mvReviewFieldSaveTimer = setTimeout(() => {
+    if (typeof window.saveCurrentProject === "function") {
+      window.saveCurrentProject();
+    }
+  }, 800);
+};
+
 function updateMVReviewOnlyControls(reviewCount) {
   const btn = document.getElementById("mv_scene_quality_review_only_btn");
   const statusEl = document.getElementById("mv_scene_quality_review_only_status");
@@ -1350,11 +1367,11 @@ window.renderMvThumbnailPromptsUI = function (prompts) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
                         <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">통합 프롬프트(EN)</label>
-                        <textarea id="review_thumbnail_en" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${escapeMVTextarea(thumbEn)}</textarea>
+                        <textarea id="review_thumbnail_en" oninput="window.scheduleMVReviewFieldSave()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${escapeMVTextarea(thumbEn)}</textarea>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">한글 번역</label>
-                        <textarea id="review_thumbnail_ko" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${escapeMVTextarea(thumbKo)}</textarea>
+                        <textarea id="review_thumbnail_ko" oninput="window.scheduleMVReviewFieldSave()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${escapeMVTextarea(thumbKo)}</textarea>
                     </div>
                 </div>
             </div>
@@ -1376,11 +1393,11 @@ window.renderMvThumbnailPromptsUI = function (prompts) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
                         <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">통합 프롬프트(EN)</label>
-                        <textarea id="review_background_en" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${escapeMVTextarea(backEn)}</textarea>
+                        <textarea id="review_background_en" oninput="window.scheduleMVReviewFieldSave()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${escapeMVTextarea(backEn)}</textarea>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">한글 번역</label>
-                        <textarea id="review_background_ko" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${escapeMVTextarea(backKo)}</textarea>
+                        <textarea id="review_background_ko" oninput="window.scheduleMVReviewFieldSave()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${escapeMVTextarea(backKo)}</textarea>
                     </div>
                 </div>
             </div>
@@ -1402,11 +1419,11 @@ window.renderMvThumbnailPromptsUI = function (prompts) {
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                     <div>
                         <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">통합 프롬프트(EN)</label>
-                        <textarea id="review_character_en" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${escapeMVTextarea(charEn)}</textarea>
+                        <textarea id="review_character_en" oninput="window.scheduleMVReviewFieldSave()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.85rem; font-family: monospace; resize: vertical;">${escapeMVTextarea(charEn)}</textarea>
                     </div>
                     <div>
                         <label style="display: block; margin-bottom: 5px; color: var(--text-secondary); font-size: 0.75rem;">한글 번역</label>
-                        <textarea id="review_character_ko" oninput="window.saveCurrentProject()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${escapeMVTextarea(charKo)}</textarea>
+                        <textarea id="review_character_ko" oninput="window.scheduleMVReviewFieldSave()" style="width: 100%; min-height: 80px; padding: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); font-size: 0.85rem; resize: vertical;">${escapeMVTextarea(charKo)}</textarea>
                     </div>
                 </div>
             </div>
