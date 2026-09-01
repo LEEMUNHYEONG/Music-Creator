@@ -5087,6 +5087,102 @@ window.sortProjects = function () {
   }
 };
 
+// 공통 터치 드래그 앤 드롭 폴리필
+// HTML5의 dragstart/dragover/drop 이벤트는 모바일 터치에서 발생하지 않으므로,
+// 같은 "핸들을 눌러서 끌면 순서가 바뀐다" 동작을 touchstart/touchmove/touchend로
+// 재현한다. 실제 순서 저장/재초기화는 각 호출부의 onReorderComplete 콜백에 위임한다.
+function enableTouchDragReorder(handle, item, container, itemSelector, onReorderComplete) {
+  if (!handle || !item || !container) return;
+
+  let dragging = false;
+  let startX = 0;
+  let startY = 0;
+  const MOVE_THRESHOLD = 8; // 이 값 미만 이동은 탭(스크롤 시도 등)으로 간주해 드래그로 취급하지 않음
+
+  function clearHighlights() {
+    Array.from(container.querySelectorAll(itemSelector)).forEach((el) =>
+      el.classList.remove("drag-over"),
+    );
+  }
+
+  handle.addEventListener(
+    "touchstart",
+    function (e) {
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+      dragging = false;
+    },
+    { passive: true },
+  );
+
+  handle.addEventListener(
+    "touchmove",
+    function (e) {
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+
+      if (!dragging) {
+        const dx = Math.abs(touch.clientX - startX);
+        const dy = Math.abs(touch.clientY - startY);
+        if (dx < MOVE_THRESHOLD && dy < MOVE_THRESHOLD) return;
+        dragging = true;
+        item.classList.add("dragging");
+      }
+
+      // 드래그가 확정되면 페이지 스크롤 대신 재정렬 동작을 수행
+      e.preventDefault();
+
+      const target = document.elementFromPoint(touch.clientX, touch.clientY);
+      const targetItem =
+        target && target.closest ? target.closest(itemSelector) : null;
+
+      clearHighlights();
+
+      if (
+        targetItem &&
+        targetItem !== item &&
+        container.contains(targetItem)
+      ) {
+        targetItem.classList.add("drag-over");
+        const rect = targetItem.getBoundingClientRect();
+        const insertBefore = touch.clientY < rect.top + rect.height / 2;
+        if (insertBefore) {
+          container.insertBefore(item, targetItem);
+        } else if (targetItem.nextSibling) {
+          container.insertBefore(item, targetItem.nextSibling);
+        } else {
+          container.appendChild(item);
+        }
+      }
+    },
+    { passive: false },
+  );
+
+  function finish() {
+    const wasDragging = dragging;
+    dragging = false;
+    item.classList.remove("dragging");
+    clearHighlights();
+    if (wasDragging && typeof onReorderComplete === "function") {
+      onReorderComplete();
+    }
+  }
+
+  handle.addEventListener("touchend", finish, { passive: true });
+  handle.addEventListener("touchcancel", finish, { passive: true });
+}
+
+// 프로젝트 순서를 저장하고 드래그 앤 드롭을 재초기화한다.
+// (마우스 drop 핸들러와 터치 재정렬 완료 시 공통으로 사용)
+function saveAndReinitProjectOrder() {
+  saveProjectOrder();
+  setTimeout(() => {
+    window.initProjectDragAndDrop();
+  }, 100);
+}
+
 // 프로젝트 목록 드래그 앤 드롭 초기화
 window.initProjectDragAndDrop = function () {
   const projectList = document.getElementById("projectList");
@@ -5203,17 +5299,24 @@ window.initProjectDragAndDrop = function () {
           this.parentNode.insertBefore(draggedElement, this);
         }
 
-        // 프로젝트 순서 저장
-        saveProjectOrder();
-
-        // 드래그 앤 드롭 다시 초기화
-        setTimeout(() => {
-          window.initProjectDragAndDrop();
-        }, 100);
+        // 프로젝트 순서 저장 및 재초기화
+        saveAndReinitProjectOrder();
       }
 
       this.classList.remove("drag-over");
     });
+
+    // 모바일 터치 드래그 지원 (드래그 핸들에서 끌어서 재정렬)
+    const projectDragHandle = item.querySelector(".project-drag-handle");
+    if (projectDragHandle) {
+      enableTouchDragReorder(
+        projectDragHandle,
+        item,
+        projectList,
+        ".project-item",
+        saveAndReinitProjectOrder,
+      );
+    }
   });
 
   // 프로젝트 목록 전체 드롭 영역 허용
@@ -6833,6 +6936,26 @@ function restoreSavedStepOrder(progressSteps, steps) {
   }
 }
 
+// step 순서를 localStorage에 저장하고 사용자에게 알린 뒤 드래그 앤 드롭을 재초기화한다.
+// (마우스 drop 핸들러와 터치 재정렬 완료 시 공통으로 사용)
+function saveAndReinitStepOrder(progressSteps) {
+  const newOrder = Array.from(progressSteps.querySelectorAll(".step")).map(
+    (s) => parseInt(s.getAttribute("data-step")),
+  );
+  localStorage.setItem("stepOrder", JSON.stringify(newOrder));
+
+  console.log("✅ 단계 순서 변경 및 저장 완료:", newOrder);
+
+  if (typeof window.showCopyIndicator === "function") {
+    window.showCopyIndicator("✅ 단계 순서가 저장되었습니다!");
+  }
+
+  // 드래그 앤 드롭 다시 초기화 (이벤트 리스너 재설정)
+  setTimeout(() => {
+    window.initStepDragAndDrop();
+  }, 100);
+}
+
 // 하나의 step 요소에 드래그 앤 드롭 이벤트 리스너 전체(dragstart/dragend/
 // dragover/dragleave/drop)를 붙인다.
 function attachStepDragHandlers(step, currentSteps, progressSteps) {
@@ -6939,25 +7062,15 @@ function attachStepDragHandlers(step, currentSteps, progressSteps) {
     step.classList.remove("drag-over");
     draggedStepElement.classList.remove("dragging");
 
-    // 순서 저장
-    const newOrder = Array.from(progressSteps.querySelectorAll(".step")).map(
-      (s) => parseInt(s.getAttribute("data-step")),
-    );
-    localStorage.setItem("stepOrder", JSON.stringify(newOrder));
-
-    console.log("✅ 단계 순서 변경 및 저장 완료:", newOrder);
-
-    // 사용자 피드백
-    if (typeof window.showCopyIndicator === "function") {
-      window.showCopyIndicator("✅ 단계 순서가 저장되었습니다!");
-    }
-
-    // 드래그 앤 드롭 다시 초기화 (이벤트 리스너 재설정)
-    setTimeout(() => {
-      window.initStepDragAndDrop();
-    }, 100);
+    // 순서 저장 및 재초기화
+    saveAndReinitStepOrder(progressSteps);
 
     draggedStepElement = null;
+  });
+
+  // 모바일 터치 드래그 지원 (드래그 핸들에서 끌어서 재정렬)
+  enableTouchDragReorder(dragHandle, step, progressSteps, ".step", function () {
+    saveAndReinitStepOrder(progressSteps);
   });
 }
 
