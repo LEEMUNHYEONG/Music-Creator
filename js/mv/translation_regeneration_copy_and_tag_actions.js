@@ -467,9 +467,13 @@ ${taskDescription}
             throw new Error("AI 응답에서 JSON 데이터를 찾을 수 없습니다.");
           }
         } else {
-          const errData = await response.json().catch(() => ({}));
-          const detailedError = errData.error?.message || errData.error || response.statusText || "알 수 없는 API 오류";
-          throw new Error(`API 오류: ${response.status} (${detailedError})`);
+          // callGeminiWithAutoRoute는 실패 시 이미 자체적으로 상태 코드가 담긴
+          // 명확한 Error를 던지므로 이 분기는 사실상 도달하지 않는다. 다만
+          // 예외적으로 falsy 값을 반환하는 경우를 대비해 존재하던 방어
+          // 코드였는데, 여기서 없는 response 변수를 참조해(과거 raw fetch를
+          // 쓰던 시절의 잔재) 실제로는 "ReferenceError: response is not
+          // defined"가 나서 진짜 원인을 가리고 있었다.
+          throw new Error("AI 응답이 비어있습니다. 잠시 후 다시 시도해주세요.");
         }
       } catch (aiError) {
         console.warn(`⚠️ ${type} 개별 AI 프롬프트 생성 실패:`, aiError);
@@ -1421,9 +1425,13 @@ ${getMVSceneRegenerationContext(scene, { location, mood, lighting, cameraWork })
           throw new Error("AI 응답에서 JSON 데이터를 찾을 수 없습니다.");
         }
       } else {
-        const errData = await response.json().catch(() => ({}));
-        const detailedError = errData.error?.message || errData.error || response.statusText || "알 수 없는 API 오류";
-        throw new Error(`API 오류: ${response.status} (${detailedError})`);
+        // callGeminiWithAutoRoute는 실패 시 이미 자체적으로 상태 코드가 담긴
+        // 명확한 Error를 던지므로 이 분기는 사실상 도달하지 않는다. 다만
+        // 예외적으로 falsy 값을 반환하는 경우를 대비해 존재하던 방어
+        // 코드였는데, 여기서 없는 response 변수를 참조해(과거 raw fetch를
+        // 쓰던 시절의 잔재) 실제로는 "ReferenceError: response is not
+        // defined"가 나서 진짜 원인을 가리고 있었다.
+        throw new Error("AI 응답이 비어있습니다. 잠시 후 다시 시도해주세요.");
       }
     } else {
       const sceneContext = getMVSceneRegenerationContext(scene, {
@@ -2170,9 +2178,13 @@ ${sceneContext.promptLines || "- 없음"}
           throw new Error("AI 응답이 비어있습니다.");
         }
       } else {
-        const errData = await response.json().catch(() => ({}));
-        const detailedError = errData.error?.message || errData.error || response.statusText || "알 수 없는 API 오류";
-        throw new Error(`API 오류: ${response.status} (${detailedError})`);
+        // callGeminiWithAutoRoute는 실패 시 이미 자체적으로 상태 코드가 담긴
+        // 명확한 Error를 던지므로 이 분기는 사실상 도달하지 않는다. 다만
+        // 예외적으로 falsy 값을 반환하는 경우를 대비해 존재하던 방어
+        // 코드였는데, 여기서 없는 response 변수를 참조해(과거 raw fetch를
+        // 쓰던 시절의 잔재) 실제로는 "ReferenceError: response is not
+        // defined"가 나서 진짜 원인을 가리고 있었다.
+        throw new Error("AI 응답이 비어있습니다. 잠시 후 다시 시도해주세요.");
       }
     } else {
       const sceneContext = getMVSceneRegenerationContext(scene);
