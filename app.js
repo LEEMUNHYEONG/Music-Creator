@@ -5188,7 +5188,21 @@ window.initProjectDragAndDrop = function () {
   const projectList = document.getElementById("projectList");
   if (!projectList) return;
 
-  const projectItems = projectList.querySelectorAll(".project-item");
+  // 드롭 이후 saveAndReinitProjectOrder()가 (목록을 다시 그리지 않고)
+  // 같은 DOM 노드에 대고 이 함수를 다시 호출하는데, 예전에는 여기서
+  // mousedown/dragstart/dragend/click/dragover/dragleave/drop 6종 리스너를
+  // 매번 무조건 다시 addEventListener해서, 드래그로 순서를 여러 번 바꿀
+  // 때마다 아이템당 리스너가 계속 누적됐다(정밀 재분석 중 발견 — 드롭
+  // 핸들러가 중복되면 한 번의 물리적 드롭에서 재초기화가 여러 번 예약돼
+  // 누적이 가속됨). 각 아이템을 깊은 클론으로 교체해 이전 리스너를 전부
+  // 떼어낸 뒤 새로 붙인다.
+  const projectItems = Array.from(
+    projectList.querySelectorAll(".project-item"),
+  ).map((item) => {
+    const fresh = item.cloneNode(true);
+    item.parentNode.replaceChild(fresh, item);
+    return fresh;
+  });
   let draggedElement = null;
 
   projectItems.forEach((item) => {
@@ -5320,9 +5334,15 @@ window.initProjectDragAndDrop = function () {
   });
 
   // 프로젝트 목록 전체 드롭 영역 허용
-  projectList.addEventListener("dragover", function (e) {
-    e.preventDefault();
-  });
+  // projectList 컨테이너 자신은(개별 아이템과 달리) 재초기화 때마다
+  // 교체되지 않으므로, 플래그로 한 번만 등록해 이 리스너도 누적되지
+  // 않게 한다.
+  if (!projectList.__dragDropContainerInited) {
+    projectList.__dragDropContainerInited = true;
+    projectList.addEventListener("dragover", function (e) {
+      e.preventDefault();
+    });
+  }
 };
 
 // 프로젝트 순서 저장
@@ -7092,23 +7112,41 @@ window.initStepDragAndDrop = function () {
   // 저장된 순서 로드
   restoreSavedStepOrder(progressSteps, steps);
 
-  // 현재 steps 가져오기 (순서 복원 후)
-  const currentSteps = Array.from(progressSteps.querySelectorAll(".step"));
+  // 드롭 이후 saveAndReinitStepOrder()가 (다시 그리지 않고) 같은 DOM
+  // 노드에 대고 이 함수를 다시 호출하는데, attachStepDragHandlers가
+  // step 자체(dragover/dragleave/drop)와 핸들(dragstart/dragend/터치)에
+  // 붙이는 리스너들을 예전에는 정리 없이 매번 다시 addEventListener해서
+  // 재정렬을 반복할수록 누적됐다(정밀 재분석 중 발견 — 터치로만 재정렬해도
+  // step에 붙는 dragover/dragleave/drop은 정리된 적이 없었음). 각 step을
+  // 깊은 클론으로 교체해 이전 리스너를 전부 떼어낸 뒤 새로 붙인다.
+  const currentSteps = Array.from(
+    progressSteps.querySelectorAll(".step"),
+  ).map((step) => {
+    const fresh = step.cloneNode(true);
+    step.parentNode.replaceChild(fresh, step);
+    return fresh;
+  });
 
   // 드래그 이벤트 설정
   currentSteps.forEach((step) => {
     attachStepDragHandlers(step, currentSteps, progressSteps);
   });
 
-  // progress-steps 전체 드롭 영역 허용
-  progressSteps.addEventListener("dragover", function (e) {
-    e.preventDefault();
-  });
+  // progress-steps 컨테이너 자신은(개별 step과 달리) 재초기화 때마다
+  // 교체되지 않으므로, 플래그로 한 번만 등록해 이 리스너들도 누적되지
+  // 않게 한다.
+  if (!progressSteps.__dragDropContainerInited) {
+    progressSteps.__dragDropContainerInited = true;
+    // progress-steps 전체 드롭 영역 허용
+    progressSteps.addEventListener("dragover", function (e) {
+      e.preventDefault();
+    });
 
-  progressSteps.addEventListener("drop", function (e) {
-    e.preventDefault();
-    e.stopPropagation();
-  });
+    progressSteps.addEventListener("drop", function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+  }
 };
 
 // 단계 순서 초기화
