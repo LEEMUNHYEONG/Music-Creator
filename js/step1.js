@@ -71,6 +71,20 @@ window.getSelectedTags = getSelectedTags;
 
 // --- Extracted generateAILyrics ---
 window.generateAILyrics = async function () {
+  // 재진입 방지: 이 함수는 다른 AI 생성 함수들(generateStylePromptAI 등)과
+  // 달리 버튼/입력란을 비활성화하지 않아, 응답을 기다리는 동안 다시
+  // 클릭하면(더블클릭, 느린 네트워크에서 조급하게 재클릭 등) 두 번째
+  // 요청이 겹쳐 실행되어 ChatGPT API가 중복 과금되고, 나중에 응답이
+  // 도착한 쪽이 먼저 도착한 결과를 덮어써 화면이 어느 쪽 결과인지도
+  // 알 수 없게 되는 문제가 있었다.
+  if (window.__isGeneratingAILyrics) {
+    window.showToast(
+      "이미 AI 가사를 생성하고 있습니다. 잠시만 기다려주세요.",
+      "info",
+    );
+    return;
+  }
+  window.__isGeneratingAILyrics = true;
   try {
     // 선택된 태그들 수집
     const selectedTags = {
@@ -347,6 +361,8 @@ ${guidelinesSection}
     window.showToast("가사 생성 중 오류가 발생했습니다:\n\n" + error.message, "error");
     const aiLyricsLoading = document.getElementById("aiLyricsLoading");
     if (aiLyricsLoading) aiLyricsLoading.style.display = "none";
+  } finally {
+    window.__isGeneratingAILyrics = false;
   }
 };
 
