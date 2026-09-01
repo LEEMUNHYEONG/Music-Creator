@@ -103,6 +103,14 @@
 
     showBoardWriteForm(true);
     editingPostId = id;
+    // 수정 폼을 열 때는 이전에 다른 글(새 글쓰기 등)에서 선택했다가 제출하지
+    // 않고 남아있을 수 있는 첨부 파일을 항상 초기화한다. showBoardWriteForm은
+    // isEdit=true일 때 이 초기화를 건너뛰므로(기존 이미지 미리보기를 보존하기
+    // 위해), 여기서 명시적으로 다시 초기화하지 않으면 "새 글쓰기에서 이미지
+    // 선택 후 취소 → 다른(이미지가 있는) 글 수정 → 이미지 그대로 두고 저장"
+    // 시나리오에서 관련 없는 이전 파일이 조용히 업로드되어 기존 이미지를
+    // 덮어쓸 수 있었다.
+    selectedFile = null;
 
     document.getElementById("boardNickname").value = data.nickname || "";
     document.getElementById("boardTitle").value = data.title || "";
