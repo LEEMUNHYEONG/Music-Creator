@@ -5679,25 +5679,55 @@ window.handleImport = function (event) {
           }
 
           if (!isUpdate) {
+            // 기존 프로젝트 목록은 최대한 보존한 채로 새 프로젝트를 추가한다.
+            // (이전에는 localStorage.setItem이 실패하면 - 실무에서는 거의
+            // 항상 용량 초과(QuotaExceededError) - catch 블록이
+            // localStorage.setItem("musicCreatorProjects", JSON.stringify([project]))로
+            // 전체 배열을 방금 가져온 프로젝트 1개로 덮어써, 용량이 빠듯한
+            // 상태에서 여러 프로젝트를 복원하면 기존 로컬 프로젝트 전체가
+            // 조용히 사라지는 데이터 손실 버그가 있었다. 대신 이미 검증된
+            // 용량 보호 저장 함수(js/storage.js)로 압축·폴백 저장을 시도하고,
+            // 그래도 실패하면 기존 데이터는 그대로 둔 채 이 프로젝트만
+            // 오류로 집계한다.)
+            let existingProjects = [];
             try {
               const existingData = localStorage.getItem("musicCreatorProjects");
-              const existingProjects = existingData
-                ? JSON.parse(existingData)
-                : [];
-              if (Array.isArray(existingProjects)) {
-                existingProjects.push(project);
+              const parsed = existingData ? JSON.parse(existingData) : [];
+              if (Array.isArray(parsed)) existingProjects = parsed;
+            } catch (err) {
+              console.error("기존 프로젝트 목록 파싱 실패, 빈 목록으로 시작합니다:", err);
+            }
+
+            existingProjects.push(project);
+
+            let saveOk = false;
+            if (typeof window.saveProjectListToLocalStorage === "function") {
+              const result = window.saveProjectListToLocalStorage(
+                "musicCreatorProjects",
+                existingProjects,
+                null,
+              );
+              saveOk = !!result?.ok;
+            } else {
+              try {
                 localStorage.setItem(
                   "musicCreatorProjects",
                   JSON.stringify(existingProjects),
                 );
-                importedCount++;
+                saveOk = true;
+              } catch (err) {
+                saveOk = false;
               }
-            } catch (err) {
-              localStorage.setItem(
-                "musicCreatorProjects",
-                JSON.stringify([project]),
-              );
+            }
+
+            if (saveOk) {
               importedCount++;
+            } else {
+              errorCount++;
+              console.error(
+                "프로젝트 저장 실패(저장 공간 부족 등) - 기존 프로젝트는 보존됩니다:",
+                project.id,
+              );
             }
           }
         } catch (err) {
