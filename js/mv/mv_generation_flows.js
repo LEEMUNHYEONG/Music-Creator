@@ -1764,25 +1764,13 @@ ${customSettings ? `- 추가: ${customSettings}` : ""}
       useAI ? "(AI 생성)" : "(기본 방식)",
     );
 
-    // 썸네일/배경/인물 프롬프트 자동 생성
-    if (typeof window.generateMVThumbnailPrompts === "function") {
-      try {
-        console.log("🎨 썸네일/배경/인물 프롬프트 자동 생성 시작...");
-        await window.generateMVThumbnailPrompts(
-          era,
-          country,
-          location,
-          characters,
-          customSettings,
-          lighting,
-          cameraWork,
-          mood,
-        );
-        console.log("✅ 썸네일/배경/인물 프롬프트 자동 생성 완료");
-      } catch (thumbErr) {
-        console.warn("⚠️ 썸네일 프롬프트 자동 생성 실패:", thumbErr);
-      }
-    }
+    // 썸네일/배경/인물 프롬프트는 위(1715번째 줄 근방)에서 이미
+    // generateMVThumbnailPrompts(...)를 호출해 thumbnailPrompts에 담고
+    // renderMvThumbnailPromptsUI로 렌더링까지 마쳤다. 여기서 같은 인자로
+    // 한 번 더 호출하는 코드가 있었는데, 결과를 버리는 것 외에 하는 일이
+    // 없는 완전한 중복 AI 호출이었다("MV 프롬프트 생성" 버튼 클릭 한 번에
+    // Gemini 썸네일/배경/인물 프롬프트 생성 요청이 두 번 나가 비용과
+    // 지연시간이 두 배가 됨) — 제거.
 
     // [중요] 모든 생성이 완료된 후 즉시 프로젝트 자동 저장 (영속성 확보)
     if (typeof window.saveCurrentProject === "function") {
