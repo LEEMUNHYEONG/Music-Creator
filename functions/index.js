@@ -101,14 +101,40 @@ async function verifyApprovedUser(req) {
     return decoded;
   } catch (err) {
     // 만료/위조된 토큰(err.code가 "auth/"로 시작하는 정상적인 인증 실패)은
-    // 흔히 발생하므로 조용히 무시한다. 그 외(코드에 버그가 있어 발생하는
-    // TypeError 등, err.code가 없는 경우)는 반드시 로그를 남겨야 한다 —
-    // 바로 이 catch가 아무 로그도 남기지 않아 firebase-admin v14 마이그레이션
-    // 누락으로 인증 로직 전체가 하루 가까이 조용히 죽어있던 것을
-    // 아무도 알아채지 못했던 사고가 있었다.
+    // 흔히 발생하므로 조용히 무시하고 null을 반환한다(= "로그인 필요" 401).
+    // 그 외(코드에 버그가 있어 발생하는 TypeError 등, err.code가 없는
+    // 경우)는 반드시 로그를 남기고 그대로 다시 던진다 — 바로 이 catch가
+    // 예전에는 로그도 안 남기고 조용히 null만 반환해, firebase-admin v14
+    // 마이그레이션 누락으로 인증 로직 전체가 하루 가까이 죽어있던 사고를
+    // 아무도 알아채지 못했었다. 던지도록 바꿔서 호출부(requireApprovedUser)가
+    // "정상적으로 로그인 안 됨"(401)과 "서버 코드가 실제로 깨짐"(500)을
+    // 구분해 응답하고, 사용자도 무한 재로그인 대신 정확한 안내를 받게 한다.
     if (!err || !String(err.code || "").startsWith("auth/")) {
       console.error("verifyApprovedUser unexpected error:", err);
+      throw err;
     }
+    return null;
+  }
+}
+
+// 인증 확인 + 실패 시 응답까지 한 번에 처리하는 헬퍼. verifyApprovedUser가
+// 예상된 이유(비로그인/미승인/토큰 만료)로 null을 반환하면 401을,
+// 코드 버그 등 예상 밖의 이유로 예외를 던지면 500을 응답한다. 반환값이
+// null이면 호출부는 이미 응답이 전송됐다는 뜻이므로 곧바로 return해야 한다.
+async function requireApprovedUser(req, res) {
+  try {
+    const user = await verifyApprovedUser(req);
+    if (!user) {
+      res
+        .status(401)
+        .json({ error: "인증이 필요합니다. 로그인 후 이용해 주세요." });
+      return null;
+    }
+    return user;
+  } catch (err) {
+    res.status(500).json({
+      error: "인증 확인 중 서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
+    });
     return null;
   }
 }
@@ -124,12 +150,8 @@ exports.chatProxy = onRequest(
     if (req.method !== "POST")
       return res.status(405).json({ error: "Method not allowed" });
 
-    const user = await verifyApprovedUser(req);
-    if (!user) {
-      return res
-        .status(401)
-        .json({ error: "인증이 필요합니다. 로그인 후 이용해 주세요." });
-    }
+    const user = await requireApprovedUser(req, res);
+    if (!user) return;
 
     if (!(await checkDailyQuota(user.uid))) {
       return res
@@ -195,12 +217,8 @@ exports.geminiProxy = onRequest(
     if (req.method !== "POST")
       return res.status(405).json({ error: "Method not allowed" });
 
-    const user = await verifyApprovedUser(req);
-    if (!user) {
-      return res
-        .status(401)
-        .json({ error: "인증이 필요합니다. 로그인 후 이용해 주세요." });
-    }
+    const user = await requireApprovedUser(req, res);
+    if (!user) return;
 
     if (!(await checkDailyQuota(user.uid))) {
       return res
@@ -297,10 +315,8 @@ exports.adminSetUserDisabled = onRequest({}, async (req, res) => {
   if (req.method !== "POST")
     return res.status(405).json({ error: "Method not allowed" });
 
-  const caller = await verifyApprovedUser(req);
-  if (!caller) {
-    return res.status(401).json({ error: "인증이 필요합니다." });
-  }
+  const caller = await requireApprovedUser(req, res);
+  if (!caller) return;
   // 관리자 판별용 Firestore 조회부터 실제 계정 변경까지를 하나의 try로
   // 묶는다. 예전에는 이 조회만 try/catch 밖에 있어서, verifyApprovedUser를
   // 조용히 무력화시켰던 것과 정확히 같은 클래스의 버그(Admin SDK 호출이

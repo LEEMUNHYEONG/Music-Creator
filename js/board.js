@@ -461,7 +461,15 @@
               window.firebaseStorage.app.options.storageBucket +
               ")",
           );
-          const uploadTask = await imageRef.put(selectedFile);
+          // 게시글 비공개 여부를 이미지 파일의 커스텀 메타데이터에도 함께
+          // 기록해둔다. storage.rules가 이 값을 읽어 비공개 글의 이미지는
+          // 작성자/관리자만 다운로드할 수 있도록 제한한다(정밀 재분석 중
+          // 발견: 예전에는 Storage 읽기 권한이 로그인 여부만 확인해,
+          // 게시글이 비공개여도 이미지 URL만 알면 아무 로그인 사용자나
+          // 열람할 수 있었다).
+          const uploadTask = await imageRef.put(selectedFile, {
+            customMetadata: { isPrivate: String(isPrivate) },
+          });
           console.log("✅ Storage 업로드 완료");
 
           imageUrl = await uploadTask.ref.getDownloadURL();
@@ -485,6 +493,22 @@
                 (storageErr.message || storageErr.code),
             );
           }
+        }
+      } else if (isEditMode && imageUrl) {
+        // 새 이미지를 선택하지 않고 기존 이미지를 그대로 유지하는
+        // 수정이라도, 공개/비공개 설정이 바뀌었을 수 있으므로 기존
+        // Storage 객체의 커스텀 메타데이터도 함께 최신화한다. 이걸 안
+        // 하면 "공개 글 → 비공개로 전환"했을 때 Firestore 글은
+        // 작성자/관리자만 보이지만 이미지 파일 자체는 예전 메타데이터
+        // (isPrivate:false) 그대로 남아 URL만 알면 계속 열람 가능한
+        // 상태가 된다. 실패해도 게시글 저장 자체를 막지는 않는다
+        // (최선 노력 동기화).
+        try {
+          await window.firebaseStorage
+            .refFromURL(imageUrl)
+            .updateMetadata({ customMetadata: { isPrivate: String(isPrivate) } });
+        } catch (metaErr) {
+          console.warn("게시글 이미지의 비공개 메타데이터 동기화 실패:", metaErr);
         }
       }
 

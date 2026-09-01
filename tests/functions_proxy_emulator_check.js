@@ -75,21 +75,63 @@ async function main() {
   const emulator = spawn(
     "npx",
     ["firebase", "emulators:start", "--only", "functions,firestore,auth"],
-    { cwd: projectRoot, stdio: ["ignore", logFd, logFd] },
+    {
+      cwd: projectRoot,
+      stdio: ["ignore", logFd, logFd],
+      // firebase emulators:start는 Firestore(Java)/Auth/Functions 러너 등
+      // 여러 하위 프로세스를 자체적으로 fork한다. detached:true로 이
+      // 프로세스를 새 프로세스 그룹의 리더로 만들어두면, 종료 시
+      // process.kill(-pid, sig)로 그 그룹 전체(하위 프로세스 포함)에
+      // 신호를 보낼 수 있다 — detached 없이는 부모(이 스크립트)와 같은
+      // 그룹에 속해 있어 하위 프로세스만 선택적으로 정리하기 어렵다.
+      detached: true,
+    },
   );
 
   let exitedEarly = false;
+  let exited = false;
   emulator.on("exit", (code) => {
+    exited = true;
     if (code !== 0 && !exitedEarly) {
       exitedEarly = true;
     }
   });
 
+  function waitForExit(timeoutMs) {
+    if (exited) return Promise.resolve(true);
+    return Promise.race([
+      new Promise((resolve) => emulator.once("exit", () => resolve(true))),
+      delay(timeoutMs).then(() => exited),
+    ]);
+  }
+
   async function shutdown() {
-    try {
-      emulator.kill("SIGTERM");
-    } catch {}
-    await delay(500);
+    // 이전에는 SIGTERM 후 무조건 500ms만 기다리고 넘어가서, Firestore
+    // 에뮬레이터(JVM이라 종료가 느릴 수 있음)가 그 안에 다 정리되지
+    // 않으면 포트를 점유한 좀비 프로세스가 남을 수 있었다(정밀 재분석
+    // 중 발견). 실제로 exit 이벤트를 기다리고, 그래도 안 끝나면
+    // SIGKILL로 강제 종료한다.
+    if (!exited) {
+      try {
+        process.kill(-emulator.pid, "SIGTERM");
+      } catch {
+        try {
+          emulator.kill("SIGTERM");
+        } catch {}
+      }
+      const gracefullyExited = await waitForExit(8000);
+      if (!gracefullyExited) {
+        console.warn("⚠️ 에뮬레이터가 SIGTERM으로 8초 내에 종료되지 않아 SIGKILL로 강제 종료합니다.");
+        try {
+          process.kill(-emulator.pid, "SIGKILL");
+        } catch {
+          try {
+            emulator.kill("SIGKILL");
+          } catch {}
+        }
+        await waitForExit(3000);
+      }
+    }
     try {
       fs.closeSync(logFd);
     } catch {}

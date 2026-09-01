@@ -5097,6 +5097,12 @@ function enableTouchDragReorder(handle, item, container, itemSelector, onReorder
   let dragging = false;
   let startX = 0;
   let startY = 0;
+  // 취소(touchcancel) 시 실시간으로 옮겨둔 위치를 원래 자리로 되돌리기
+  // 위해, 드래그가 확정되는 순간의 원래 다음 형제 노드를 기록해 둔다.
+  // (정밀 재분석 중 발견: 예전에는 취소돼도 이미 이동된 위치가 그대로
+  // 저장돼, 전화 수신 등 시스템 인터럽트로 제스처가 끊겨도 사용자가
+  // 의도하지 않은 순서 변경이 조용히 커밋됐다.)
+  let originalNextSibling = null;
   const MOVE_THRESHOLD = 8; // 이 값 미만 이동은 탭(스크롤 시도 등)으로 간주해 드래그로 취급하지 않음
 
   function clearHighlights() {
@@ -5120,7 +5126,14 @@ function enableTouchDragReorder(handle, item, container, itemSelector, onReorder
   handle.addEventListener(
     "touchmove",
     function (e) {
-      if (e.touches.length !== 1) return;
+      if (e.touches.length !== 1) {
+        // 드래그 확정 후에 다른 손가락이 화면에 추가로 닿아도(우발적
+        // 멀티터치), 페이지가 스크롤되며 드래그가 어중간하게 끊기지
+        // 않도록 계속 막는다. 위치 갱신은 손가락이 다시 하나로 돌아올
+        // 때까지 보류한다.
+        if (dragging) e.preventDefault();
+        return;
+      }
       const touch = e.touches[0];
 
       if (!dragging) {
@@ -5128,6 +5141,7 @@ function enableTouchDragReorder(handle, item, container, itemSelector, onReorder
         const dy = Math.abs(touch.clientY - startY);
         if (dx < MOVE_THRESHOLD && dy < MOVE_THRESHOLD) return;
         dragging = true;
+        originalNextSibling = item.nextSibling;
         item.classList.add("dragging");
       }
 
@@ -5160,18 +5174,26 @@ function enableTouchDragReorder(handle, item, container, itemSelector, onReorder
     { passive: false },
   );
 
-  function finish() {
+  function finish(cancelled) {
     const wasDragging = dragging;
     dragging = false;
     item.classList.remove("dragging");
     clearHighlights();
-    if (wasDragging && typeof onReorderComplete === "function") {
+    if (wasDragging && cancelled) {
+      // 시스템 인터럽트 등으로 제스처가 취소되면 저장하지 않고 원래
+      // 위치로 되돌린다. nextSibling이 null이면(원래 마지막 항목이었다면)
+      // insertBefore(item, null)은 appendChild와 동일하게 끝에 붙인다.
+      container.insertBefore(item, originalNextSibling);
+    } else if (wasDragging && typeof onReorderComplete === "function") {
       onReorderComplete();
     }
+    originalNextSibling = null;
   }
 
-  handle.addEventListener("touchend", finish, { passive: true });
-  handle.addEventListener("touchcancel", finish, { passive: true });
+  handle.addEventListener("touchend", () => finish(false), { passive: true });
+  handle.addEventListener("touchcancel", () => finish(true), {
+    passive: true,
+  });
 }
 
 // 프로젝트 순서를 저장하고 드래그 앤 드롭을 재초기화한다.

@@ -185,14 +185,17 @@ window.firebaseDb = {
 
 let nextPutResult = null; // { ok:true, url } 또는 { ok:false, error }
 const storagePutCalls = [];
+const storagePutMetadataCalls = [];
+const storageUpdateMetadataCalls = [];
 window.firebaseStorage = {
   app: { options: { storageBucket: "fake-bucket" } },
   ref() {
     return {
       child(path) {
         return {
-          async put(file) {
+          async put(file, metadata) {
             storagePutCalls.push(path);
+            storagePutMetadataCalls.push(metadata);
             if (nextPutResult && !nextPutResult.ok) throw nextPutResult.error;
             return {
               ref: {
@@ -206,8 +209,13 @@ window.firebaseStorage = {
       },
     };
   },
-  refFromURL() {
-    return { async delete() {} };
+  refFromURL(url) {
+    return {
+      async delete() {},
+      async updateMetadata(metadata) {
+        storageUpdateMetadataCalls.push({ url, metadata });
+      },
+    };
   },
 };
 
@@ -371,11 +379,53 @@ function makeFile({ name = "photo.png", type = "image/png", size = 1024 }) {
   elements.get("boardContent").value = "내용2";
   window.handleBoardImageSelect({ target: { files: [makeFile({ name: "pic.png" })] } });
   storagePutCalls.length = 0;
+  storagePutMetadataCalls.length = 0;
   nextPutResult = { ok: true, url: "https://fake.storage/uploaded.png" };
   await window.submitBoardPost();
   assert.strictEqual(storagePutCalls.length, 1, "Storage 업로드가 호출되어야 함");
   const withImagePost = boardDocs.find((d) => d.data.title === "이미지 있는 글");
   assert.strictEqual(withImagePost.data.imageUrl, "https://fake.storage/uploaded.png");
+  assert.strictEqual(
+    storagePutMetadataCalls[0]?.customMetadata?.isPrivate,
+    "false",
+    "★ 공개 글로 업로드하면 이미지에도 isPrivate:false 메타데이터가 함께 기록되어야 함(비공개 이미지 접근 제어의 기반)",
+  );
+
+  // ═══════════════════════════════════════════════════════════════
+  // 12-1. ★ 비공개 글로 업로드하면 이미지 메타데이터에도 isPrivate:true가
+  //       기록되고, 이후 이미지를 바꾸지 않고 공개로 전환만 해도 기존
+  //       Storage 객체의 메타데이터가 함께 갱신되는지 (정밀 재분석 중
+  //       "게시판 이미지 Storage 읽기 권한이 비공개 여부와 미연동" 발견 후
+  //       추가한 방어)
+  // ═══════════════════════════════════════════════════════════════
+  window.showBoardWriteForm(false);
+  elements.get("boardTitle").value = "비공개 이미지 글";
+  elements.get("boardContent").value = "내용";
+  elements.get("boardIsPrivate").checked = true;
+  window.handleBoardImageSelect({ target: { files: [makeFile({ name: "priv.png" })] } });
+  storagePutMetadataCalls.length = 0;
+  nextPutResult = { ok: true, url: "https://fake.storage/private-uploaded.png" };
+  await window.submitBoardPost();
+  assert.strictEqual(
+    storagePutMetadataCalls[0]?.customMetadata?.isPrivate,
+    "true",
+    "비공개 글로 업로드하면 이미지 메타데이터도 isPrivate:true여야 함",
+  );
+
+  const privateImagePost = boardDocs.find((d) => d.data.title === "비공개 이미지 글");
+  window.currentBoardPostData = { ...privateImagePost.data };
+  window.currentBoardPostId = privateImagePost.id;
+  window.showBoardEditForm(); // 기존 이미지 유지, selectedFile은 초기화됨
+  elements.get("boardIsPrivate").checked = false; // 공개로 전환
+  storageUpdateMetadataCalls.length = 0;
+  await window.submitBoardPost();
+  assert.strictEqual(
+    storageUpdateMetadataCalls.length,
+    1,
+    "새 이미지를 첨부하지 않고 공개/비공개만 바꿔도 기존 이미지의 메타데이터를 동기화해야 함",
+  );
+  assert.strictEqual(storageUpdateMetadataCalls[0].url, "https://fake.storage/private-uploaded.png");
+  assert.strictEqual(storageUpdateMetadataCalls[0].metadata.customMetadata.isPrivate, "false");
 
   // ═══════════════════════════════════════════════════════════════
   // 13. submitBoardPost: Storage 업로드 실패(권한 없음) 오류 메시지
