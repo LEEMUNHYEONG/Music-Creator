@@ -20,6 +20,18 @@ window.currentProject = null;
 window.currentProjectId = null;
 window.editMode = false; // 수정 모드 상태 (false = 읽기 전용, true = 수정 가능)
 
+// 프로젝트가 저장될 수 있는 localStorage 키(현재 + 레거시 이름).
+// 이 정확한 4개짜리 배열이 여러 함수(삭제/복제/필터/내보내기/가져오기 등)에
+// 개별적으로 복붙되어 있었다 - 키를 추가/제거할 때 한 곳만 고치고
+// 다른 곳을 놓치기 쉬운 상태였다. 어느 곳도 이 배열 자체를 변형(push 등)
+// 하지 않으므로 하나의 공유 상수로 안전하게 통합했다.
+const LEGACY_PROJECT_STORAGE_KEYS = [
+  "musicCreatorProjects",
+  "savedProjects",
+  "sunoLyricsHistory",
+  "stylePromptHistory",
+];
+
 // ═══════════════════════════════════════════════════════════════
 // 단계 이동 함수
 // ═══════════════════════════════════════════════════════════════
@@ -5286,12 +5298,7 @@ window.deleteProject = function (projectId) {
   // 프로젝트 정보 찾기 (삭제 확인 메시지에 제목 표시용)
   let projectTitle = "이 프로젝트";
   try {
-    const keys = [
-      "musicCreatorProjects",
-      "savedProjects",
-      "sunoLyricsHistory",
-      "stylePromptHistory",
-    ];
+    const keys = LEGACY_PROJECT_STORAGE_KEYS;
     for (const key of keys) {
       try {
         const data = localStorage.getItem(key);
@@ -5336,12 +5343,7 @@ window.deleteProject = function (projectId) {
 
   try {
     let deleted = false;
-    const keys = [
-      "musicCreatorProjects",
-      "savedProjects",
-      "sunoLyricsHistory",
-      "stylePromptHistory",
-    ];
+    const keys = LEGACY_PROJECT_STORAGE_KEYS;
 
     // 모든 localStorage 키에서 프로젝트 검색 및 삭제
     keys.forEach((key) => {
@@ -5455,12 +5457,7 @@ window.exportAllProjects = function () {
   try {
     // localStorage에서 모든 프로젝트 수집
     let allProjects = [];
-    const keys = [
-      "musicCreatorProjects",
-      "savedProjects",
-      "sunoLyricsHistory",
-      "stylePromptHistory",
-    ];
+    const keys = LEGACY_PROJECT_STORAGE_KEYS;
 
     keys.forEach((key) => {
       try {
@@ -5540,7 +5537,7 @@ window.handleImport = function (event) {
       // 전체 프로그램 백업 형식 처리
       if (importData.backupVersion && importData.projects) {
         isFullBackup = true;
-        const projectKeys = ["musicCreatorProjects", "savedProjects", "sunoLyricsHistory", "stylePromptHistory"];
+        const projectKeys = LEGACY_PROJECT_STORAGE_KEYS;
         projectKeys.forEach(key => {
           if (importData.projects[key] && Array.isArray(importData.projects[key])) {
             projects = projects.concat(importData.projects[key]);
@@ -5617,12 +5614,7 @@ window.handleImport = function (event) {
             project.updatedAt = now;
           }
 
-          const existingKeys = [
-            "musicCreatorProjects",
-            "savedProjects",
-            "sunoLyricsHistory",
-            "stylePromptHistory",
-          ];
+          const existingKeys = LEGACY_PROJECT_STORAGE_KEYS;
 
           let isUpdate = false;
           for (const key of existingKeys) {
@@ -5760,12 +5752,7 @@ window.backupFullProgram = function () {
     };
 
     // 프로젝트 데이터 수집
-    const projectKeys = [
-      "musicCreatorProjects",
-      "savedProjects",
-      "sunoLyricsHistory",
-      "stylePromptHistory",
-    ];
+    const projectKeys = LEGACY_PROJECT_STORAGE_KEYS;
     projectKeys.forEach((key) => {
       try {
         const data = localStorage.getItem(key);
