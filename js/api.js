@@ -48,11 +48,21 @@
     const hasRealLocalOpenAIKey = localOpenAIKey && localOpenAIKey.startsWith("sk-") && !localOpenAIKey.includes("proxy");
     const hasRealLocalGeminiKey = localGeminiKey && localGeminiKey.startsWith("AIza") && !localGeminiKey.includes("proxy");
 
-    // 개인 키를 직접 사용해 브라우저 다이렉트 호출을 의도한 경우: 로그인 여부와 관계없이 nativeFetch 허용
-    if (isOpenAI && hasRealLocalOpenAIKey) {
+    // 개인 키를 직접 사용해 브라우저 다이렉트 호출을 의도한 경우에도
+    // "로그인 + 관리자 승인(approved)"은 반드시 거치도록 한다.
+    // (이전에는 "로그인 여부와 관계없이" 개인 키만 있으면 직접 호출을
+    // 허용했는데, localStorage.setItem('openai_api_key', 'sk-...')를
+    // devtools에서 실행하기만 하면 로그인조차 하지 않은 상태로도 AI
+    // 기능을 쓸 수 있어, 관리자 승인 워크플로우 전체를 완전히
+    // 우회하는 구멍이었다. 개인 키 UI 자체도 관리자만 저장할 수
+    // 있게 되어 있으므로(app.js saveAPIKeys), 정상적으로 키를 가진
+    // 사용자라면 이미 로그인·승인된 상태이니 이 조건이 실사용을
+    // 막지 않는다.)
+    const isApprovedUser = !!(user && window.currentUserData?.approved === true);
+    if (isOpenAI && hasRealLocalOpenAIKey && isApprovedUser) {
       return nativeFetch(input, init);
     }
-    if (isGemini && hasRealLocalGeminiKey) {
+    if (isGemini && hasRealLocalGeminiKey && isApprovedUser) {
       return nativeFetch(input, init);
     }
 
