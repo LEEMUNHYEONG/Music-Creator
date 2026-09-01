@@ -1008,6 +1008,26 @@ function updateMVSceneQualitySummary() {
   applyMVReviewOnlyVisibility();
 }
 
+// updateMVSceneQualitySummary(전체 씬을 순회하며 정규식 기반 중복/금지어/
+// 캐릭터 일관성 검사를 다시 계산)와 refreshMVSceneTimelinePreview(전체
+// 씬 타임라인 HTML을 다시 만들어 DOM을 통째로 교체)는 둘 다 씬 개수에
+// 비례해 무거워진다. 이전에는 씬 편집 필드(장소/감정/시간/가사/장면
+// 설명 등)에 한 글자를 입력할 때마다 이 두 함수가 즉시 다시 실행되어,
+// 씬이 20~30개인 실제 사용 상황에서는 타이핑할 때마다 체감되는 렉이
+// 있었다. 데이터 동기화(scene 객체 갱신, 개별 씬 카드 배지 갱신)는
+// 여전히 즉시 실행하되, 이 "전체 목록 재계산" 두 가지만 타이핑이
+// 멈추고 나서 한 번만 실행되도록 디바운스한다.
+let _mvSceneHeavyRefreshTimer = null;
+function scheduleMVSceneHeavyRefresh() {
+  clearTimeout(_mvSceneHeavyRefreshTimer);
+  _mvSceneHeavyRefreshTimer = setTimeout(() => {
+    updateMVSceneQualitySummary();
+    if (typeof window.refreshMVSceneTimelinePreview === "function") {
+      window.refreshMVSceneTimelinePreview();
+    }
+  }, 400);
+}
+
 function updateMVReviewOnlyControls(reviewCount) {
   const btn = document.getElementById("mv_scene_quality_review_only_btn");
   const statusEl = document.getElementById("mv_scene_quality_review_only_status");
@@ -1241,7 +1261,7 @@ window.updateMVSceneTimelineFromEditor = function (scene, index) {
   }
   updateMVSceneEditorNotice(index, notices);
   updateMVSceneEditorSummary(scene, index);
-  updateMVSceneQualitySummary();
+  scheduleMVSceneHeavyRefresh();
 
   return scene;
 };
@@ -1254,9 +1274,9 @@ window.updateMVSceneEditorPreview = function (sceneIndex) {
       sceneIndex,
     );
   }
-  if (typeof window.refreshMVSceneTimelinePreview === "function") {
-    window.refreshMVSceneTimelinePreview();
-  }
+  // refreshMVSceneTimelinePreview()는 위 updateMVSceneTimelineFromEditor
+  // 안에서 scheduleMVSceneHeavyRefresh()가 이미 예약하므로 여기서 또
+  // 예약할 필요 없다(중복 타이머 낭비만 될 뿐).
 };
 
 function getMVSceneRegenerationContext(scene, fallback = {}) {
@@ -1612,7 +1632,7 @@ window.renderSceneOverview = function (scenesArg) {
           window.currentScenes[index].promptKo = event.target.value;
         }
         updateMVSceneEditorSummary(window.currentScenes[index], index);
-        updateMVSceneQualitySummary();
+        scheduleMVSceneHeavyRefresh();
       };
       field.addEventListener("input", syncEditorSummary);
       field.addEventListener("change", syncEditorSummary);

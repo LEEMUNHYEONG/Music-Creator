@@ -15,6 +15,18 @@ const sceneCards = [];
 const completePrompt =
   "sunrise rooftop music video frame with hopeful vocalist walking toward warm open horizon, golden sunrise backlight, slow crane-up camera movement, photorealistic cinematic detail, emotional performance, 16:9 aspect ratio, sharp focus, detailed lighting, cohesive color palette";
 global.window = global;
+// updateMVSceneQualitySummary/refreshMVSceneTimelinePreview는 이제
+// scheduleMVSceneHeavyRefresh()로 디바운스(400ms)되어 있다(씬이 많을 때
+// 타이핑마다 전체 목록을 다시 계산/렌더링하지 않도록 하는 성능 최적화).
+// 이 테스트는 함수를 직접 호출한 뒤 결과를 동기적으로 검증하는 방식이라,
+// 실제 타이머를 기다리는 대신 setTimeout을 동기 실행 스텁으로 바꿔
+// 디바운스 코드 경로(clearTimeout/setTimeout 자체)는 그대로 타면서도
+// 콜백은 즉시 실행되게 한다.
+global.setTimeout = function (fn) {
+  fn();
+  return 0;
+};
+global.clearTimeout = function () {};
 global.document = {
   getElementById(id) {
     return elements.get(id) || null;
