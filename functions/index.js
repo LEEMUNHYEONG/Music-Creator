@@ -171,8 +171,15 @@ exports.chatProxy = onRequest(
       }
       return res.json(data);
     } catch (err) {
+      // err.message를 그대로 클라이언트에 돌려주면 안 된다 — node-fetch가
+      // 네트워크 레벨 오류(타임아웃/DNS 실패 등)에서 요청 URL을 그대로
+      // 메시지에 포함시키는데, geminiProxy처럼 API 키가 쿼리스트링에 있는
+      // 경로에서는 그 키가 고스란히 노출될 수 있다(정밀 재분석 중 발견).
+      // 상세 내용은 서버 로그로만 남기고 클라이언트에는 고정 메시지만 보낸다.
       console.error("chatProxy error:", err);
-      return res.status(500).json({ error: "서버 내부 오류: " + err.message });
+      return res
+        .status(500)
+        .json({ error: "서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해 주세요." });
     }
   },
 );
@@ -253,8 +260,16 @@ exports.geminiProxy = onRequest(
       }
       return res.json(data);
     } catch (err) {
+      // ★ 보안: err.message를 그대로 노출하면 안 된다. Gemini 요청 URL은
+      // API 키를 쿼리스트링(?key=...)으로 담고 있는데, node-fetch가
+      // 네트워크 레벨 오류(타임아웃/DNS 실패 등)에서 요청 URL을 그대로
+      // 에러 메시지에 포함시키므로, 그걸 그대로 응답에 실어 보내면 공유
+      // Gemini API 키 전체가 클라이언트에 노출된다(정밀 재분석 중 발견).
+      // 상세 내용은 서버 로그로만 남기고 클라이언트에는 고정 메시지만 보낸다.
       console.error("geminiProxy error:", err);
-      return res.status(500).json({ error: "서버 내부 오류: " + err.message });
+      return res
+        .status(500)
+        .json({ error: "서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해 주세요." });
     }
   },
 );
@@ -286,23 +301,28 @@ exports.adminSetUserDisabled = onRequest({}, async (req, res) => {
   if (!caller) {
     return res.status(401).json({ error: "인증이 필요합니다." });
   }
-  const callerDoc = await getFirestore()
-    .collection("users")
-    .doc(caller.uid)
-    .get();
-  if (!callerDoc.exists || callerDoc.data().role !== "admin") {
-    return res.status(403).json({ error: "관리자만 사용할 수 있습니다." });
-  }
-
-  const { uid, disabled } = req.body || {};
-  if (!uid || typeof uid !== "string") {
-    return res.status(400).json({ error: "uid가 필요합니다." });
-  }
-  if (uid === caller.uid) {
-    return res.status(400).json({ error: "자기 자신은 비활성화할 수 없습니다." });
-  }
-
+  // 관리자 판별용 Firestore 조회부터 실제 계정 변경까지를 하나의 try로
+  // 묶는다. 예전에는 이 조회만 try/catch 밖에 있어서, verifyApprovedUser를
+  // 조용히 무력화시켰던 것과 정확히 같은 클래스의 버그(Admin SDK 호출이
+  // 코드 버그로 깨지면 unhandled rejection이 되어 요청이 응답 없이 걸릴
+  // 위험)에 노출돼 있었다(정밀 재분석 중 발견).
   try {
+    const callerDoc = await getFirestore()
+      .collection("users")
+      .doc(caller.uid)
+      .get();
+    if (!callerDoc.exists || callerDoc.data().role !== "admin") {
+      return res.status(403).json({ error: "관리자만 사용할 수 있습니다." });
+    }
+
+    const { uid, disabled } = req.body || {};
+    if (!uid || typeof uid !== "string") {
+      return res.status(400).json({ error: "uid가 필요합니다." });
+    }
+    if (uid === caller.uid) {
+      return res.status(400).json({ error: "자기 자신은 비활성화할 수 없습니다." });
+    }
+
     await getAuth().updateUser(uid, { disabled: disabled !== false });
     await getAuth().revokeRefreshTokens(uid);
     return res.json({ ok: true, uid, disabled: disabled !== false });
