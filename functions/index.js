@@ -6,10 +6,22 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
 const { defineSecret } = require("firebase-functions/params");
-const admin = require("firebase-admin");
+// firebase-admin@13부터 최상위 네임스페이스(admin.firestore()/admin.auth())가
+// 제거되고 모듈형 API(getFirestore()/getAuth())만 남았다. 이 파일은 Node 22/
+// firebase-admin 14 업그레이드 당시 이 API 변경을 반영하지 못한 채
+// `admin.firestore()`/`admin.auth()`를 그대로 호출하고 있었는데, 두 호출부
+// 모두 try/catch로 감싸져 있어 배포 이후 모든 인증된 요청이 "TypeError:
+// admin.auth is not a function"으로 조용히 실패하며 401만 반환했다(로그도
+// 남지 않음) — 실사용자 관점에서는 로그인 여부와 무관하게 AI 생성 기능
+// 전체와 회원 비활성화 기능이 완전히 먹통이었던 셈이다. functions/index.js
+// 테스트를 새로 작성하는 과정에서 로컬 에뮬레이터로 실제 인증된 요청을
+// 재현해보다가 발견했다.
+const { initializeApp } = require("firebase-admin/app");
+const { getFirestore } = require("firebase-admin/firestore");
+const { getAuth } = require("firebase-admin/auth");
 const fetch = require("node-fetch");
 
-admin.initializeApp();
+initializeApp();
 
 // 서울 리전으로 기본 설정
 setGlobalOptions({ region: "asia-northeast3" });
@@ -19,6 +31,16 @@ const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
 
 // ─── CORS 헬퍼 (허용 오리진 화이트리스트) ───────────────────
+// ⚠️ onRequest 옵션에 cors:true(또는 cors 키 자체)를 전달하면
+// firebase-functions v2가 이 핸들러 전체를 npm `cors` 패키지 미들웨어로
+// 감싸버리는데, cors:true는 그 미들웨어의 origin:true(=요청 Origin을
+// 그대로 반사) 모드로 해석된다. 이 미들웨어가 우리 핸들러보다 먼저
+// 실행되며 OPTIONS 프리플라이트까지 가로채 응답해버리므로, 아래
+// setCORSHeaders의 화이트리스트 검사는 실행조차 되지 않고 사실상 모든
+// 오리진에 Access-Control-Allow-Origin이 반사되는 데드 코드였다
+// (테스트 작성 중 실제로 재현해 발견). onRequest 옵션에서 cors 키를
+// 아예 빼야만 firebase-functions가 이 래핑을 건너뛰고 아래 함수가
+// CORS를 전담하게 된다.
 const ALLOWED_ORIGINS = new Set([
   "https://music-creator-app-92d15.web.app",
   "https://music-creator-app-92d15.firebaseapp.com",
@@ -46,12 +68,11 @@ const DAILY_REQUEST_LIMIT = 300; // 사용자당 하루 프록시 호출 상한
 
 async function checkDailyQuota(uid) {
   const day = new Date().toISOString().slice(0, 10);
-  const ref = admin
-    .firestore()
+  const ref = getFirestore()
     .collection("api_usage_daily")
     .doc(`${uid}_${day}`);
   try {
-    return await admin.firestore().runTransaction(async (tx) => {
+    return await getFirestore().runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       const count = (snap.exists ? snap.data().count || 0 : 0) + 1;
       if (count > DAILY_REQUEST_LIMIT) return false;
@@ -71,9 +92,8 @@ async function verifyApprovedUser(req) {
   if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
   const token = authHeader.split("Bearer ")[1];
   try {
-    const decoded = await admin.auth().verifyIdToken(token);
-    const userDoc = await admin
-      .firestore()
+    const decoded = await getAuth().verifyIdToken(token);
+    const userDoc = await getFirestore()
       .collection("users")
       .doc(decoded.uid)
       .get();
@@ -88,7 +108,7 @@ async function verifyApprovedUser(req) {
 // 1) ChatGPT (OpenAI) 프록시 — POST /api/chat
 // ═══════════════════════════════════════════════════════════════
 exports.chatProxy = onRequest(
-  { secrets: [OPENAI_API_KEY], cors: true },
+  { secrets: [OPENAI_API_KEY] },
   async (req, res) => {
     setCORSHeaders(req, res);
     if (req.method === "OPTIONS") return res.status(204).send("");
@@ -152,7 +172,7 @@ exports.chatProxy = onRequest(
 // 2) Gemini (Google AI) 프록시 — POST /api/gemini
 // ═══════════════════════════════════════════════════════════════
 exports.geminiProxy = onRequest(
-  { secrets: [GEMINI_API_KEY], cors: true },
+  { secrets: [GEMINI_API_KEY] },
   async (req, res) => {
     setCORSHeaders(req, res);
     if (req.method === "OPTIONS") return res.status(204).send("");
@@ -233,7 +253,8 @@ exports.geminiProxy = onRequest(
 // ═══════════════════════════════════════════════════════════════
 // 3) 헬스 체크 — GET /api/health
 // ═══════════════════════════════════════════════════════════════
-exports.healthCheck = onRequest({ cors: true }, (req, res) => {
+exports.healthCheck = onRequest({}, (req, res) => {
+  setCORSHeaders(req, res);
   res.json({
     status: "ok",
     service: "Music Creator API Proxy",
@@ -246,7 +267,7 @@ exports.healthCheck = onRequest({ cors: true }, (req, res) => {
 //    (가입 거절 시 Firestore 문서 삭제만으로는 Auth 계정이 남아
 //     로그인·쓰기가 가능하던 문제를 서버에서 차단)
 // ═══════════════════════════════════════════════════════════════
-exports.adminSetUserDisabled = onRequest({ cors: true }, async (req, res) => {
+exports.adminSetUserDisabled = onRequest({}, async (req, res) => {
   setCORSHeaders(req, res);
   if (req.method === "OPTIONS") return res.status(204).send("");
   if (req.method !== "POST")
@@ -256,8 +277,7 @@ exports.adminSetUserDisabled = onRequest({ cors: true }, async (req, res) => {
   if (!caller) {
     return res.status(401).json({ error: "인증이 필요합니다." });
   }
-  const callerDoc = await admin
-    .firestore()
+  const callerDoc = await getFirestore()
     .collection("users")
     .doc(caller.uid)
     .get();
@@ -274,8 +294,8 @@ exports.adminSetUserDisabled = onRequest({ cors: true }, async (req, res) => {
   }
 
   try {
-    await admin.auth().updateUser(uid, { disabled: disabled !== false });
-    await admin.auth().revokeRefreshTokens(uid);
+    await getAuth().updateUser(uid, { disabled: disabled !== false });
+    await getAuth().revokeRefreshTokens(uid);
     return res.json({ ok: true, uid, disabled: disabled !== false });
   } catch (err) {
     console.error("adminSetUserDisabled error:", err);

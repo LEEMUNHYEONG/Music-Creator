@@ -36,3 +36,7 @@ music-creator-react/
 src/
 
 _archive_backup/
+
+# Firebase Functions 로컬 에뮬레이터용 가짜 시크릿 (실제 키 아님, 커밋 금지)
+functions/.secret.local
+*.secret.local
