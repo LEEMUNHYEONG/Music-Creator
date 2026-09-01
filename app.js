@@ -7323,19 +7323,26 @@ window.copySunoLyricsAndStyle = async function () {
     }
   }
   const text = "【가사】\n" + lyrics + "\n\n【스타일】\n" + style;
-  try {
-    navigator.clipboard.writeText(text).then(function () {
+  // navigator.clipboard.writeText()는 Promise를 반환하므로, 클립보드
+  // 권한 거부 등으로 그 Promise가 reject돼도 동기 try/catch로는 절대
+  // 잡히지 않는다 — 아래 catch{}의 "복사 실패" 분기는 사실상 도달 불가능한
+  // 죽은 코드였고, 실패 시 사용자는 성공도 실패도 못 보는 무반응 상태였다
+  // (정밀 재분석 중 발견). Promise 체인에 .catch를 붙여 실제로 실패를
+  // 감지하도록 수정.
+  navigator.clipboard
+    .writeText(text)
+    .then(function () {
       if (typeof window.showCopyIndicator === "function") {
         window.showCopyIndicator(
           "✅ Suno용 가사+스타일이 클립보드에 복사되었습니다",
         );
       }
+    })
+    .catch(function () {
+      if (typeof window.showCopyIndicator === "function") {
+        window.showCopyIndicator("❌ 복사 실패");
+      }
     });
-  } catch (err) {
-    if (typeof window.showCopyIndicator === "function") {
-      window.showCopyIndicator("❌ 복사 실패");
-    }
-  }
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -7383,21 +7390,38 @@ window.duplicateProject = function (projectId) {
     copy.updatedAt = copy.savedAt;
     window.currentProjectId = null;
     window.currentProject = null;
+    // 원시 localStorage.setItem을 직접 호출하면 용량 초과(QuotaExceededError)
+    // 시 그대로 조용히 실패하는데도(빈 catch) 아래에서 무조건 "복제되었습니다"
+    // 성공 토스트를 띄우고 있었다 — 정밀 재분석 중 발견. handleImport와
+    // 동일하게 이미 검증된 용량 보호 저장 함수(js/storage.js)를 사용해,
+    // 두 키 중 하나라도 실제로 저장에 실패하면 정확한 결과를 안내한다.
     var keys = ["musicCreatorProjects", "savedProjects"];
+    var saveOk = true;
     for (var k = 0; k < keys.length; k++) {
       try {
         var raw = localStorage.getItem(keys[k]);
         var arr = raw ? JSON.parse(raw) : [];
         if (!Array.isArray(arr)) arr = [];
         arr.push(copy);
-        localStorage.setItem(keys[k], JSON.stringify(arr));
-      } catch (e) {}
+        if (typeof window.saveProjectListToLocalStorage === "function") {
+          var result = window.saveProjectListToLocalStorage(keys[k], arr, null);
+          if (!result || !result.ok) saveOk = false;
+        } else {
+          localStorage.setItem(keys[k], JSON.stringify(arr));
+        }
+      } catch (e) {
+        saveOk = false;
+      }
     }
     if (typeof window.loadProjectList === "function") {
       window.loadProjectList(true);
     }
     if (typeof window.showCopyIndicator === "function") {
-      window.showCopyIndicator("✅ 프로젝트가 복제되었습니다");
+      window.showCopyIndicator(
+        saveOk
+          ? "✅ 프로젝트가 복제되었습니다"
+          : "⚠️ 저장 공간이 부족해 복제본이 저장되지 못했을 수 있습니다. 프로젝트 목록을 확인해 주세요.",
+      );
     }
   } catch (err) {
     if (typeof window.showCopyIndicator === "function") {
