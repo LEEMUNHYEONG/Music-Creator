@@ -74,6 +74,7 @@ const tests = [
   "tests/mv_clean_midjourney_prompt_smoke.js",
   "tests/mv_auth_flow_smoke.js",
   "tests/mv_admin_panel_smoke.js",
+  "tests/mv_cloud_sync_ui_smoke.js",
 ];
 
 for (const testFile of tests) {
