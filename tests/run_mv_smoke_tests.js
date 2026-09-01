@@ -79,6 +79,8 @@ const tests = [
   "tests/mv_step1_lyrics_flow_smoke.js",
   "tests/mv_step2_transition_flow_smoke.js",
   "tests/mv_step4_finalize_flow_smoke.js",
+  "tests/mv_step3_transition_flow_smoke.js",
+  "tests/mv_step5_tag_selection_smoke.js",
 ];
 
 for (const testFile of tests) {
