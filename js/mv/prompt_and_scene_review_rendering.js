@@ -1426,8 +1426,22 @@ window.renderMvPrompts = function () {
     }
     
     // 결과창(Results) 렌더링 (Silent 모드로 호출하여 화면 이동 방지)
+    // renderMvPrompts는 동기 함수이고 restoreStepData까지 이어지는 호출
+    // 체인 전체가 동기라 await할 수 없다(fire-and-forget). 이전에는
+    // .catch()가 없어 confirmSceneOverviewAndGenerate 내부에서 예외가
+    // 나면(자체 try/catch가 없는 함수라 그대로 전파됨) 아무 안내 없이
+    // unhandled promise rejection으로만 남아, 사용자는 MV 결과 화면이
+    // 왜 비어있는지 알 방법이 없었다.
     if (typeof window.confirmSceneOverviewAndGenerate === "function") {
-      window.confirmSceneOverviewAndGenerate(true);
+      window.confirmSceneOverviewAndGenerate(true).catch((err) => {
+        console.error("MV 결과 화면 복원 중 오류:", err);
+        if (typeof window.showToast === "function") {
+          window.showToast(
+            "MV 결과 화면을 불러오는 중 오류가 발생했습니다: " + err.message,
+            "error",
+          );
+        }
+      });
     }
   }
 };
