@@ -1585,6 +1585,18 @@ window.renderSceneOverview = function (scenesArg) {
       const syncEditorSummary = (event) => {
         const index = Number(event.target?.dataset?.index);
         if (!Number.isInteger(index) || !window.currentScenes?.[index]) return;
+        // 사용자가 직접 편집한 값을 즉시 currentScenes에 반영한다.
+        // (이전에는 이 리스너가 요약 배지만 갱신하고 실제 데이터는 쓰지
+        //  않아, 아래 자동 번역이 실패하거나 한글 필드를 직접 수정한
+        //  경우 편집 내용이 저장 시점에 반영되지 않고 조용히 유실되는
+        //  버그가 있었다. 자동저장/단계이동은 window.currentScenes를
+        //  그대로 읽어 저장하므로, DOM 편집은 이렇게 즉시 동기화되어야
+        //  한다.)
+        if (event.target.classList.contains("scene-overview-en")) {
+          window.currentScenes[index].prompt = event.target.value;
+        } else if (event.target.classList.contains("scene-overview-ko")) {
+          window.currentScenes[index].promptKo = event.target.value;
+        }
         updateMVSceneEditorSummary(window.currentScenes[index], index);
         updateMVSceneQualitySummary();
       };
