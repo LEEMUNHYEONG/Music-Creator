@@ -280,8 +280,14 @@ function handleGoToStepThree() {
 
 window.goToStep = function (step, saveBefore = false, skipValidation = false) {
   try {
-    // 저장이 필요한 경우
-    if (saveBefore && typeof window.saveCurrentProject === "function") {
+    // 단계를 벗어나기 전에는 항상 저장한다. (이전에는 saveBefore=true인
+    // "다음 단계로" 버튼에서만 저장하고, 상단 단계 탭/"이전" 버튼
+    // (saveBefore=false)으로 이동할 때는 저장을 건너뛰었다. 60초 자동저장
+    // 간격보다 빠르게 다른 단계를 눌렀다가 돌아오면 restoreStepData가
+    // 옛 데이터로 방금 입력한 내용을 덮어써 편집 내용이 조용히
+    // 유실되는 데이터 손실 버그가 있었음 - saveBefore 값과 무관하게
+    // 저장하도록 분리했다.)
+    if (window.currentProject && typeof window.saveCurrentProject === "function") {
       window.saveCurrentProject();
     }
 
