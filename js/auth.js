@@ -107,6 +107,19 @@
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   }
 
+  // 예상되는 Firebase Auth 오류(err.code가 "auth/"로 시작)는 사용자
+  // 입력 문제로 흔히 발생하므로 콘솔에 남기지 않고, 그 외(코드 버그로
+  // 발생하는 TypeError 등)만 남긴다. functions/index.js의
+  // verifyApprovedUser에 적용한 것과 동일한 패턴 — 정밀 재분석 중
+  // doSignup/doLogin/doResetPassword의 catch가 이 구분 없이 아무 로그도
+  // 남기지 않아, 실제 코드 버그가 나도 원인 추적이 불가능하다는 점을
+  // 발견해 통일했다.
+  function logUnexpectedAuthError(context, err) {
+    if (!err || !String(err.code || "").startsWith("auth/")) {
+      console.error(`${context} unexpected error:`, err);
+    }
+  }
+
   // ─── 회원 가입 ──────────────────────────────────────────────
   window.doSignup = async function () {
     clearAuthMessage("signupMessage");
@@ -184,6 +197,7 @@
       
       setTimeout(() => showAuthTab("login"), 2000);
     } catch (err) {
+      logUnexpectedAuthError("doSignup", err);
       const msg = getFirebaseErrorMessage(err.code);
       showAuthMessage("signupMessage", "❌ " + msg);
     } finally {
@@ -209,6 +223,7 @@
       await window.firebaseAuth.signInWithEmailAndPassword(email, password);
       // onAuthStateChanged가 상태 처리
     } catch (err) {
+      logUnexpectedAuthError("doLogin", err);
       const msg = getFirebaseErrorMessage(err.code);
       showAuthMessage("loginMessage", "❌ " + msg);
       setButtonLoading("loginBtn", false);
@@ -258,6 +273,7 @@
       await window.firebaseAuth.sendPasswordResetEmail(email);
       window.showToast(`✅ 비밀번호 재설정 이메일을 ${email}로 전송했습니다.`, "success");
     } catch (err) {
+      logUnexpectedAuthError("doResetPassword", err);
       window.showToast("❌ " + getFirebaseErrorMessage(err.code), "error");
     }
   };
@@ -474,8 +490,15 @@
         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
       });
     } catch (err) {
-      // 권한 부족이나 오프라인 상태일 때 과도한 에러 출력 방지
-      // console.debug("📊 API 사용량 로깅 실패 (정상 동작 중):", err.message);
+      // 권한 부족("permission-denied")이나 오프라인("unavailable") 상태는
+      // 흔히 발생하므로 과도한 에러 출력을 막기 위해 조용히 넘어간다.
+      // 다만 이전에는 이 가정을 실제로 err.code로 확인하지 않고 모든
+      // 예외를 무조건 삼켰다 — 이 컬렉션 쓰기가 코드 버그나 규칙 변경으로
+      // 영구히 막혀도 전혀 알 수 없는 구조였다(정밀 재분석 중 발견).
+      // 예상 밖의 코드(위 두 가지가 아닌 경우)만 로그를 남기도록 수정.
+      if (!["permission-denied", "unavailable"].includes(err?.code)) {
+        console.warn("📊 API 사용량 로깅 실패:", err);
+      }
     }
   };
 

@@ -549,7 +549,13 @@
       if (postData.imageUrl) {
         try {
           await window.firebaseStorage.refFromURL(postData.imageUrl).delete();
-        } catch (e) {}
+        } catch (e) {
+          // Firestore 문서 삭제가 주 동작이라 이미지 정리 실패로 사용자
+          // 삭제 자체를 막지는 않지만(의도된 설계), 로그조차 없으면 고아
+          // 이미지가 Storage에 계속 쌓여도(과금 발생) 알 방법이 없었다
+          // (정밀 재분석 중 발견).
+          console.warn("게시글 이미지 삭제 실패(고아 파일로 남을 수 있음):", e);
+        }
       }
       window.showToast("삭제되었습니다.", "success");
       showBoardList();

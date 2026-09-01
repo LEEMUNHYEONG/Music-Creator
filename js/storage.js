@@ -846,11 +846,25 @@ window.copyCurrentMarketingMVDiagnosticsReport = function () {
   const text =
     window.__lastMarketingMVDiagnosticsText ||
     window.buildCurrentMarketingMVRehearsalReport().text;
+  // 실제 복사 결과를 기다리지 않고 무조건 성공 표시를 하고 있었다
+  // (정밀 재분석 중 발견) — 권한 거부 등으로 복사가 실패해도 사용자는
+  // 항상 성공했다고 믿게 됨. Promise 결과에 따라 정확히 안내하도록 수정.
   if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(text).catch(() => {});
-  }
-  if (typeof window.showCopyIndicator === "function") {
-    window.showCopyIndicator("✅ MV 리허설 진단 보고서가 클립보드에 복사되었습니다.");
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        if (typeof window.showCopyIndicator === "function") {
+          window.showCopyIndicator("✅ MV 리허설 진단 보고서가 클립보드에 복사되었습니다.");
+        }
+      })
+      .catch((err) => {
+        console.warn("MV 진단 보고서 클립보드 복사 실패:", err);
+        if (typeof window.showCopyIndicator === "function") {
+          window.showCopyIndicator("❌ 클립보드 복사에 실패했습니다.");
+        }
+      });
+  } else if (typeof window.showCopyIndicator === "function") {
+    window.showCopyIndicator("❌ 이 브라우저에서는 클립보드 복사를 지원하지 않습니다.");
   }
   return text;
 };
@@ -1489,7 +1503,15 @@ window.saveCurrentProject = function () {
                   excess.forEach((id) => batch.delete(historyRef.doc(id)));
                   return batch.commit();
                 });
-              }).catch(() => {});
+              }).catch((historyErr) => {
+                // 이 체인은 바깥 .then() 콜백에서 반환(return)되지 않는
+                // fire-and-forget 스냅샷 기록이라, 여기서 로그를 안 남기면
+                // 바깥의 "☁️ 클라우드 백업 실패" catch(1495행)로도 절대
+                // 전파되지 않아 완전히 무로그로 실패했다(정밀 재분석 중
+                // 발견) — "버전 히스토리 복원" 기능이 조용히 죽을 수 있는
+                // 지점이었다. 최소한 콘솔에는 남기도록 수정.
+                console.warn("☁️ 히스토리 스냅샷 저장 실패:", historyErr);
+              });
             }
           })
           .catch((err) => {

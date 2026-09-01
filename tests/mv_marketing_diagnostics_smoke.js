@@ -331,49 +331,61 @@ assert.strictEqual(
 assert.strictEqual(window.__lastMarketingMVDiagnostics.context, "manual");
 assert.ok(window.__lastMarketingMVDiagnosticsText.includes("MV 실제 프로젝트 리허설 판정"));
 assert.ok(clipboardText.includes("MV 실제 프로젝트 리허설 보고서"));
-assert.ok(toastMessage.includes("클립보드"));
 
-const copied = window.copyCurrentMarketingMVDiagnosticsReport();
-assert.ok(copied.includes("MV 실제 프로젝트 리허설 보고서"));
-let focusedReview = false;
-window.focusMVFirstReviewScene = function focusMVFirstReviewSceneStub() {
-  focusedReview = true;
-  return true;
-};
-assert.strictEqual(window.focusFirstMarketingMVDiagnosticsScene(), true);
-assert.strictEqual(focusedReview, true);
-assert.ok(
-  !elements.get("marketingMVDiagnosticsModal").classList.contains("show"),
-);
+// copyCurrentMarketingMVDiagnosticsReport()가 이제 실제 클립보드 복사
+// 결과(Promise)를 기다린 뒤에만 성공 토스트를 띄우도록 고쳐졌으므로
+// (정밀 재분석 중 "결과를 기다리지 않고 무조건 성공 표시" 버그를 발견해
+// 수정), 목(mock) writeText가 즉시 resolve하더라도 그 완료는 마이크로
+// 태스크 한 틱 뒤에 반영된다. Promise.resolve().then()으로 그 한 틱을
+// 기다린 뒤 나머지 검증을 이어간다.
+Promise.resolve().then(() => {
+  assert.ok(toastMessage.includes("클립보드"));
 
-focusedReview = false;
-delete window.focusMVFirstReviewScene;
-let focusedIndex = null;
-window.focusMVSceneCard = function focusMVSceneCardStub(index) {
-  focusedIndex = index;
-};
-window.openMarketingMVDiagnosticsModal(window.__lastMarketingMVDiagnosticsText);
-assert.strictEqual(window.focusFirstMarketingMVDiagnosticsScene(), true);
-assert.strictEqual(focusedIndex, 0);
+  const copied = window.copyCurrentMarketingMVDiagnosticsReport();
+  assert.ok(copied.includes("MV 실제 프로젝트 리허설 보고서"));
+  let focusedReview = false;
+  window.focusMVFirstReviewScene = function focusMVFirstReviewSceneStub() {
+    focusedReview = true;
+    return true;
+  };
+  assert.strictEqual(window.focusFirstMarketingMVDiagnosticsScene(), true);
+  assert.strictEqual(focusedReview, true);
+  assert.ok(
+    !elements.get("marketingMVDiagnosticsModal").classList.contains("show"),
+  );
 
-window.closeMarketingMVDiagnosticsModal();
-assert.ok(
-  !elements.get("marketingMVDiagnosticsModal").classList.contains("show"),
-);
+  focusedReview = false;
+  delete window.focusMVFirstReviewScene;
+  let focusedIndex = null;
+  window.focusMVSceneCard = function focusMVSceneCardStub(index) {
+    focusedIndex = index;
+  };
+  window.openMarketingMVDiagnosticsModal(window.__lastMarketingMVDiagnosticsText);
+  assert.strictEqual(window.focusFirstMarketingMVDiagnosticsScene(), true);
+  assert.strictEqual(focusedIndex, 0);
 
-const downloaded = window.downloadMarketingMVRehearsalReport();
-assert.ok(
-  /^진단_테스트_프로젝트-mv-rehearsal-report-\d{4}-\d{2}-\d{2}\.txt$/.test(
-    downloaded,
-  ),
-);
-assert.strictEqual(clickedDownload, downloaded);
-assert.strictEqual(appended, true);
-assert.strictEqual(removed, true);
-assert.strictEqual(revokedUrl, "blob:mv-rehearsal-report-test");
-assert.ok(blobText.includes("MV 실제 프로젝트 리허설 보고서"));
-assert.ok(blobText.includes("MV marketing.mv 진단 요약"));
-assert.ok(toastMessage.includes("TXT"));
+  window.closeMarketingMVDiagnosticsModal();
+  assert.ok(
+    !elements.get("marketingMVDiagnosticsModal").classList.contains("show"),
+  );
 
-originalConsole.log("MV marketing diagnostics smoke test: PASS");
-process.exit(0);
+  const downloaded = window.downloadMarketingMVRehearsalReport();
+  assert.ok(
+    /^진단_테스트_프로젝트-mv-rehearsal-report-\d{4}-\d{2}-\d{2}\.txt$/.test(
+      downloaded,
+    ),
+  );
+  assert.strictEqual(clickedDownload, downloaded);
+  assert.strictEqual(appended, true);
+  assert.strictEqual(removed, true);
+  assert.strictEqual(revokedUrl, "blob:mv-rehearsal-report-test");
+  assert.ok(blobText.includes("MV 실제 프로젝트 리허설 보고서"));
+  assert.ok(blobText.includes("MV marketing.mv 진단 요약"));
+  assert.ok(toastMessage.includes("TXT"));
+
+  originalConsole.log("MV marketing diagnostics smoke test: PASS");
+  process.exit(0);
+}).catch((err) => {
+  originalConsole.error(err);
+  process.exit(1);
+});
