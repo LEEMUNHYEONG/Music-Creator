@@ -293,6 +293,66 @@ window.extractLyricsOnly = function (lyrics) {
     .join("\n");
 };
 
+// translateEnglishToKoreanForScene과 translateKoreanToEnglishForScene이
+// 완전히 동일하게 복붙해 갖고 있던 두 부분을 공용 헬퍼로 통합한다
+// (필드별 프롬프트 문구/요구사항/정리 정규식/캐시 사용 여부는 두 방향이
+// 서로 미묘하게 달라 그대로 각자 함수에 남겨두고, 정말 100% 동일했던
+// "API 키 존재 확인"과 "프록시(OpenAI/Gemini) 호출" 부분만 뽑아냈다.
+// 이렇게 하면 이 두 공통 로직을 고칠 때 한쪽에만 반영하고 다른 쪽을
+// 놓치는 사고를 원천적으로 막는다).
+function hasSceneTranslationApiKey() {
+  const openaiKey = (typeof window.getOpenAIApiKey === "function") ? window.getOpenAIApiKey() : (localStorage.getItem("openai_api_key") || "");
+  const geminiKey = (typeof window.getGeminiApiKey === "function") ? window.getGeminiApiKey() : (localStorage.getItem("gemini_api_key") || "");
+  return !!((openaiKey && openaiKey.startsWith("sk-")) || (geminiKey && geminiKey.startsWith("AIza")));
+}
+
+async function callSceneTranslationProxy(prompt) {
+  const token = (window.firebase && window.firebase.auth && window.firebase.auth().currentUser)
+    ? await window.firebase.auth().currentUser.getIdToken()
+    : null;
+
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  // OpenAI 우선 사용 (기본값)
+  let useGemini = false;
+  const selectedAPI = localStorage.getItem("selectedAPI") || "openai";
+  if (selectedAPI === "gemini") useGemini = true;
+
+  if (!useGemini) {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
+        messages: [
+          { role: "system", content: "당신은 번역 전문가입니다. 번역만 출력하세요." },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.3,
+        max_tokens: 1000,
+      }),
+    });
+    if (!response.ok) throw new Error(`OpenAI Proxy 오류: ${response.status}`);
+    const data = await response.json();
+    return data.choices?.[0]?.message?.content || "";
+  } else {
+    const response = await fetch("/api/gemini", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        prompt: prompt,
+        model: (window.getGeminiModel ? window.getGeminiModel() : (window.AI_DEFAULTS && window.AI_DEFAULTS.GEMINI_MODEL) || "gemini-2.5-flash"),
+        temperature: 0.3,
+        maxOutputTokens: 1000,
+      }),
+    });
+    if (!response.ok) throw new Error(`Gemini Proxy 오류: ${response.status}`);
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  }
+}
+
 // --- Extracted translateEnglishToKoreanForScene ---
 const sceneOverviewTranslationCache = {};
 async function translateEnglishToKoreanForScene(fieldName, englishText) {
@@ -306,10 +366,7 @@ async function translateEnglishToKoreanForScene(fieldName, englishText) {
 
   try {
     // 공용 키 또는 개인 키 가져오기 (admin 설정값 포함)
-    const openaiKey = (typeof window.getOpenAIApiKey === "function") ? window.getOpenAIApiKey() : (localStorage.getItem("openai_api_key") || "");
-    const geminiKey = (typeof window.getGeminiApiKey === "function") ? window.getGeminiApiKey() : (localStorage.getItem("gemini_api_key") || "");
-
-    if ((!openaiKey || !openaiKey.startsWith("sk-")) && (!geminiKey || !geminiKey.startsWith("AIza"))) {
+    if (!hasSceneTranslationApiKey()) {
       console.warn("번역 API 키가 없어 번역을 건너뜁니다.");
       return englishText; // 번역 실패 시 원본 반환
     }
@@ -343,50 +400,7 @@ ${englishText}
 
     let translation = "";
     try {
-      const token = (window.firebase && window.firebase.auth && window.firebase.auth().currentUser) 
-        ? await window.firebase.auth().currentUser.getIdToken() 
-        : null;
-      
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      // OpenAI 우선 사용 (기본값)
-      let useGemini = false;
-      const selectedAPI = localStorage.getItem("selectedAPI") || "openai";
-      if (selectedAPI === "gemini") useGemini = true;
-
-      if (!useGemini) {
-        const response = await fetch("/api/chat", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
-            messages: [
-              { role: "system", content: "당신은 번역 전문가입니다. 번역만 출력하세요." },
-              { role: "user", content: prompt },
-            ],
-            temperature: 0.3,
-            max_tokens: 1000,
-          }),
-        });
-        if (!response.ok) throw new Error(`OpenAI Proxy 오류: ${response.status}`);
-        const data = await response.json();
-        translation = data.choices?.[0]?.message?.content || "";
-      } else {
-        const response = await fetch("/api/gemini", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            prompt: prompt,
-            model: (window.getGeminiModel ? window.getGeminiModel() : (window.AI_DEFAULTS && window.AI_DEFAULTS.GEMINI_MODEL) || "gemini-2.5-flash"),
-            temperature: 0.3,
-            maxOutputTokens: 1000,
-          }),
-        });
-        if (!response.ok) throw new Error(`Gemini Proxy 오류: ${response.status}`);
-        const data = await response.json();
-        translation = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      }
+      translation = await callSceneTranslationProxy(prompt);
     } catch (apiErr) {
       console.warn("Proxy 번역 실패, 원본 유지:", apiErr);
       return englishText;
@@ -422,10 +436,7 @@ async function translateKoreanToEnglishForScene(fieldName, koreanText) {
 
   try {
     // 공용 키 또는 개인 키 가져오기 (admin 설정값 포함)
-    const openaiKey = (typeof window.getOpenAIApiKey === "function") ? window.getOpenAIApiKey() : (localStorage.getItem("openai_api_key") || "");
-    const geminiKey = (typeof window.getGeminiApiKey === "function") ? window.getGeminiApiKey() : (localStorage.getItem("gemini_api_key") || "");
-
-    if ((!openaiKey || !openaiKey.startsWith("sk-")) && (!geminiKey || !geminiKey.startsWith("AIza"))) {
+    if (!hasSceneTranslationApiKey()) {
       console.warn("번역 API 키가 없어 번역을 건너뜁니다.");
       return koreanText; // 번역 실패 시 원본 반환
     }
@@ -460,49 +471,7 @@ ${koreanText}
 
     let translation = "";
     try {
-      const token = (window.firebase && window.firebase.auth && window.firebase.auth().currentUser) 
-        ? await window.firebase.auth().currentUser.getIdToken() 
-        : null;
-      
-      const headers = { "Content-Type": "application/json" };
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-
-      let useGemini = false;
-      const selectedAPI = localStorage.getItem("selectedAPI") || "openai";
-      if (selectedAPI === "gemini") useGemini = true;
-
-      if (!useGemini) {
-        const response = await fetch("/api/chat", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            model: (window.getOpenAIModel ? window.getOpenAIModel() : "gpt-4o-mini"),
-            messages: [
-              { role: "system", content: "당신은 번역 전문가입니다. 번역만 출력하세요." },
-              { role: "user", content: prompt },
-            ],
-            temperature: 0.3,
-            max_tokens: 1000,
-          }),
-        });
-        if (!response.ok) throw new Error(`OpenAI Proxy 오류: ${response.status}`);
-        const data = await response.json();
-        translation = data.choices?.[0]?.message?.content || "";
-      } else {
-        const response = await fetch("/api/gemini", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            prompt: prompt,
-            model: (window.getGeminiModel ? window.getGeminiModel() : (window.AI_DEFAULTS && window.AI_DEFAULTS.GEMINI_MODEL) || "gemini-2.5-flash"),
-            temperature: 0.3,
-            maxOutputTokens: 1000,
-          }),
-        });
-        if (!response.ok) throw new Error(`Gemini Proxy 오류: ${response.status}`);
-        const data = await response.json();
-        translation = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      }
+      translation = await callSceneTranslationProxy(prompt);
     } catch (apiErr) {
       console.warn("Proxy 번역 실패, 원본 유지:", apiErr);
       return koreanText;
